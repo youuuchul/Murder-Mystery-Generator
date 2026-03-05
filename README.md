@@ -24,7 +24,7 @@
 | 영역 | 선택 | 비고 |
 |------|------|------|
 | Framework | Next.js 14+ (App Router) | SSR + API Routes 통합 |
-| Language | TypeScript | Zod로 LLM 출력 검증 |
+| Language | TypeScript | 검증 라이브러리(Zod) 활용한 입력/저장 데이터 스키마 검증 |
 | Styling | Tailwind CSS | 모바일 우선 |
 | Storage | 로컬 JSON + SQLite | Phase 1 |
 | 실시간 | SSE (Server-Sent Events) | 카드 배포·이전 알림 |
@@ -98,7 +98,7 @@ Murder-Mystery_Generator/
 
 ## 개발 단계
 
-- **Phase 1** — 코어 루프: Next.js 세팅, 타입 정의, LLM 스토리 생성, 라이브러리 UI
+- **Phase 1** — 코어 루프: Next.js 세팅, 타입 정의, 시나리오 작성 코어 구현, 라이브러리 UI
 - **Phase 2** — 메이커 완성: Step Wizard, 편집기, 카드 미리보기
 - **Phase 3** — 플레이어 경험: 게임 상태 머신, SSE 실시간, 투표
 - **Phase 4** — 퀄리티: PDF 출력, 테마 스킨, 공유

@@ -4,7 +4,7 @@
 
 웹 기반 머더미스터리 보드게임 제작·플레이 플랫폼.
 
-- **메이커**: LLM 보조로 시나리오를 단계별로 구성해 게임 패키지 생성
+- **메이커**: 단계별 편집기로 시나리오를 직접 구성해 게임 패키지 생성
 - **라이브러리**: 저장된 게임 목록 관리 (선택 → 플레이 / 편집 / 삭제)
 - **플레이어**: 생성된 게임을 실제로 진행하는 인터랙티브 세션
 
@@ -21,10 +21,10 @@
   → 난이도 (쉬움/보통/어려움)
   → 분위기 (진지/코믹/공포)
 
-[LLM 생성 단계 — 순서 중요]
-  Step 1. 사건 개요 생성    (범죄 유형, 배경, 동기, 범인)
-  Step 2. 인물 생성         (캐릭터별 배경·비밀·알리바이)
-  Step 3. 단서 카드 생성    (물적 증거, 증언, 현장 단서)
+[콘텐츠 작성 단계 — 순서 중요]
+  Step 1. 사건 개요 작성    (범죄 유형, 배경, 동기, 범인)
+  Step 2. 인물 작성         (캐릭터별 배경·비밀·알리바이)
+  Step 3. 단서 카드 작성    (물적 증거, 증언, 현장 단서)
   Step 4. 오프닝 스크립트  (사건 나레이션)
   Step 5. 라운드 이벤트    (각 라운드에서 공개될 단서/사건)
   Step 6. 엔딩 스크립트    (진실 공개 나레이션)
@@ -152,7 +152,7 @@ data/
       game.json          ← 전체 게임 패키지
       metadata.json      ← 제목/설정/날짜 (목록 조회용 경량 파일)
       assets/
-        characters/      ← AI 생성 캐릭터 이미지 (선택)
+        characters/      ← 캐릭터 이미지 (선택)
         cards/           ← 카드 렌더링 캐시
 ```
 
@@ -185,94 +185,155 @@ SQLite 또는 Supabase로 전환 시:
 
 ## 6. 폴더 구조
 
+> Next.js 14+ App Router 기준. `src/` 루트 컨벤션 + Feature-first 컴포넌트 배치.
+
 ```
 Murder-Mystery_Generator/
-├── app/
-│   ├── page.tsx                    ← 루트 (라이브러리로)
-│   ├── library/
-│   │   └── page.tsx                ← 게임 목록
-│   ├── maker/
-│   │   ├── page.tsx                ← 메이커 홈
-│   │   ├── new/
-│   │   │   └── page.tsx            ← 새 게임 생성 위자드
-│   │   └── [gameId]/
-│   │       └── edit/page.tsx       ← 게임 편집
-│   ├── play/
-│   │   └── [gameId]/
-│   │       ├── page.tsx            ← GM 뷰
-│   │       └── [charId]/
-│   │           └── page.tsx        ← 플레이어 뷰
-│   ├── rulebook/
-│   │   └── page.tsx
-│   └── api/
-│       ├── games/
-│       │   └── route.ts            ← 게임 CRUD
-│       └── generate/
-│           ├── story/route.ts      ← LLM: 사건 생성
-│           ├── characters/route.ts ← LLM: 인물 생성
-│           ├── clues/route.ts      ← LLM: 단서 생성
-│           └── scripts/route.ts   ← LLM: 스크립트 생성
-│
-├── components/
-│   ├── maker/
-│   │   ├── StepWizard.tsx          ← 생성 단계 UI
-│   │   ├── SettingsForm.tsx        ← 기본 설정 폼
-│   │   ├── StoryEditor.tsx         ← 사건 검토/편집
-│   │   ├── CharacterEditor.tsx     ← 인물 검토/편집
-│   │   ├── ClueEditor.tsx          ← 단서 검토/편집
-│   │   └── CardPreview.tsx         ← 카드 미리보기
-│   ├── player/
-│   │   ├── GamePhase.tsx           ← 게임 단계 컨트롤러
-│   │   ├── OpeningScreen.tsx       ← 오프닝 연출
-│   │   ├── RoundView.tsx           ← 라운드 진행
-│   │   ├── VotePanel.tsx           ← 투표 UI
-│   │   └── EndingScreen.tsx        ← 엔딩 연출
-│   └── shared/
-│       ├── CharacterCard.tsx       ← 캐릭터 카드 컴포넌트
-│       ├── ClueCard.tsx            ← 단서 카드 컴포넌트
-│       ├── CardFlip.tsx            ← 카드 뒤집기 애니메이션
-│       └── Rulebook.tsx            ← 룰북 뷰어
-│
-├── lib/
-│   ├── claude.ts                   ← Anthropic API 클라이언트
-│   ├── game-storage.ts             ← 파일 I/O (게임 패키지 저장/로드)
-│   └── game-engine.ts             ← 게임 상태 머신
-│
-├── prompts/
-│   ├── story.ts                    ← 사건 생성 프롬프트
-│   ├── characters.ts               ← 인물 생성 프롬프트
-│   ├── clues.ts                    ← 단서 생성 프롬프트
-│   └── scripts.ts                  ← 스크립트 생성 프롬프트
-│
-├── types/
-│   ├── game.ts                     ← GamePackage 전체 타입
-│   ├── character.ts
-│   └── clue.ts
-│
-├── data/
-│   └── games/                      ← 생성된 게임 패키지 저장소
-│       └── {game-id}/
-│           ├── metadata.json
-│           └── game.json
+├── src/
+│   ├── app/                                   ← Next.js App Router
+│   │   ├── (marketing)/                       ← Route Group (URL 없음)
+│   │   │   └── page.tsx                       ← 랜딩 (라이브러리 리다이렉트)
+│   │   ├── library/
+│   │   │   ├── page.tsx                       ← 게임 목록
+│   │   │   └── _components/                   ← 이 라우트 전용 컴포넌트
+│   │   │       ├── GameCard.tsx
+│   │   │       └── GameGrid.tsx
+│   │   ├── maker/
+│   │   │   ├── page.tsx                       ← 메이커 홈
+│   │   │   ├── new/
+│   │   │   │   ├── page.tsx                   ← 새 게임 생성 위자드
+│   │   │   │   └── _components/
+│   │   │   └── [gameId]/edit/
+│   │   │       └── page.tsx                   ← 기존 게임 편집
+│   │   ├── play/
+│   │   │   └── [gameId]/
+│   │   │       ├── page.tsx                   ← GM 뷰
+│   │   │       └── [charId]/
+│   │   │           └── page.tsx               ← 플레이어 개인 뷰
+│   │   ├── join/[sessionCode]/
+│   │   │   └── page.tsx                       ← 플레이어 입장 (QR 링크)
+│   │   ├── rulebook/
+│   │   │   └── page.tsx
+│   │   └── api/
+│   │       ├── games/
+│   │       │   ├── route.ts                   ← 게임 목록 GET / 생성 POST
+│   │       │   └── [gameId]/route.ts          ← 게임 GET/PUT/DELETE
+│   │       ├── sessions/
+│   │       │   ├── route.ts                   ← 세션 생성 POST
+│   │       │   └── [sessionId]/
+│   │       │       ├── route.ts               ← 세션 상태 GET/PATCH
+│   │       │       ├── events/route.ts        ← SSE 스트림
+│   │       │       └── cards/route.ts         ← 카드 배포·이전
+│   │       └── inventory/route.ts             ← 인벤토리 조회 (SSE fallback)
+│   │
+│   ├── components/
+│   │   ├── maker/                             ← 메이커 전용
+│   │   │   ├── StepWizard.tsx
+│   │   │   ├── SettingsForm.tsx
+│   │   │   ├── StoryEditor.tsx
+│   │   │   ├── CharacterEditor.tsx
+│   │   │   ├── ClueEditor.tsx
+│   │   │   └── CardPreview.tsx
+│   │   ├── player/                            ← 플레이어 전용
+│   │   │   ├── OpeningScreen.tsx
+│   │   │   ├── RoundView.tsx
+│   │   │   ├── VotePanel.tsx
+│   │   │   └── EndingScreen.tsx
+│   │   ├── gm/                               ← GM 대시보드 전용
+│   │   │   ├── GMDashboard.tsx
+│   │   │   ├── CardDistributor.tsx
+│   │   │   └── PlayerInventory.tsx
+│   │   └── ui/                               ← 범용 프리미티브 (shadcn/ui 패턴)
+│   │       ├── Button.tsx
+│   │       ├── Card.tsx
+│   │       ├── CardFlip.tsx                  ← 카드 뒤집기 애니메이션
+│   │       ├── CharacterCard.tsx
+│   │       ├── ClueCard.tsx
+│   │       └── Rulebook.tsx
+│   │
+│   ├── lib/
+│   │   ├── db/
+│   │   │   ├── client.ts                     ← SQLite 연결
+│   │   │   ├── schema.ts                     ← 테이블 정의
+│   │   │   └── migrations/
+│   │   ├── storage/
+│   │   │   └── game-storage.ts               ← 게임 패키지 파일 I/O
+│   │   └── game/
+│   │       ├── engine.ts                     ← 게임 상태 머신
+│   │       └── session.ts                    ← 세션 관리
+│   │
+│   ├── types/
+│   │   ├── game.ts                           ← GamePackage 전체 타입
+│   │   ├── session.ts
+│   │   ├── character.ts
+│   │   └── clue.ts
+│   │
+│   └── hooks/                                ← React 클라이언트 커스텀 훅
+│       ├── useSSE.ts
+│       ├── useInventory.ts
+│       └── useGamePhase.ts
 │
 ├── public/
-│   ├── themes/                     ← 테마별 배경 이미지
-│   └── card-templates/             ← 카드 배경 디자인
+│   ├── images/
+│   │   ├── themes/                           ← 테마별 배경 이미지
+│   │   │   ├── gothic-mansion/
+│   │   │   ├── city-noir/
+│   │   │   └── fantasy/
+│   │   └── ui/                               ← UI 정적 이미지
+│   ├── card-templates/                       ← 카드 배경 SVG/PNG 템플릿
+│   │   ├── character/
+│   │   ├── clue/
+│   │   └── event/
+│   └── fonts/                                ← 커스텀 웹폰트
+│
+├── data/                                     ← 런타임 생성 데이터 (gitignored)
+│   ├── games/{game-id}/
+│   │   ├── game.json                         ← 전체 게임 패키지
+│   │   ├── metadata.json                     ← 목록 조회용 경량 파일
+│   │   └── assets/
+│   │       ├── characters/                   ← 캐릭터 이미지 (외부 생성 포함)
+│   │       └── cards/                        ← 카드 렌더링 캐시
+│   └── sessions/
+
+│       └── sessions.db                       ← SQLite
+│
+├── design/                                   ← 디자인 소스 파일
+│   ├── tokens/
+│   │   └── tokens.json                       ← 색상·타이포 디자인 토큰
+│   ├── card-layouts/                         ← 카드 레이아웃 설계
+│   └── mockups/                              ← Figma 익스포트, 화면 목업
 │
 ├── docs/
-│   └── SPEC.md                     ← 이 문서
+│   ├── SPEC.md                               ← 이 문서
+│   └── ADR/                                  ← Architecture Decision Records
+│       └── 001-sse-vs-websocket.md
 │
-├── ai_history/                     ← 작업 보고서 (자동 생성)
-│
-├── CLAUDE.md                       ← Claude 컨텍스트
-└── package.json
+├── ai_history/                               ← 작업 보고서 (Claude 자동 생성)
+├── CLAUDE.md
+├── README.md
+├── package.json
+├── tsconfig.json
+├── tailwind.config.ts
+└── next.config.ts
 ```
+
+### 폴더 설계 원칙
+
+| 패턴 | 이유 |
+|------|------|
+| `src/` 루트 | Next.js 14+ 공식 권장, 앱 코드와 설정 파일 분리 |
+| Feature-first 컴포넌트 | `maker/`, `player/`, `gm/` — 기능 단위로 그룹화, 도메인 응집도 향상 |
+| Route-level `_components/` | App Router 패턴: 해당 라우트만 쓰는 컴포넌트를 라우트 옆에 배치 |
+| `components/ui/` | 재사용 프리미티브. shadcn/ui 방식으로 직접 소유·수정 가능 |
+| `lib/` 도메인 서브디렉토리 | `ai/`, `db/`, `storage/`, `game/` — 서버 전용 코드 격리 |
+| `public/` vs `data/` | `public/`: 정적 에셋(URL 필요). `data/`: 런타임 생성(gitignored) |
+| `design/` | Figma 익스포트, 디자인 토큰, 목업. 코드와 분리해 관리 |
 
 ---
 
-## 7. LLM 생성 파이프라인
+## 7. 메이커 편집 흐름
 
-### 생성 순서 (의존성 고려)
+### 작성 순서 (의존성 고려)
 
 ```
 settings → story → characters → clues → cards → scripts
@@ -280,12 +341,14 @@ settings → story → characters → clues → cards → scripts
            (필수)  (story 참조)  (chars 참조)
 ```
 
-### API 호출 전략
+각 단계는 이전 단계 결과를 참조. 단계별 폼/에디터로 사용자가 직접 입력하며,
+언제든 이전 단계로 돌아가 수정 가능.
 
-- 각 단계 독립 API route로 분리
-- Streaming 지원 (체감 속도 개선)
-- 출력 포맷: JSON Schema 명시 → Zod로 파싱 검증
-- 실패 시 재생성 버튼 제공 (단계별)
+### 저장 전략
+
+- 각 단계 완료 시 임시 저장 (draft)
+- 최종 저장 시 `game.json`으로 패키징
+- Zod로 폼 입력값 검증 (필수 필드, 타입 체크)
 
 ---
 
@@ -294,13 +357,13 @@ settings → story → characters → clues → cards → scripts
 ### Phase 1 — 코어 루프 검증
 - [ ] Next.js 프로젝트 세팅
 - [ ] 게임 패키지 타입 정의 (TypeScript)
-- [ ] 기본 설정 폼 → LLM 스토리 생성 → JSON 저장
+- [ ] 기본 설정 폼 → 스토리 작성 → JSON 저장
 - [ ] 라이브러리 목록 UI
 - [ ] 기본 플레이어 뷰 (텍스트 기반)
 
 ### Phase 2 — 메이커 완성
 - [ ] Step Wizard UI
-- [ ] 인물/단서/스크립트 생성 & 편집
+- [ ] 인물/단서/스크립트 작성 & 편집기
 - [ ] 카드 미리보기 컴포넌트
 - [ ] 테스트 플레이 모드
 
@@ -499,7 +562,6 @@ WebSocket 대비 SSE를 선택한 이유:
 | Framework | Next.js 14+ (App Router) | SSR + API Routes 통합 |
 | Language | TypeScript | 타입 안전성 (게임 패키지 구조 복잡) |
 | Styling | Tailwind CSS | 빠른 UI 구성 |
-| AI | Anthropic Claude API | 스토리 생성 품질 |
 | Storage | 로컬 JSON (Phase 1) | 빠른 프로토타이핑 |
-| 검증 | Zod | LLM 출력 파싱 안전성 |
+| 검증 | Zod | 폼 입력 유효성 검사 |
 | 패키지 | npm / bun | - |

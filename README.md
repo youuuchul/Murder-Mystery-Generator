@@ -1,55 +1,117 @@
 # Murder Mystery Generator
 
-LLM으로 머더미스터리 시나리오를 생성하고, 오프라인 보드게임 세션을 진행하는 플랫폼입니다.
+머더미스터리 시나리오를 직접 제작하고, 오프라인 보드게임 세션을 진행하는 플랫폼.
 
-LLM-powered platform for generating murder mystery scenarios and running in-person board game sessions.
+> A platform for authoring murder mystery scenarios and running in-person board game sessions.
 
-## Overview (EN)
+---
 
-- Generate murder mystery scenarios with AI assistance
-- Run in-person sessions with GM controls and per-player private information
-- Support scenario/card-based gameplay designed for mobile participants in the same physical space
+## 서비스 개요
 
-## 프로젝트 문서
+| 모드 | 기기 | 기능 |
+|------|------|------|
+| **메이커** | PC/노트북 | 시나리오·캐릭터·단서 직접 작성·편집·저장 |
+| **라이브러리** | PC/노트북 | 게임 목록 관리, 세션 시작 |
+| **GM** | PC/노트북 | 게임 진행 제어, 카드 배포, 전체 상태 감시 |
+| **플레이어** | 모바일 | 캐릭터 배경, 인벤토리, 카드 열람·건네주기 |
 
-- 서비스 컨텍스트: `CLAUDE.md`
-- 상세 명세: `docs/SPEC.md`
-- 작업 기록: `ai_history/`
+플레이어들이 **같은 공간에 모여** 각자 모바일로 접속, GM이 노트북에서 세션을 진행하는 오프라인 방식입니다.
 
-## Documentation (EN)
+---
 
-- Project context: `CLAUDE.md`
-- Full specification: `docs/SPEC.md`
-- Work logs: `ai_history/`
+## 기술 스택
 
-## 현재 상태
+| 영역 | 선택 | 비고 |
+|------|------|------|
+| Framework | Next.js 14+ (App Router) | SSR + API Routes 통합 |
+| Language | TypeScript | Zod로 LLM 출력 검증 |
+| Styling | Tailwind CSS | 모바일 우선 |
+| Storage | 로컬 JSON + SQLite | Phase 1 |
+| 실시간 | SSE (Server-Sent Events) | 카드 배포·이전 알림 |
+| 패키지 | npm | — |
 
-- 현재는 기획/명세 중심 초기 단계입니다.
-- 앱 구현 구조와 데이터 모델 초안은 `docs/SPEC.md`에 정의되어 있습니다.
+---
 
-## Status (EN)
+## 폴더 구조
 
-- The project is currently in the planning/specification stage.
-- Initial app architecture and data model drafts are documented in `docs/SPEC.md`.
+```
+Murder-Mystery_Generator/
+├── src/
+│   ├── app/                          # Next.js App Router
+│   │   ├── (marketing)/              # 랜딩 페이지 (URL 없는 Route Group)
+│   │   ├── library/                  # 게임 목록
+│   │   │   └── _components/          # 이 라우트 전용 컴포넌트
+│   │   ├── maker/                    # 게임 생성 위자드
+│   │   │   ├── new/
+│   │   │   └── [gameId]/edit/
+│   │   ├── play/
+│   │   │   └── [gameId]/
+│   │   │       └── [charId]/         # 플레이어 개인 뷰
+│   │   ├── join/[sessionCode]/       # 플레이어 입장
+│   │   ├── rulebook/
+│   │   └── api/
+│   │       ├── games/                # 게임 CRUD
+│   │       ├── sessions/[sessionId]/ # 세션 관리 + SSE (/events)
+│   │       └── inventory/            # 인벤토리 조회 (SSE fallback)
+│   │
+│   ├── components/
+│   │   ├── maker/                    # 메이커 UI (StepWizard, SettingsForm, ...)
+│   │   ├── player/                   # 플레이어 UI (OpeningScreen, RoundView, ...)
+│   │   ├── gm/                       # GM 대시보드 UI
+│   │   └── ui/                       # 범용 프리미티브 (Button, Card, CardFlip, ...)
+│   │
+│   ├── lib/
+│   │   ├── db/                       # SQLite 연결 + 스키마 + 마이그레이션
+│   │   ├── storage/                  # 게임 패키지 파일 I/O
+│   │   └── game/                     # 게임 상태 머신, 세션 관리
+│   │
+│   ├── types/                        # TypeScript 타입 (game/session/character/clue)
+│   └── hooks/                        # React 커스텀 훅 (useSSE, useInventory, ...)
+│
+├── public/
+│   ├── images/
+│   │   ├── themes/                   # 테마별 배경 이미지 (gothic-mansion, city-noir, ...)
+│   │   └── ui/                       # UI용 정적 이미지
+│   ├── card-templates/               # 카드 배경 SVG/PNG 템플릿 (character/clue/event)
+│   └── fonts/                        # 커스텀 웹폰트
+│
+├── data/                             # 런타임 생성 데이터 (gitignored)
+│   ├── games/{game-id}/              # 게임 패키지 JSON + AI 생성 이미지
+│   └── sessions/sessions.db          # SQLite (세션 상태)
+│
+├── design/                           # 디자인 소스
+│   ├── tokens/tokens.json            # 색상·타이포 디자인 토큰
+│   ├── card-layouts/                 # 카드 레이아웃 설계 파일
+│   └── mockups/                      # Figma 익스포트, 화면 목업
+│
+├── docs/
+│   ├── SPEC.md                       # 서비스 전체 명세
+│   └── ADR/                          # Architecture Decision Records
+│
+├── ai_history/                       # 작업 보고서 (Claude 자동 생성)
+├── CLAUDE.md
+├── README.md
+└── package.json
+```
+
+---
+
+## 개발 단계
+
+- **Phase 1** — 코어 루프: Next.js 세팅, 타입 정의, LLM 스토리 생성, 라이브러리 UI
+- **Phase 2** — 메이커 완성: Step Wizard, 편집기, 카드 미리보기
+- **Phase 3** — 플레이어 경험: 게임 상태 머신, SSE 실시간, 투표
+- **Phase 4** — 퀄리티: PDF 출력, 테마 스킨, 공유
+
+> 현재 상태: Phase 1 진입 전 (기획·명세 완료)
+
+---
+
+## 문서
+
+- 상세 명세: [`docs/SPEC.md`](docs/SPEC.md)
+- 작업 기록: [`ai_history/`](ai_history/)
 
 ## 라이선스
 
-이 프로젝트는 커스텀 제한 라이선스를 따릅니다.
-
-- 소스코드 수정 금지
-- 소스코드 재배포 금지
-- 상업적 이용 금지
-- 시나리오/스토리 콘텐츠는 각 제작자에게 저작권이 있으며, 해당 콘텐츠의 상업적 재생산·이용은 금지
-
-자세한 조항은 `LICENSE` 파일을 확인하세요.
-
-## License Summary (EN)
-
-This project uses a custom restrictive license.
-
-- No source code modification
-- No source code redistribution
-- No commercial use
-- Scenario/story content remains copyrighted by each creator, and commercial reproduction/use is prohibited
-
-See `LICENSE` for full terms.
+커스텀 제한 라이선스 — 수정·재배포·상업적 이용 금지. 자세한 조항은 [`LICENSE`](LICENSE) 참조.

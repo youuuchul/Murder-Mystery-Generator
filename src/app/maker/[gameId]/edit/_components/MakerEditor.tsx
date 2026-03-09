@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
+import SettingsEditor from "./SettingsEditor";
 import StoryEditor from "./StoryEditor";
 import PlayerEditor from "./PlayerEditor";
 import LocationEditor from "./LocationEditor";
@@ -17,8 +18,9 @@ const STEP_COUNT = 5;
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [game, setGame] = useState<GamePackage>(initialGame);
-  const [currentStep, setCurrentStep] = useState(2);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set([1]));
+  const [currentStep, setCurrentStep] = useState(1);
+  // 편집 모드: 모든 스텝이 완료된 것으로 처리 (자유 이동)
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
@@ -56,9 +58,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         <StepWizard
           currentStep={currentStep}
           completedSteps={completedSteps}
-          onStepClick={(step) => {
-            if (completedSteps.has(step) || step <= currentStep) setCurrentStep(step);
-          }}
+          onStepClick={(step) => setCurrentStep(step)}
+          allClickable
         />
       </div>
 
@@ -66,10 +67,12 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
 
       <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
         {currentStep === 1 && (
-          <div className="text-center py-12 text-dark-400">
-            <p>기본 설정은 새 게임 만들기에서만 수정할 수 있습니다.</p>
-            <p className="text-sm mt-1">Step 2부터 편집을 진행하세요.</p>
-          </div>
+          <SettingsEditor
+            game={game}
+            onChange={updateGame}
+            onSave={() => save({ ...game })}
+            saving={saving}
+          />
         )}
         {currentStep === 2 && (
           <StoryEditor

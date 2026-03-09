@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import type { Location, Clue, GameRules, Player } from "@/types/game";
+import type { Location, Clue, GameRules, Player, ClueCondition, ClueConditionType } from "@/types/game";
 
 interface LocationEditorProps {
   locations: Location[];
@@ -48,11 +48,170 @@ function createClue(locationId: string): Clue {
   };
 }
 
+const CONDITION_TYPE_LABELS: Record<ClueConditionType, string> = {
+  has_items: "내 아이템 보유 — 내가 지정 단서를 현재 인벤토리에 보유",
+  character_has_item: "특정 캐릭터 보유 — 특정 캐릭터가 지정 단서를 현재 보유",
+};
+
+/** 조건 설정 폼 — 단서/장소에서 공용 */
+function ConditionForm({
+  label,
+  condition,
+  onChange,
+  allClues,
+  allCharacters,
+  excludeClueId,
+}: {
+  label: string;
+  condition: ClueCondition | undefined;
+  onChange: (c: ClueCondition | undefined) => void;
+  allClues: Clue[];
+  allCharacters: Player[];
+  excludeClueId?: string;
+}) {
+  const enabled = condition !== undefined;
+
+  function toggle() {
+    onChange(enabled ? undefined : { type: "has_items", requiredClueIds: [], hint: "" });
+  }
+
+  function update<K extends keyof ClueCondition>(key: K, value: ClueCondition[K]) {
+    if (!condition) return;
+    onChange({ ...condition, [key]: value });
+  }
+
+  const selectableClues = allClues.filter((c) => c.id !== excludeClueId);
+  const needsTarget = condition?.type === "character_has_item";
+
+  return (
+    <div className="border border-dark-700 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-3 py-2 bg-dark-800/30 hover:bg-dark-800/50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{enabled ? "🔐" : "🔓"}</span>
+          <span className="text-xs font-medium text-dark-400">
+            {label}: {enabled ? "조건 설정됨" : "조건 없음 (자유 접근)"}
+          </span>
+        </div>
+        <span className="text-xs text-mystery-500 hover:text-mystery-300 shrink-0 ml-2">
+          {enabled ? "조건 제거" : "+ 조건 추가"}
+        </span>
+      </button>
+
+      {enabled && condition && (
+        <div className="px-3 pb-3 pt-3 space-y-3 border-t border-dark-700">
+          {/* 조건 유형 */}
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">조건 유형</label>
+            <select
+              value={condition.type}
+              onChange={(e) => {
+                const t = e.target.value as ClueConditionType;
+                onChange({
+                  ...condition,
+                  type: t,
+                  targetCharacterId: t === "character_has_item" ? condition.targetCharacterId : undefined,
+                });
+              }}
+              className={inputClass}
+            >
+              {(Object.keys(CONDITION_TYPE_LABELS) as ClueConditionType[]).map((t) => (
+                <option key={t} value={t}>{CONDITION_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 필요 아이템 */}
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">
+              필요 단서/아이템
+              <span className="text-dark-600 ml-1">(복수 선택 가능)</span>
+            </label>
+            {selectableClues.length === 0 ? (
+              <p className="text-xs text-dark-700 py-2 px-2">
+                선택 가능한 단서가 없습니다. 다른 단서를 먼저 추가하세요.
+              </p>
+            ) : (
+              <div className="space-y-1 max-h-36 overflow-y-auto bg-dark-800/40 rounded-lg p-2">
+                {selectableClues.map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded hover:bg-dark-700/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={condition.requiredClueIds.includes(c.id)}
+                      onChange={(e) => {
+                        const ids = e.target.checked
+                          ? [...condition.requiredClueIds, c.id]
+                          : condition.requiredClueIds.filter((id) => id !== c.id);
+                        update("requiredClueIds", ids);
+                      }}
+                      className="accent-mystery-500 w-3.5 h-3.5 shrink-0"
+                    />
+                    <span className="text-xs text-dark-300">
+                      {c.title || "(제목 없음)"}
+                      <span className="text-dark-600 ml-1">[{c.type}]</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {condition.requiredClueIds.length > 0 && (
+              <p className="text-xs text-mystery-500 mt-1">{condition.requiredClueIds.length}개 필요</p>
+            )}
+          </div>
+
+          {/* 대상 캐릭터 (character_has_item만) */}
+          {needsTarget && (
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">
+                아이템을 보유해야 할 캐릭터
+              </label>
+              <select
+                value={condition.targetCharacterId ?? ""}
+                onChange={(e) => update("targetCharacterId", e.target.value || undefined)}
+                className={inputClass}
+              >
+                <option value="">— 선택 —</option>
+                {allCharacters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || "(이름 없음)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 힌트 */}
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">
+              플레이어 힌트
+              <span className="text-dark-600 ml-1">(잠금 상태일 때 표시)</span>
+            </label>
+            <input
+              type="text"
+              value={condition.hint ?? ""}
+              onChange={(e) => update("hint", e.target.value)}
+              placeholder="예: 열쇠를 누군가에게 건네야 합니다"
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 장소 1개 + 해당 장소의 단서 카드들 */
 function LocationBlock({
   location,
   clues,
   allLocations,
+  allClues,
   allCharacters,
   onChangeLocation,
   onDeleteLocation,
@@ -63,6 +222,7 @@ function LocationBlock({
   location: Location;
   clues: Clue[];
   allLocations: Location[];
+  allClues: Clue[];
   allCharacters: Player[];
   onChangeLocation: (l: Location) => void;
   onDeleteLocation: () => void;
@@ -189,6 +349,21 @@ function LocationBlock({
             />
           </div>
 
+          {/* 장소 입장 조건 */}
+          <div>
+            <label className="block text-xs font-medium text-dark-400 mb-2">
+              장소 입장 조건
+              <span className="text-dark-600 font-normal ml-1">— 조건 미충족 시 이 장소의 모든 단서 획득 불가</span>
+            </label>
+            <ConditionForm
+              label="입장 조건"
+              condition={location.accessCondition}
+              onChange={(c) => update("accessCondition", c)}
+              allClues={allClues}
+              allCharacters={allCharacters}
+            />
+          </div>
+
           {/* 이 장소의 단서 카드들 */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -212,6 +387,8 @@ function LocationBlock({
                   <ClueForm
                     key={clue.id}
                     clue={clue}
+                    allClues={allClues}
+                    allCharacters={allCharacters}
                     onChange={onChangeClue}
                     onDelete={() => onDeleteClue(clue.id)}
                   />
@@ -228,10 +405,14 @@ function LocationBlock({
 /** 단서 카드 1개 폼 */
 function ClueForm({
   clue,
+  allClues,
+  allCharacters,
   onChange,
   onDelete,
 }: {
   clue: Clue;
+  allClues: Clue[];
+  allCharacters: Player[];
   onChange: (c: Clue) => void;
   onDelete: () => void;
 }) {
@@ -257,6 +438,11 @@ function ClueForm({
           {clue.isSecret && (
             <span className="text-xs text-yellow-400 border border-yellow-800 bg-yellow-950/30 px-1.5 py-0.5 rounded">
               비밀
+            </span>
+          )}
+          {clue.condition && (
+            <span className="text-xs text-mystery-400 border border-mystery-800 bg-mystery-950/30 px-1.5 py-0.5 rounded">
+              🔐 조건
             </span>
           )}
         </div>
@@ -334,6 +520,22 @@ function ClueForm({
               />
               <span className="text-xs text-dark-400">GM 직접 배포</span>
             </label>
+          </div>
+
+          {/* 단서 획득 조건 */}
+          <div>
+            <label className="block text-xs text-dark-500 mb-2">
+              단서 획득 조건
+              <span className="text-dark-600 font-normal ml-1">— 조건 충족 시에만 획득 가능</span>
+            </label>
+            <ConditionForm
+              label="획득 조건"
+              condition={clue.condition}
+              onChange={(c) => update("condition", c)}
+              allClues={allClues}
+              allCharacters={allCharacters}
+              excludeClueId={clue.id}
+            />
           </div>
         </div>
       )}
@@ -494,6 +696,7 @@ export default function LocationEditor({
                 location={location}
                 clues={locationClues}
                 allLocations={locations}
+                allClues={clues}
                 allCharacters={characters}
                 onChangeLocation={(updated) => updateLocation(idx, updated)}
                 onDeleteLocation={() => deleteLocation(idx)}

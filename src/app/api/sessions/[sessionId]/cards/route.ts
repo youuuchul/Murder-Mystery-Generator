@@ -2,9 +2,50 @@ import { NextResponse } from "next/server";
 import { getSession, updateSession } from "@/lib/storage/session-storage";
 import { getGame } from "@/lib/storage/game-storage";
 import { broadcast } from "@/lib/sse/broadcaster";
-import type { InventoryCard } from "@/types/session";
+import type { InventoryCard, PlayerState } from "@/types/session";
+import type { ClueCondition } from "@/types/game";
 
 type Params = { params: { sessionId: string } };
+
+/**
+ * 단서/장소 조건 평가 — 현재 인벤토리 상태 기반 (동적 체크)
+ * - has_items:          요청 플레이어가 지정 단서를 현재 보유
+ * - character_has_item: 특정 캐릭터가 지정 단서를 현재 보유
+ */
+function evaluateCondition(
+  condition: ClueCondition,
+  pState: PlayerState,
+  allPlayerStates: PlayerState[]
+): { ok: boolean; reason: string } {
+  if (condition.type === "has_items") {
+    const missing = condition.requiredClueIds.filter(
+      (id) => !pState.inventory.some((i) => i.cardId === id)
+    );
+    if (missing.length > 0) {
+      return { ok: false, reason: "조건 미충족: 필요한 아이템을 현재 보유하고 있지 않습니다." };
+    }
+    return { ok: true, reason: "" };
+  }
+
+  if (condition.type === "character_has_item") {
+    if (!condition.targetCharacterId) {
+      return { ok: false, reason: "조건 설정 오류: 대상 캐릭터가 지정되지 않았습니다." };
+    }
+    const targetState = allPlayerStates.find((p) => p.playerId === condition.targetCharacterId);
+    if (!targetState) {
+      return { ok: false, reason: "대상 캐릭터가 게임에 참여하지 않았습니다." };
+    }
+    const missing = condition.requiredClueIds.filter(
+      (id) => !targetState.inventory.some((i) => i.cardId === id)
+    );
+    if (missing.length > 0) {
+      return { ok: false, reason: "조건 미충족: 대상 캐릭터가 필요한 아이템을 보유하고 있지 않습니다." };
+    }
+    return { ok: true, reason: "" };
+  }
+
+  return { ok: false, reason: "알 수 없는 조건 유형" };
+}
 
 /**
  * POST /api/sessions/[sessionId]/cards
@@ -44,9 +85,20 @@ export async function POST(req: Request, { params }: Params) {
     const location = game.locations?.find((l) => l.id === locationId);
     if (!clue || !location) return NextResponse.json({ error: "단서/장소 없음" }, { status: 404 });
 
-    // 장소 접근 가능 여부 체크
+    // 장소 소유자 접근 불가
     if (location.ownerPlayerId === pState.playerId) {
       return NextResponse.json({ error: "자신의 공간 단서는 획득 불가" }, { status: 403 });
+    }
+
+    // 장소 입장 조건 체크
+    if (location.accessCondition) {
+      const condResult = evaluateCondition(location.accessCondition, pState, session.playerStates);
+      if (!condResult.ok) {
+        return NextResponse.json(
+          { error: `[장소 입장 불가] ${condResult.reason}` },
+          { status: 403 }
+        );
+      }
     }
 
     // 라운드 잠금 확인
@@ -64,6 +116,14 @@ export async function POST(req: Request, { params }: Params) {
     // 비밀 단서는 GM만 배포
     if (clue.isSecret) {
       return NextResponse.json({ error: "GM 직접 배포 단서입니다." }, { status: 403 });
+    }
+
+    // 단서 획득 조건 체크
+    if (clue.condition) {
+      const condResult = evaluateCondition(clue.condition, pState, session.playerStates);
+      if (!condResult.ok) {
+        return NextResponse.json({ error: condResult.reason }, { status: 403 });
+      }
     }
 
     // 이미 보유 여부 (본인)

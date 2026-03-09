@@ -18,12 +18,15 @@ interface StepWizardProps {
   currentStep: number;
   onStepClick?: (step: number) => void;
   completedSteps?: Set<number>;
+  /** true이면 모든 스텝 클릭 가능 (편집 모드용) */
+  allClickable?: boolean;
 }
 
 export default function StepWizard({
   currentStep,
   onStepClick,
   completedSteps = new Set(),
+  allClickable = false,
 }: StepWizardProps) {
   return (
     <div className="w-full">
@@ -32,7 +35,7 @@ export default function StepWizard({
         {STEPS.map((step, idx) => {
           const isCompleted = completedSteps.has(step.id);
           const isCurrent = step.id === currentStep;
-          const isClickable = isCompleted || step.id <= currentStep;
+          const isClickable = allClickable || isCompleted || step.id <= currentStep;
 
           return (
             <div key={step.id} className="flex-1 flex items-start">
@@ -99,10 +102,12 @@ export default function StepWizard({
         </span>
         <div className="flex gap-1">
           {STEPS.map((s) => (
-            <div
+            <button
               key={s.id}
-              className={`h-1.5 w-6 rounded-full ${
-                s.id < currentStep
+              type="button"
+              onClick={() => (allClickable || s.id <= currentStep || completedSteps.has(s.id)) && onStepClick?.(s.id)}
+              className={`h-1.5 w-6 rounded-full transition-colors ${
+                s.id < currentStep || completedSteps.has(s.id)
                   ? "bg-mystery-600"
                   : s.id === currentStep
                     ? "bg-mystery-400"

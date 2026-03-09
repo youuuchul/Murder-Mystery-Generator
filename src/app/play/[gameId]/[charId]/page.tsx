@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
-import type { GamePackage, Player } from "@/types/game";
+import type { GamePackage, Player, ClueCondition } from "@/types/game";
 import type { SharedState, InventoryCard, VoteReveal } from "@/types/session";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -497,6 +497,20 @@ export default function PlayerView() {
     }
   );
 
+  /**
+   * 클라이언트 사이드 조건 평가
+   * - has_items: 내 인벤토리로 즉시 확인 가능
+   * - character_has_item: 다른 플레이어 인벤토리 필요 → null (서버가 최종 판단)
+   */
+  function checkConditionLocally(condition: ClueCondition | undefined): boolean | null {
+    if (!condition) return true;
+    if (condition.type === "has_items") {
+      return condition.requiredClueIds.every((id) => inventoryIds.has(id));
+    }
+    // character_has_item은 다른 플레이어 상태 필요 → 서버 전용
+    return null;
+  }
+
   async function acquireClue(locationId: string, clueId: string) {
     setAcquiring(clueId);
     const res = await fetch(`/api/sessions/${sessionId}/cards`, {
@@ -840,20 +854,50 @@ export default function PlayerView() {
                       return (roundAcquired[String(currentRound)] ?? 0) >= limit;
                     })();
 
+                    // 장소 입장 조건 클라이언트 체크
+                    const locationCondMet = checkConditionLocally(loc.accessCondition);
+                    // has_items 조건이 명확히 미충족인 경우만 잠금 표시
+                    const locationLocked = locationCondMet === false;
+
                     return (
                       <div key={loc.id} className={`bg-dark-900 border rounded-xl overflow-hidden ${
-                        !allowRevisit && visitedThisRound ? "border-dark-700 opacity-60" : "border-dark-800"
+                        locationLocked
+                          ? "border-red-900/50 opacity-70"
+                          : !allowRevisit && visitedThisRound
+                          ? "border-dark-700 opacity-60"
+                          : "border-dark-800"
                       }`}>
-                        <div className="px-4 py-3 bg-dark-800/60 flex items-center gap-2">
-                          <span>🗺️</span>
-                          <span className="font-medium text-dark-100">{loc.name}</span>
-                          {!allowRevisit && visitedThisRound && (
+                        <div className="px-4 py-3 bg-dark-800/60 flex items-center gap-2 flex-wrap">
+                          <span>{locationLocked ? "🔒" : "🗺️"}</span>
+                          <span className={`font-medium ${locationLocked ? "text-dark-400" : "text-dark-100"}`}>
+                            {loc.name}
+                          </span>
+                          {loc.accessCondition && (
+                            <span className={`text-xs border px-1.5 py-0.5 rounded-full ${
+                              locationLocked
+                                ? "text-red-400 border-red-800 bg-red-950/30"
+                                : locationCondMet === true
+                                ? "text-green-400 border-green-800 bg-green-950/20"
+                                : "text-yellow-400 border-yellow-800 bg-yellow-950/20"
+                            }`}>
+                              {locationLocked ? "입장 불가" : locationCondMet === true ? "조건 충족" : "조건 확인 중"}
+                            </span>
+                          )}
+                          {!allowRevisit && visitedThisRound && !locationLocked && (
                             <span className="text-xs text-dark-500 border border-dark-700 px-1.5 py-0.5 rounded-full">
                               이번 라운드 방문 완료
                             </span>
                           )}
                           <span className="text-xs text-dark-600 ml-auto">단서 {locClues.length}개</span>
                         </div>
+                        {/* 장소 조건 힌트 */}
+                        {loc.accessCondition?.hint && (
+                          <div className={`px-4 py-2 text-xs ${
+                            locationLocked ? "text-red-400 bg-red-950/10" : "text-yellow-400/80 bg-yellow-950/10"
+                          }`}>
+                            {locationLocked ? "🔐 " : "💡 "}{loc.accessCondition.hint}
+                          </div>
+                        )}
                         {loc.description && (
                           <p className="px-4 pt-3 text-xs text-dark-500">{loc.description}</p>
                         )}
@@ -864,6 +908,11 @@ export default function PlayerView() {
                             locClues.map((clue, idx) => {
                               const alreadyHas = inventoryIds.has(clue.id);
                               const takenByOther = !alreadyHas && globalAcquired.includes(clue.id);
+
+                              // 단서 획득 조건 체크
+                              const clueCondMet = checkConditionLocally(clue.condition);
+                              const clueLocked = clueCondMet === false; // has_items 조건이 명확히 미충족
+
                               return (
                                 <div
                                   key={clue.id}
@@ -872,18 +921,31 @@ export default function PlayerView() {
                                       ? "border-mystery-800 bg-mystery-950/20 opacity-70"
                                       : takenByOther
                                       ? "border-dark-800 bg-dark-800/20 opacity-50"
+                                      : clueLocked || locationLocked
+                                      ? "border-red-900/40 bg-dark-900/40"
+                                      : clue.condition
+                                      ? "border-yellow-900/50 bg-dark-800/40"
                                       : "border-dark-700 bg-dark-800/40"
                                   }`}
                                 >
-                                  <div>
+                                  <div className="min-w-0 flex-1">
                                     {alreadyHas ? (
                                       <p className="text-sm text-mystery-300 font-medium truncate">
-                                        {game.clues.find((c) => c.id === clue.id)?.title || "(카드)"}
+                                        {clue.title || "(카드)"}
                                       </p>
                                     ) : takenByOther ? (
                                       <>
                                         <p className="text-sm text-dark-600">카드 #{idx + 1}</p>
                                         <p className="text-xs text-dark-700">다른 플레이어가 보유 중</p>
+                                      </>
+                                    ) : clue.condition ? (
+                                      <>
+                                        <p className="text-sm text-dark-400 font-medium">
+                                          {clueLocked ? "🔐" : clueCondMet === true ? "🔓" : "🔒"} 조건부 단서 #{idx + 1}
+                                        </p>
+                                        {clue.condition.hint && (
+                                          <p className="text-xs text-yellow-500/80 mt-0.5">{clue.condition.hint}</p>
+                                        )}
                                       </>
                                     ) : (
                                       <>
@@ -896,10 +958,14 @@ export default function PlayerView() {
                                     <span className="text-xs text-mystery-500 shrink-0">✓ 보유</span>
                                   ) : takenByOther ? (
                                     <span className="text-xs text-dark-600 shrink-0">보유됨</span>
+                                  ) : locationLocked ? (
+                                    <span className="text-xs text-red-500 shrink-0">장소 잠금</span>
                                   ) : limitReached ? (
                                     <span className="text-xs text-red-400 shrink-0">한도 초과</span>
                                   ) : !allowRevisit && visitedThisRound ? (
                                     <span className="text-xs text-dark-500 shrink-0">방문 완료</span>
+                                  ) : clueLocked ? (
+                                    <span className="text-xs text-red-400 shrink-0">조건 미충족</span>
                                   ) : (
                                     <button
                                       onClick={() => acquireClue(loc.id, clue.id)}

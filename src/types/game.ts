@@ -125,6 +125,24 @@ export interface Player {
   cardImage?: string;
 }
 
+// ─── 단서/장소 획득 조건 ──────────────────────────────────────
+
+/**
+ * has_items           : 요청 플레이어가 지정 단서를 현재 인벤토리에 보유
+ * character_has_item  : 특정 캐릭터가 지정 단서를 현재 인벤토리에 보유
+ *
+ * 두 타입 모두 현재 인벤토리 상태를 동적으로 체크하므로
+ * 아이템 반환 시 조건이 자동으로 해제됨
+ */
+export type ClueConditionType = "has_items" | "character_has_item";
+
+export interface ClueCondition {
+  type: ClueConditionType;
+  requiredClueIds: string[];   // 필요한 단서/아이템 ID 목록
+  targetCharacterId?: string;  // character_has_item: 아이템을 보유해야 할 캐릭터 ID
+  hint?: string;               // 잠금 상태일 때 플레이어에게 보여줄 힌트
+}
+
 // ─── 장소 & 단서 ─────────────────────────────────────────────
 
 export interface Location {
@@ -133,7 +151,8 @@ export interface Location {
   description: string;
   unlocksAtRound: number | null;
   clueIds: string[];
-  ownerPlayerId?: string; // 이 장소 소유자 — 해당 플레이어는 접근 불가
+  ownerPlayerId?: string;         // 이 장소 소유자 — 해당 플레이어는 접근 불가
+  accessCondition?: ClueCondition; // 입장 조건 (없으면 자유 입장)
 }
 
 export interface Clue {
@@ -142,8 +161,9 @@ export interface Clue {
   description: string;
   type: "physical" | "testimony" | "document" | "scene";
   locationId: string;
-  pointsTo?: string; // GM 메모
-  isSecret?: boolean; // GM 직접 배포용
+  pointsTo?: string;           // GM 메모
+  isSecret?: boolean;          // GM 직접 배포용
+  condition?: ClueCondition;   // 획득 조건 (없으면 자유 획득)
 }
 
 // ─── 카드셋 ──────────────────────────────────────────────────

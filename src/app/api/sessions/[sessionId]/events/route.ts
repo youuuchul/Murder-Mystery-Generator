@@ -22,6 +22,10 @@ export async function GET(
       ctrl = controller;
       subscribe(sessionId, ctrl);
 
+      // Cloudflare 등 프록시의 초기 버퍼를 즉시 플러시하기 위한 2kB 패딩
+      // 패딩이 없으면 첫 이벤트가 버퍼에 묶여 지연 전달됨
+      ctrl.enqueue(encoder.encode(`: ${" ".repeat(2048)}\n\n`));
+
       // 초기 상태 즉시 전송
       ctrl.enqueue(
         encoder.encode(
@@ -29,14 +33,15 @@ export async function GET(
         )
       );
 
-      // 25초마다 keepalive ping (프록시/브라우저 타임아웃 방지)
+      // 5초마다 keepalive ping
+      // 짧은 간격으로 Cloudflare 버퍼를 지속적으로 플러시
       pingInterval = setInterval(() => {
         try {
           ctrl.enqueue(encoder.encode(`: ping\n\n`));
         } catch {
           clearInterval(pingInterval);
         }
-      }, 25000);
+      }, 5000);
     },
     cancel() {
       clearInterval(pingInterval);

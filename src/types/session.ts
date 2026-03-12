@@ -48,6 +48,8 @@ export interface VoteReveal {
 export interface SharedState {
   phase: GamePhase;
   currentRound: number;
+  /** 현재 라운드의 서브 페이즈 — round-N 페이즈에서만 유효 */
+  currentSubPhase?: "investigation" | "briefing" | "discussion";
   publicClueIds: string[];
   /** 누군가 보유 중인 단서 ID 목록 — 장소에서 중복 획득 방지용 */
   acquiredClueIds: string[];

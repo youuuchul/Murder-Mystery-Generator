@@ -13,8 +13,17 @@ const PHASE_LABEL: Record<string, string> = {
   ending: "엔딩",
 };
 
-function phaseLabel(p: string) {
-  if (p.startsWith("round-")) return `Round ${p.split("-")[1]} 조사`;
+const SUB_PHASE_LABEL: Record<string, string> = {
+  investigation: "조사",
+  briefing: "브리핑",
+  discussion: "토론",
+};
+
+function phaseLabel(p: string, subPhase?: string) {
+  if (p.startsWith("round-")) {
+    const sub = SUB_PHASE_LABEL[subPhase ?? "investigation"] ?? "조사";
+    return `Round ${p.split("-")[1]} ${sub}`;
+  }
   return PHASE_LABEL[p] ?? p;
 }
 
@@ -481,6 +490,23 @@ export default function PlayerView() {
     if (sharedState?.phase === "vote") setTab("vote");
   }, [sharedState?.phase]);
 
+  // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 상태 동기화
+  useEffect(() => {
+    if (!token || !sessionId) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}?token=${token}`);
+        if (!res.ok) return;
+        const { sharedState: ss, playerState } = await res.json();
+        setSharedState(ss);
+        setInventory(playerState.inventory ?? []);
+        setRoundAcquired(playerState.roundAcquired ?? {});
+        setRoundVisited(playerState.roundVisitedLocations ?? {});
+      } catch {}
+    }, 3000);
+    return () => clearInterval(id);
+  }, [token, sessionId]);
+
   useSSE(
     sessionId && token ? `/api/sessions/${sessionId}/events` : null,
     {
@@ -619,7 +645,7 @@ export default function PlayerView() {
               : "border-dark-700 text-dark-500"
           }`}
         >
-          {phaseLabel(phase)}
+          {phaseLabel(phase, sharedState?.currentSubPhase)}
         </span>
       </div>
 

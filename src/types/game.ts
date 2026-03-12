@@ -21,13 +21,16 @@ export interface GamePackage {
 export interface GameSettings {
   playerCount: number; // 4~8
   difficulty: "easy" | "normal" | "hard";
-  theme: string;
-  tone: "serious" | "comedy" | "horror";
+  tags: string[];
+  /** legacy field — 기존 데이터 호환용 */
+  theme?: string;
+  /** legacy field — 기존 데이터 호환용 */
+  tone?: "serious" | "comedy" | "horror";
   estimatedDuration: number; // 분 단위
 }
 
 export interface PhaseConfig {
-  type: "investigation" | "briefing" | "discussion";
+  type: "investigation" | "discussion";
   label: string;
   durationMinutes: number;
 }
@@ -215,8 +218,10 @@ export interface RoundScript {
 }
 
 export interface Scripts {
+  lobby: ScriptSegment;
   opening: ScriptSegment;
   rounds: RoundScript[];
+  vote: ScriptSegment;
   ending: ScriptSegment;          // 공통 (빈 경우 분기별로 표시)
   endingSuccess?: ScriptSegment;  // 범인 검거 성공 엔딩
   endingFail?: ScriptSegment;     // 범인 도주 성공 엔딩
@@ -229,7 +234,7 @@ export interface GameMetadata {
   title: string;
   createdAt: string;
   updatedAt: string;
-  settings: Pick<GameSettings, "playerCount" | "difficulty" | "theme" | "tone" | "estimatedDuration">;
+  settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration">;
   playerCount: number;
   clueCount: number;
   locationCount: number;

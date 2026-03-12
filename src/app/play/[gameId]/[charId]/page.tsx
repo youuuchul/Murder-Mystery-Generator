@@ -15,13 +15,13 @@ const PHASE_LABEL: Record<string, string> = {
 
 const SUB_PHASE_LABEL: Record<string, string> = {
   investigation: "조사",
-  briefing: "브리핑",
   discussion: "토론",
 };
 
 function phaseLabel(p: string, subPhase?: string) {
   if (p.startsWith("round-")) {
-    const sub = SUB_PHASE_LABEL[subPhase ?? "investigation"] ?? "조사";
+    const normalizedSubPhase = subPhase === "discussion" || subPhase === "briefing" ? "discussion" : "investigation";
+    const sub = SUB_PHASE_LABEL[normalizedSubPhase] ?? "조사";
     return `Round ${p.split("-")[1]} ${sub}`;
   }
   return PHASE_LABEL[p] ?? p;

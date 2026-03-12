@@ -10,19 +10,23 @@ const SettingsSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(100, "제목은 100자 이내로 입력하세요"),
   playerCount: z.number().int().min(4, "최소 4명").max(8, "최대 8명"),
   difficulty: z.enum(["easy", "normal", "hard"]),
-  theme: z.string().min(1, "테마를 선택하세요"),
-  tone: z.enum(["serious", "comedy", "horror"]),
+  tags: z.array(z.string().min(1)).min(1, "태그를 1개 이상 추가하세요"),
   estimatedDuration: z.number().int().min(30, "최소 30분").max(300, "최대 300분"),
 });
 
 type SettingsFormData = z.infer<typeof SettingsSchema>;
 
-const THEMES = [
-  { value: "gothic-mansion", label: "고딕 저택", emoji: "🏰" },
-  { value: "city-noir", label: "도시 누아르", emoji: "🌆" },
-  { value: "fantasy", label: "판타지", emoji: "🧙" },
-  { value: "historical", label: "역사", emoji: "⚔️" },
-  { value: "scifi", label: "SF", emoji: "🚀" },
+const TAG_SUGGESTIONS = [
+  "고딕 저택",
+  "도시 누아르",
+  "폐쇄형",
+  "심리전",
+  "가문 비밀",
+  "파티",
+  "호러",
+  "코믹",
+  "역사",
+  "SF",
 ];
 
 const DIFFICULTIES = [
@@ -31,15 +35,8 @@ const DIFFICULTIES = [
   { value: "hard", label: "어려움", desc: "고난도 추리" },
 ] as const;
 
-const TONES = [
-  { value: "serious", label: "진지", emoji: "🎭" },
-  { value: "comedy", label: "코믹", emoji: "😄" },
-  { value: "horror", label: "공포", emoji: "👻" },
-] as const;
-
-const PHASE_LABELS: Record<PhaseConfig["type"], string> = {
+const PHASE_LABELS: Record<string, string> = {
   investigation: "조사",
-  briefing: "브리핑",
   discussion: "토론",
 };
 
@@ -49,7 +46,6 @@ function buildDefaultRules(playerCount: number): GameRules {
     roundCount: 4,
     phases: [
       { type: "investigation", label: "조사", durationMinutes: investigationMin },
-      { type: "briefing", label: "브리핑", durationMinutes: 5 },
       { type: "discussion", label: "토론", durationMinutes: 10 },
     ],
     privateChat: {
@@ -79,12 +75,12 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
     title: "",
     playerCount: 5,
     difficulty: "normal",
-    theme: "",
-    tone: "serious",
+    tags: [],
     estimatedDuration: 120,
   });
 
   const [rules, setRules] = useState<GameRules>(() => buildDefaultRules(5));
+  const [tagInput, setTagInput] = useState("");
 
   function updateForm<K extends keyof SettingsFormData>(key: K, value: SettingsFormData[K]) {
     setForm((prev) => {
@@ -109,6 +105,17 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
     setRules((prev) => ({ ...prev, privateChat: { ...prev.privateChat, ...partial } }));
   }
 
+  function addTag(raw: string) {
+    const tag = raw.trim();
+    if (!tag || form.tags.includes(tag)) return;
+    updateForm("tags", [...form.tags, tag]);
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    updateForm("tags", form.tags.filter((item) => item !== tag));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -124,8 +131,8 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
 
     setLoading(true);
     try {
-      const { title, playerCount, difficulty, theme, tone, estimatedDuration } = result.data;
-      const settings: GameSettings = { playerCount, difficulty, theme, tone, estimatedDuration };
+      const { title, playerCount, difficulty, tags, estimatedDuration } = result.data;
+      const settings: GameSettings = { playerCount, difficulty, tags, estimatedDuration };
 
       const res = await fetch("/api/games", {
         method: "POST",
@@ -165,34 +172,67 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
         {errors.title && <p className="mt-1 text-xs text-red-400">{errors.title}</p>}
       </div>
 
-      {/* ── 테마 ── */}
+      {/* ── 태그 ── */}
       <div>
         <label className="block text-sm font-medium text-dark-200 mb-3">
-          테마 <span className="text-mystery-400">*</span>
+          태그 <span className="text-mystery-400">*</span>
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {THEMES.map((theme) => (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {form.tags.length === 0 && (
+              <span className="text-xs text-dark-600">아직 추가된 태그가 없습니다.</span>
+            )}
+            {form.tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="rounded-full border border-mystery-700 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-200 hover:bg-mystery-950/50 transition-colors"
+              >
+                #{tag} ×
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  addTag(tagInput);
+                }
+              }}
+              placeholder="직접 태그 입력 후 Enter"
+              className={`flex-1 ${inputClass}`}
+            />
             <button
-              key={theme.value}
               type="button"
-              onClick={() => updateForm("theme", theme.value)}
-              className={[
-                "flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all",
-                form.theme === theme.value
-                  ? "border-mystery-500 bg-mystery-950/50 text-mystery-200"
-                  : "border-dark-700 bg-dark-800/50 text-dark-400 hover:border-dark-500 hover:text-dark-200",
-              ].join(" ")}
+              onClick={() => addTag(tagInput)}
+              className="rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm text-dark-200 hover:bg-dark-700 transition-colors"
             >
-              <span className="text-2xl">{theme.emoji}</span>
-              <span className="text-xs font-medium">{theme.label}</span>
+              추가
             </button>
-          ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {TAG_SUGGESTIONS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => addTag(tag)}
+                className="rounded-full border border-dark-700 bg-dark-800/60 px-3 py-1 text-xs text-dark-300 hover:border-dark-500 hover:text-dark-100 transition-colors"
+              >
+                + #{tag}
+              </button>
+            ))}
+          </div>
         </div>
-        {errors.theme && <p className="mt-1 text-xs text-red-400">{errors.theme}</p>}
+        {errors.tags && <p className="mt-1 text-xs text-red-400">{errors.tags}</p>}
       </div>
 
-      {/* ── 플레이어 수 / 난이도 / 분위기 ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      {/* ── 플레이어 수 / 난이도 ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* 플레이어 수 */}
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-3">플레이어 수</label>
@@ -218,20 +258,6 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
                   form.difficulty === d.value ? "border-mystery-600 bg-mystery-950/50 text-mystery-200" : "border-dark-700 bg-dark-800/50 text-dark-400 hover:border-dark-500"].join(" ")}>
                 <span className="font-medium">{d.label}</span>
                 <span className="text-xs text-dark-500">{d.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 분위기 */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-3">분위기</label>
-          <div className="space-y-2">
-            {TONES.map((t) => (
-              <button key={t.value} type="button" onClick={() => updateForm("tone", t.value)}
-                className={["w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-sm transition-all",
-                  form.tone === t.value ? "border-mystery-600 bg-mystery-950/50 text-mystery-200" : "border-dark-700 bg-dark-800/50 text-dark-400 hover:border-dark-500"].join(" ")}>
-                <span>{t.emoji}</span><span className="font-medium">{t.label}</span>
               </button>
             ))}
           </div>
@@ -264,7 +290,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-xs font-medium text-dark-400 mb-2">
-              총 라운드 수 <span className="text-dark-600">(조사→브리핑→토론 반복)</span>
+              총 라운드 수 <span className="text-dark-600">(조사→토론 반복)</span>
             </label>
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setRules((r) => ({ ...r, roundCount: Math.max(1, r.roundCount - 1) }))}

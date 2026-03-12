@@ -21,7 +21,7 @@ export default function NewGamePage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* 스텝 위자드 */}
         <div className="mb-10 bg-dark-900 border border-dark-800 rounded-2xl p-5">
-          <StepWizard currentStep={1} completedSteps={new Set()} />
+          <StepWizard currentStep={1} />
         </div>
 
         {/* 단계별 콘텐츠 */}

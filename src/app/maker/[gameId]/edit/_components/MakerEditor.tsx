@@ -19,17 +19,11 @@ const STEP_COUNT = 5;
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [game, setGame] = useState<GamePackage>(initialGame);
   const [currentStep, setCurrentStep] = useState(1);
-  // 편집 모드: 모든 스텝이 완료된 것으로 처리 (자유 이동)
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
     setGame((prev) => ({ ...prev, ...partial }));
-  }, []);
-
-  const markCompleted = useCallback((step: number) => {
-    setCompletedSteps((prev) => new Set([...prev, step]));
   }, []);
 
   async function save(updatedGame: GamePackage = game) {
@@ -57,7 +51,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
       <div className="bg-dark-900 border border-dark-800 rounded-2xl p-5">
         <StepWizard
           currentStep={currentStep}
-          completedSteps={completedSteps}
           onStepClick={(step) => setCurrentStep(step)}
           allClickable
         />
@@ -109,6 +102,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           <ScriptEditor
             scripts={game.scripts}
             rounds={game.rules?.roundCount ?? 4}
+            locations={game.locations ?? []}
             onChange={(scripts) => updateGame({ scripts })}
             onSave={() => save({ ...game })}
             saving={saving}
@@ -123,9 +117,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         <div className="flex gap-3">
           <Button variant="secondary" onClick={() => save()} loading={saving}>저장</Button>
           {currentStep < STEP_COUNT ? (
-            <Button onClick={() => { markCompleted(currentStep); setCurrentStep((s) => s + 1); }}>다음 →</Button>
+            <Button onClick={() => setCurrentStep((s) => s + 1)}>다음 →</Button>
           ) : (
-            <Button onClick={() => { markCompleted(STEP_COUNT); save(); }} loading={saving}>완료 & 저장</Button>
+            <Button onClick={() => save()} loading={saving}>완료 & 저장</Button>
           )}
         </div>
       </div>

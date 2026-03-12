@@ -6,6 +6,7 @@
 import fs from "fs";
 import path from "path";
 import type { GameMetadata, GamePackage } from "@/types/game";
+import { buildMetadataFromGame, normalizeGame } from "@/lib/game-normalizer";
 
 const GAMES_DIR = path.join(process.cwd(), "data", "games");
 
@@ -40,18 +41,9 @@ export function listGames(): GameMetadata[] {
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-
-    const mPath = metadataPath(entry.name);
-    if (!fs.existsSync(mPath)) continue;
-
-    try {
-      const raw = fs.readFileSync(mPath, "utf-8");
-      const metadata = JSON.parse(raw) as GameMetadata;
-      metadataList.push(metadata);
-    } catch {
-      // 손상된 파일 건너뜀
-      console.warn(`[game-storage] metadata 파싱 실패: ${entry.name}`);
-    }
+    const game = getGame(entry.name);
+    if (!game) continue;
+    metadataList.push(buildMetadataFromGame(game));
   }
 
   // 최신 수정 순
@@ -70,7 +62,7 @@ export function getGame(id: string): GamePackage | null {
 
   try {
     const raw = fs.readFileSync(gPath, "utf-8");
-    return JSON.parse(raw) as GamePackage;
+    return normalizeGame(JSON.parse(raw) as GamePackage);
   } catch {
     console.error(`[game-storage] game.json 파싱 실패: ${id}`);
     return null;
@@ -84,26 +76,18 @@ export function getGame(id: string): GamePackage | null {
 export function saveGame(game: GamePackage): void {
   ensureGamesDir();
 
+  const normalizedGame = normalizeGame(game);
   const dir = gameDir(game.id);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
   // game.json 전체 저장
-  fs.writeFileSync(gamePath(game.id), JSON.stringify(game, null, 2), "utf-8");
+  fs.writeFileSync(gamePath(game.id), JSON.stringify(normalizedGame, null, 2), "utf-8");
 
   // metadata.json 경량 저장
-  const metadata: GameMetadata = {
-    id: game.id,
-    title: game.title,
-    createdAt: game.createdAt,
-    updatedAt: game.updatedAt,
-    settings: game.settings,
-    playerCount: game.players?.length ?? 0,
-    clueCount: game.clues.length,
-    locationCount: game.locations?.length ?? 0,
-  };
-  fs.writeFileSync(metadataPath(game.id), JSON.stringify(metadata, null, 2), "utf-8");
+  const metadata = buildMetadataFromGame(normalizedGame);
+  fs.writeFileSync(metadataPath(normalizedGame.id), JSON.stringify(metadata, null, 2), "utf-8");
 }
 
 /**

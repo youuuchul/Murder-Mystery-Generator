@@ -11,7 +11,6 @@ function buildDefaultRules(playerCount: number): GameRules {
     roundCount: 4,
     phases: [
       { type: "investigation", label: "조사", durationMinutes: investigationMin },
-      { type: "briefing", label: "브리핑", durationMinutes: 5 },
       { type: "discussion", label: "토론", durationMinutes: 10 },
     ],
     privateChat: {
@@ -32,8 +31,7 @@ const CreateGameSchema = z.object({
   settings: z.object({
     playerCount: z.number().int().min(4).max(8),
     difficulty: z.enum(["easy", "normal", "hard"]),
-    theme: z.string().min(1),
-    tone: z.enum(["serious", "comedy", "horror"]),
+    tags: z.array(z.string().min(1)).min(1),
     estimatedDuration: z.number().int().min(30).max(300),
   }),
 });
@@ -94,8 +92,10 @@ export async function POST(request: NextRequest) {
         eventCards: [],
       },
       scripts: {
+        lobby: { narration: "" },
         opening: { narration: "" },
         rounds: [],
+        vote: { narration: "" },
         ending: { narration: "" },
       },
     };

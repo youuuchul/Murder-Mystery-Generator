@@ -7,6 +7,12 @@ import type { GamePhase } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 
+function normalizeSubPhase(subPhase?: string): "investigation" | "discussion" | undefined {
+  if (subPhase === "discussion" || subPhase === "briefing") return "discussion";
+  if (subPhase === "investigation") return "investigation";
+  return undefined;
+}
+
 /** GET /api/sessions/[sessionId] — 세션 상태 조회 */
 export async function GET(req: Request, { params }: Params) {
   const { sessionId } = params;
@@ -85,10 +91,10 @@ export async function PATCH(req: Request, { params }: Params) {
       session.endedAt = new Date().toISOString();
     }
   } else if (body.action === "set_subphase") {
-    const sub = body.subPhase as "investigation" | "briefing" | "discussion" | undefined;
+    const sub = normalizeSubPhase(body.subPhase);
     if (sub && sharedState.phase.startsWith("round-")) {
       sharedState.currentSubPhase = sub;
-      const labels: Record<string, string> = { investigation: "조사", briefing: "브리핑", discussion: "토론" };
+      const labels: Record<string, string> = { investigation: "조사", discussion: "토론" };
       message = `${labels[sub]} 페이즈가 시작됩니다.`;
     }
   } else if (body.action === "end_session") {

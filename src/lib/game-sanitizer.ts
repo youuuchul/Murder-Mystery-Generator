@@ -62,8 +62,10 @@ function sanitizeGame(game: GamePackage, viewerPlayerId?: string): GamePackage {
     },
     players: game.players.map((player) => sanitizePlayer(player, viewerPlayerId)),
     scripts: {
+      lobby: sanitizeSegment(game.scripts.lobby),
       opening: sanitizeSegment(game.scripts.opening),
       rounds: game.scripts.rounds.map(sanitizeRound),
+      vote: sanitizeSegment(game.scripts.vote),
       ending: sanitizeSegment(game.scripts.ending),
       endingSuccess: game.scripts.endingSuccess
         ? sanitizeSegment(game.scripts.endingSuccess)

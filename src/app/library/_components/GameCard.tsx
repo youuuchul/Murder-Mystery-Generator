@@ -17,20 +17,6 @@ const difficultyColor: Record<string, string> = {
   hard: "text-red-400 bg-red-900/30 border-red-800",
 };
 
-const toneLabel: Record<string, string> = {
-  serious: "진지",
-  comedy: "코믹",
-  horror: "공포",
-};
-
-const themeLabel: Record<string, string> = {
-  "gothic-mansion": "고딕 저택",
-  "city-noir": "도시 누아르",
-  fantasy: "판타지",
-  historical: "역사",
-  scifi: "SF",
-};
-
 interface GameCardProps {
   game: GameMetadata;
 }
@@ -52,8 +38,7 @@ export default function GameCard({ game }: GameCardProps) {
     }
   }
   const diff = game.settings.difficulty;
-  const theme = themeLabel[game.settings.theme] ?? game.settings.theme;
-  const tone = toneLabel[game.settings.tone] ?? game.settings.tone;
+  const tags = game.settings.tags ?? [];
 
   return (
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
@@ -78,12 +63,11 @@ export default function GameCard({ game }: GameCardProps) {
           >
             {difficultyLabel[diff] ?? diff}
           </span>
-          <span className="text-xs px-2 py-0.5 rounded-full border text-dark-300 bg-dark-800 border-dark-600">
-            {theme}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full border text-dark-300 bg-dark-800 border-dark-600">
-            {tone}
-          </span>
+          {tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="text-xs px-2 py-0.5 rounded-full border text-dark-300 bg-dark-800 border-dark-600">
+              #{tag}
+            </span>
+          ))}
         </div>
 
         {/* 통계 */}

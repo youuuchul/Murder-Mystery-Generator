@@ -42,7 +42,7 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-bold text-dark-50">사건 개요</h2>
-        <p className="text-sm text-dark-500 mt-1">게임의 전체 스토리와 사건을 설정합니다.</p>
+        <p className="text-sm text-dark-500 mt-1">게임의 전체 스토리, 피해자 정보, 공통 이미지 정보를 설정합니다.</p>
       </div>
 
       {/* ── 피해자 정보 ── */}
@@ -89,20 +89,13 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
             placeholder="예: 브라운 저택"
             className={inp} />
         </Field>
-        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 화면 공통 보드에 띄울 이미지입니다.">
+        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 보드에 띄울 공통 이미지 또는 지도입니다.">
           <input type="url" value={story.mapImageUrl ?? ""}
             onChange={(e) => update("mapImageUrl", e.target.value || undefined)}
             placeholder="https://..."
             className={inp} />
         </Field>
       </div>
-
-      <Field label="GM 메인 화면 공통 메모" hint="GM 대시보드 보드 영역에 고정 표시할 공통 정보입니다.">
-        <textarea rows={4} value={story.gmOverview ?? ""}
-          onChange={(e) => update("gmOverview", e.target.value || undefined)}
-          placeholder="예) 오늘 공개해야 할 핵심 규칙, 플레이 흐름 메모, 보드에 계속 띄워둘 요약"
-          className={ta} />
-      </Field>
 
       {/* ── 범인 선택 ── */}
       <Field
@@ -125,37 +118,6 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
             ✓ {players.find((p) => p.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
           </p>
         )}
-      </Field>
-
-      {/* ── 타임라인 ── */}
-      <Field label="사건 전 타임라인">
-        <div className="space-y-2">
-          {story.timeline.map((ev, idx) => (
-            <div key={idx} className="flex gap-2">
-              <input type="text" value={ev.time}
-                onChange={(e) => {
-                  const next = [...story.timeline];
-                  next[idx] = { ...ev, time: e.target.value };
-                  update("timeline", next);
-                }}
-                placeholder="시각" className="w-28 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 text-sm transition" />
-              <input type="text" value={ev.description}
-                onChange={(e) => {
-                  const next = [...story.timeline];
-                  next[idx] = { ...ev, description: e.target.value };
-                  update("timeline", next);
-                }}
-                placeholder="내용" className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 text-sm transition" />
-              <button type="button" onClick={() => update("timeline", story.timeline.filter((_, i) => i !== idx))}
-                className="px-2 text-dark-500 hover:text-red-400 transition-colors text-sm">✕</button>
-            </div>
-          ))}
-          <button type="button"
-            onClick={() => update("timeline", [...story.timeline, { time: "", description: "" }])}
-            className="text-sm text-mystery-400 hover:text-mystery-300 transition-colors">
-            + 항목 추가
-          </button>
-        </div>
       </Field>
 
       <div className="flex justify-end pt-2">

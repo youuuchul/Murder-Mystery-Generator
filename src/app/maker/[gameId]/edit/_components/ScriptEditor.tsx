@@ -73,6 +73,19 @@ function SegmentEditor({
           />
         </div>
       </div>
+
+      <div>
+        <label className="block text-xs font-medium text-dark-400 mb-1">
+          GM 화면 메모 <span className="text-dark-600">(선택)</span>
+        </label>
+        <textarea
+          rows={4}
+          value={segment.gmNote ?? ""}
+          onChange={(e) => onChange({ ...segment, gmNote: e.target.value || undefined })}
+          placeholder="해당 페이즈에서 GM 메인 화면에 고정할 진행 메모"
+          className={textareaClass}
+        />
+      </div>
     </div>
   );
 }
@@ -134,6 +147,44 @@ function RoundScriptForm({
               className={inputClass}
             />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-dark-400 mb-1">
+                배경 음악 URL <span className="text-dark-600">(선택)</span>
+              </label>
+              <input
+                type="url"
+                value={round.backgroundMusic ?? ""}
+                onChange={(e) => onChange({ ...round, backgroundMusic: e.target.value || undefined })}
+                placeholder="https://..."
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark-400 mb-1">
+                영상 URL <span className="text-dark-600">(선택)</span>
+              </label>
+              <input
+                type="url"
+                value={round.videoUrl ?? ""}
+                onChange={(e) => onChange({ ...round, videoUrl: e.target.value || undefined })}
+                placeholder="https://..."
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-dark-400 mb-1">
+              GM 화면 메모 <span className="text-dark-600">(선택)</span>
+            </label>
+            <textarea
+              rows={4}
+              value={round.gmNote ?? ""}
+              onChange={(e) => onChange({ ...round, gmNote: e.target.value || undefined })}
+              placeholder={`Round ${round.round}에서 GM 보드에 띄울 진행 메모`}
+              className={textareaClass}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -153,7 +204,16 @@ export default function ScriptEditor({
     const existing = scripts.rounds;
     const result: RoundScript[] = [];
     for (let i = 1; i <= count; i++) {
-      result.push(existing.find((r) => r.round === i) ?? { round: i, narration: "", unlockedLocationIds: [] });
+      result.push(
+        existing.find((r) => r.round === i) ?? {
+          round: i,
+          narration: "",
+          unlockedLocationIds: [],
+          videoUrl: undefined,
+          backgroundMusic: undefined,
+          gmNote: undefined,
+        }
+      );
     }
     return result;
   }

@@ -45,15 +45,6 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
         <p className="text-sm text-dark-500 mt-1">게임의 전체 스토리와 사건을 설정합니다.</p>
       </div>
 
-      {/* ── 시놉시스 ── */}
-      <Field label="스토리 시놉시스" hint="메이커 전용 — 전체 진실·플롯을 자유롭게 정리. 플레이어에게 노출되지 않습니다.">
-        <textarea rows={5} value={story.synopsis}
-          onChange={(e) => update("synopsis", e.target.value)}
-          placeholder="예) 저택 주인이 독살됐다. 범인은 장남으로, 유산을 독차지하기 위해 와인에 독을 탔다..."
-          className={ta} />
-        <p className="text-xs text-dark-500 mt-1">{story.synopsis.length}자</p>
-      </Field>
-
       {/* ── 피해자 정보 ── */}
       <div className="border border-dark-700 rounded-xl p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
@@ -98,18 +89,18 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
             placeholder="예: 브라운 저택"
             className={inp} />
         </Field>
-        <Field label="범행 수법" hint="GM only">
-          <input type="text" value={story.method}
-            onChange={(e) => update("method", e.target.value)}
-            placeholder="예: 와인에 청산가리 혼입"
+        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 화면 공통 보드에 띄울 이미지입니다.">
+          <input type="url" value={story.mapImageUrl ?? ""}
+            onChange={(e) => update("mapImageUrl", e.target.value || undefined)}
+            placeholder="https://..."
             className={inp} />
         </Field>
       </div>
 
-      <Field label="범행 동기" hint="GM only — 플레이어에게 노출되지 않습니다.">
-        <textarea rows={3} value={story.motive}
-          onChange={(e) => update("motive", e.target.value)}
-          placeholder="범인의 동기를 작성하세요."
+      <Field label="GM 메인 화면 공통 메모" hint="GM 대시보드 보드 영역에 고정 표시할 공통 정보입니다.">
+        <textarea rows={4} value={story.gmOverview ?? ""}
+          onChange={(e) => update("gmOverview", e.target.value || undefined)}
+          placeholder="예) 오늘 공개해야 할 핵심 규칙, 플레이 흐름 메모, 보드에 계속 띄워둘 요약"
           className={ta} />
       </Field>
 

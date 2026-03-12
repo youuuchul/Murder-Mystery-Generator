@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "@/hooks/useSSE";
-import type { GamePackage, GameRules, PhaseConfig } from "@/types/game";
+import type { GamePackage, GameRules, PhaseConfig, ScriptSegment } from "@/types/game";
 import type { GameSession, SharedState, CharacterSlot } from "@/types/session";
 
 interface GMDashboardProps {
@@ -20,6 +20,395 @@ const PHASE_LABELS: Record<string, string> = {
 function phaseLabel(phase: string): string {
   if (phase.startsWith("round-")) return `Round ${phase.split("-")[1]}`;
   return PHASE_LABELS[phase] ?? phase;
+}
+
+type VideoSource =
+  | { kind: "html5"; src: string }
+  | { kind: "iframe"; src: string }
+  | { kind: "external"; src: string };
+
+interface PhaseBoardContent {
+  title: string;
+  badge: string;
+  narrationBlocks: { label: string; text: string }[];
+  gmNote?: string;
+  videoUrl?: string;
+  backgroundMusic?: string;
+}
+
+/** GM 메인 화면에서 재생 가능한 URL을 embed/video 형태로 정규화한다. */
+function resolveVideoSource(url?: string): VideoSource | null {
+  if (!url) return null;
+
+  if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) {
+    return { kind: "html5", src: url };
+  }
+
+  const youtubeMatch =
+    url.match(/youtube\.com\/watch\?v=([^&]+)/i) ??
+    url.match(/youtu\.be\/([^?&/]+)/i) ??
+    url.match(/youtube\.com\/embed\/([^?&/]+)/i);
+  if (youtubeMatch?.[1]) {
+    return { kind: "iframe", src: `https://www.youtube.com/embed/${youtubeMatch[1]}` };
+  }
+
+  const vimeoMatch =
+    url.match(/vimeo\.com\/(\d+)/i) ??
+    url.match(/player\.vimeo\.com\/video\/(\d+)/i);
+  if (vimeoMatch?.[1]) {
+    return { kind: "iframe", src: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return { kind: "external", src: url };
+  }
+
+  return null;
+}
+
+/** 현재 GM 화면에 띄울 페이즈별 메인 보드 콘텐츠를 계산한다. */
+function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): PhaseBoardContent {
+  const phase = sharedState.phase;
+  const roundNum = sharedState.currentRound;
+  const roundScript = game.scripts.rounds.find((round) => round.round === roundNum);
+
+  if (phase === "opening") {
+    return {
+      title: "오프닝 장면",
+      badge: "Opening",
+      narrationBlocks: game.scripts.opening.narration
+        ? [{ label: "오프닝 나레이션", text: game.scripts.opening.narration }]
+        : [],
+      gmNote: game.scripts.opening.gmNote,
+      videoUrl: game.scripts.opening.videoUrl,
+      backgroundMusic: game.scripts.opening.backgroundMusic,
+    };
+  }
+
+  if (phase.startsWith("round-")) {
+    return {
+      title: `Round ${roundNum} 진행 보드`,
+      badge: sharedState.currentSubPhase ? SUB_PHASE_LABELS[sharedState.currentSubPhase] : "Round",
+      narrationBlocks: roundScript?.narration
+        ? [{ label: `Round ${roundNum} 나레이션`, text: roundScript.narration }]
+        : [],
+      gmNote: roundScript?.gmNote,
+      videoUrl: roundScript?.videoUrl,
+      backgroundMusic: roundScript?.backgroundMusic,
+    };
+  }
+
+  if (phase === "ending") {
+    const branchScript: ScriptSegment | undefined = sharedState.voteReveal
+      ? sharedState.voteReveal.majorityCorrect
+        ? game.scripts.endingSuccess
+        : game.scripts.endingFail
+      : undefined;
+
+    return {
+      title: "엔딩 장면",
+      badge: sharedState.voteReveal?.majorityCorrect ? "Success" : "Ending",
+      narrationBlocks: [
+        game.scripts.ending.narration
+          ? { label: "공통 엔딩", text: game.scripts.ending.narration }
+          : null,
+        branchScript?.narration
+          ? {
+              label: sharedState.voteReveal?.majorityCorrect ? "검거 성공 엔딩" : "도주 성공 엔딩",
+              text: branchScript.narration,
+            }
+          : null,
+      ].filter((block): block is { label: string; text: string } => Boolean(block)),
+      gmNote: branchScript?.gmNote ?? game.scripts.ending.gmNote,
+      videoUrl: branchScript?.videoUrl ?? game.scripts.ending.videoUrl,
+      backgroundMusic: branchScript?.backgroundMusic ?? game.scripts.ending.backgroundMusic,
+    };
+  }
+
+  if (phase === "vote") {
+    return {
+      title: "투표 집계",
+      badge: "Vote",
+      narrationBlocks: [
+        {
+          label: "진행 메모",
+          text: "전원 투표 여부를 확인하고, 지연되면 강제 결과 공개를 사용하세요.",
+        },
+      ],
+    };
+  }
+
+  return {
+    title: "세션 준비",
+    badge: "Lobby",
+    narrationBlocks: [
+      {
+        label: "진행 메모",
+        text: "참가 코드 공유, 전원 입장 확인, 오프닝 전 마지막 안내를 진행합니다.",
+      },
+    ],
+  };
+}
+
+function MediaPanel({ source, title }: { source: VideoSource | null; title: string }) {
+  if (!source) {
+    return (
+      <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-600">
+        이 페이즈에 연결된 영상이 없습니다.
+      </div>
+    );
+  }
+
+  if (source.kind === "html5") {
+    return (
+      <video
+        controls
+        preload="metadata"
+        className="w-full rounded-xl border border-dark-700 bg-black aspect-video"
+        src={source.src}
+      />
+    );
+  }
+
+  if (source.kind === "iframe") {
+    return (
+      <iframe
+        src={source.src}
+        title={title}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="w-full rounded-xl border border-dark-700 bg-black aspect-video"
+      />
+    );
+  }
+
+  return (
+    <a
+      href={source.src}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center justify-center rounded-xl border border-emerald-800 bg-emerald-950/20 px-4 py-8 text-sm font-medium text-emerald-300 hover:bg-emerald-950/30 transition-colors"
+    >
+      외부 영상 열기
+    </a>
+  );
+}
+
+function GMBoard({
+  game,
+  session,
+}: {
+  game: GamePackage;
+  session: GameSession;
+}) {
+  const board = getPhaseBoardContent(game, session.sharedState);
+  const videoSource = resolveVideoSource(board.videoUrl);
+  const acquiredClueIds = new Set(session.sharedState.acquiredClueIds ?? []);
+  const currentRound = session.sharedState.currentRound;
+
+  const locations = (game.locations ?? []).map((location) => {
+    const clues = game.clues.filter((clue) => clue.locationId === location.id);
+    const acquired = clues.filter((clue) => acquiredClueIds.has(clue.id)).length;
+    const secret = clues.filter((clue) => clue.isSecret).length;
+    const unlocked = location.unlocksAtRound === null || currentRound >= (location.unlocksAtRound ?? 0);
+
+    return {
+      location,
+      clues,
+      acquired,
+      remaining: clues.length - acquired,
+      secret,
+      unlocked,
+    };
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-dark-800 overflow-hidden bg-[linear-gradient(135deg,rgba(72,47,19,0.35),rgba(17,24,39,0.92))]">
+        <div className="border-b border-dark-800/80 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs tracking-[0.22em] uppercase text-mystery-400/80">GM Board</p>
+            <h3 className="text-xl font-bold text-dark-50 mt-1">{board.title}</h3>
+          </div>
+          <span className="rounded-full border border-mystery-700/60 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-300">
+            {board.badge}
+          </span>
+        </div>
+
+        <div className="grid gap-4 p-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                <p className="text-xs text-dark-500">배경 장소</p>
+                <p className="mt-1 text-base font-semibold text-dark-50">{game.story.location || "미설정"}</p>
+                <p className="mt-2 text-sm leading-relaxed text-dark-300 whitespace-pre-line">
+                  {game.story.incident || "공개 사건 설명이 아직 없습니다."}
+                </p>
+              </div>
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                <p className="text-xs text-dark-500">공통 GM 메모</p>
+                <p className="mt-2 text-sm leading-relaxed text-dark-300 whitespace-pre-line">
+                  {game.story.gmOverview || "공통 메모 없음"}
+                </p>
+              </div>
+            </div>
+
+            {board.narrationBlocks.length > 0 && (
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+                {board.narrationBlocks.map((block) => (
+                  <div key={block.label}>
+                    <p className="text-xs text-dark-500">{block.label}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-dark-200 whitespace-pre-line">{block.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                <p className="text-xs text-dark-500">현재 페이즈 메모</p>
+                <p className="mt-2 text-sm leading-relaxed text-dark-300 whitespace-pre-line">
+                  {board.gmNote || "이 페이즈용 GM 메모 없음"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                <p className="text-xs text-dark-500">배경 음악</p>
+                {board.backgroundMusic ? (
+                  <a
+                    href={board.backgroundMusic}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex text-sm font-medium text-emerald-300 hover:text-emerald-200 transition-colors"
+                  >
+                    배경 음악 열기
+                  </a>
+                ) : (
+                  <p className="mt-2 text-sm text-dark-600">연결된 음악 없음</p>
+                )}
+              </div>
+            </div>
+
+            {game.story.timeline.length > 0 && (
+              <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                <p className="text-xs text-dark-500 mb-3">사건 전 타임라인</p>
+                <div className="space-y-2">
+                  {game.story.timeline.map((item, index) => (
+                    <div key={`${item.time}-${index}`} className="flex gap-3 text-sm">
+                      <span className="w-16 shrink-0 rounded-full bg-dark-900 px-2 py-0.5 text-center text-xs text-dark-400">
+                        {item.time || "--:--"}
+                      </span>
+                      <p className="text-dark-300">{item.description || "내용 없음"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+              <p className="text-xs text-dark-500">페이즈 영상</p>
+              <MediaPanel source={videoSource} title={board.title} />
+            </div>
+
+            <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+              <p className="text-xs text-dark-500">공통 지도 / 참고 이미지</p>
+              {game.story.mapImageUrl ? (
+                <img
+                  src={game.story.mapImageUrl}
+                  alt={`${game.title} 공통 지도`}
+                  className="w-full rounded-xl border border-dark-700 object-cover"
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-600">
+                  연결된 지도 이미지가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs tracking-[0.22em] uppercase text-dark-500">Location Status</p>
+            <h3 className="text-lg font-semibold text-dark-50 mt-1">장소 리스트 / 카드 현황</h3>
+          </div>
+          <span className="text-xs text-dark-500">
+            {locations.length}개 장소 · {game.clues.length}장 단서
+          </span>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-2">
+          {locations.map(({ location, clues, acquired, remaining, secret, unlocked }) => {
+            const ownerName = location.ownerPlayerId
+              ? game.players.find((player) => player.id === location.ownerPlayerId)?.name
+              : null;
+
+            return (
+              <div key={location.id} className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-dark-50">{location.name || "이름 없는 장소"}</p>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                          unlocked
+                            ? "border-emerald-800 text-emerald-300 bg-emerald-950/20"
+                            : "border-yellow-800 text-yellow-300 bg-yellow-950/20"
+                        }`}
+                      >
+                        {unlocked ? "활성" : `Round ${location.unlocksAtRound} 잠금`}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-dark-500">{location.description || "설명 없음"}</p>
+                  </div>
+                  <div className="text-right text-xs text-dark-500">
+                    <p>총 {clues.length}</p>
+                    <p>획득 {acquired}</p>
+                    <p>남음 {remaining}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  <span className="rounded-full bg-dark-900 px-2 py-1 text-dark-300">비밀 단서 {secret}</span>
+                  {ownerName && (
+                    <span className="rounded-full bg-dark-900 px-2 py-1 text-dark-300">소유자 {ownerName}</span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {clues.length === 0 ? (
+                    <span className="text-xs text-dark-600">배치된 단서 없음</span>
+                  ) : (
+                    clues.map((clue) => {
+                      const acquiredState = acquiredClueIds.has(clue.id);
+                      return (
+                        <span
+                          key={clue.id}
+                          className={`rounded-full border px-2 py-1 text-[11px] ${
+                            acquiredState
+                              ? "border-mystery-700 bg-mystery-950/20 text-mystery-300 line-through"
+                              : clue.isSecret
+                              ? "border-amber-800 bg-amber-950/20 text-amber-300"
+                              : "border-dark-700 bg-dark-900 text-dark-300"
+                          }`}
+                        >
+                          {clue.title || "제목 없음"}
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── 페이즈 안내 패널 ────────────────────────────────────────────
@@ -794,7 +1183,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                 </div>
               ) : phase !== "ending" ? (
                 <button
-                  onClick={advancePhase}
+                  onClick={() => { void advancePhase(); }}
                   disabled={advancing}
                   className="w-full py-2.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
@@ -850,6 +1239,8 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
 
           {/* 오른쪽: 플레이어 슬롯 */}
           <div className="lg:col-span-2 space-y-4">
+            <GMBoard game={game} session={session} />
+
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-dark-300">
                 플레이어 슬롯 (

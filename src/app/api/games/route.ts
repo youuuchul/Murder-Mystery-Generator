@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
         victim: { name: "", background: "", deathCircumstances: "" },
         incident: "",
         location: "",
+        gmOverview: "",
+        mapImageUrl: undefined,
         timeline: [],
         culpritPlayerId: "",
         motive: "",

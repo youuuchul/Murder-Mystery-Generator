@@ -226,6 +226,11 @@ export async function POST(req: Request, { params }: Params) {
       acquiredAt: new Date().toISOString(),
     };
     pState.inventory.push(card);
+
+    if (!session.sharedState.acquiredClueIds.includes(clueId)) {
+      session.sharedState.acquiredClueIds.push(clueId);
+    }
+
     session.sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),

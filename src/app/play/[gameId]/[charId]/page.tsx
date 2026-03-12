@@ -464,17 +464,13 @@ export default function PlayerView() {
   useEffect(() => {
     if (!token || !sessionId) return;
     async function fetchState() {
-      const [sessionRes, gameRes] = await Promise.all([
-        fetch(`/api/sessions/${sessionId}?token=${token}`),
-        fetch(`/api/games/${gameId}`),
-      ]);
+      const sessionRes = await fetch(`/api/sessions/${sessionId}?token=${token}`);
       if (!sessionRes.ok) {
         setError("세션에 접근할 수 없습니다.");
         setLoading(false);
         return;
       }
-      const { sharedState: ss, playerState } = await sessionRes.json();
-      const { game: g } = await gameRes.json();
+      const { sharedState: ss, playerState, game: g } = await sessionRes.json();
       setSharedState(ss);
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});

@@ -314,7 +314,7 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
                 className={["relative w-11 h-6 rounded-full transition-colors",
                   privateChat.enabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
               >
-                <span className={["absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                <span className={["absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
                   privateChat.enabled ? "translate-x-6" : "translate-x-1"].join(" ")} />
               </button>
             </div>
@@ -356,7 +356,7 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
                 className={["relative w-11 h-6 rounded-full transition-colors",
                   cardTradingEnabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
               >
-                <span className={["absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                <span className={["absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
                   cardTradingEnabled ? "translate-x-6" : "translate-x-1"].join(" ")} />
               </button>
             </div>

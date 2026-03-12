@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, updateSession, deleteSession } from "@/lib/storage/session-storage";
+import { getGame } from "@/lib/storage/game-storage";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { GamePhase } from "@/types/session";
 
@@ -40,10 +41,13 @@ export async function GET(req: Request, { params }: Params) {
 /** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 */
 export async function PATCH(req: Request, { params }: Params) {
   const { sessionId } = params;
-  const body = await req.json().catch(() => ({})) as { action?: string };
+  const body = await req.json().catch(() => ({})) as { action?: string; subPhase?: string };
 
   const session = getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+  const game = getGame(session.gameId);
+  const maxRound = game?.rules?.roundCount ?? 4;
 
   const { sharedState } = session;
   let newPhase: GamePhase = sharedState.phase;
@@ -57,22 +61,31 @@ export async function PATCH(req: Request, { params }: Params) {
     } else if (sharedState.phase === "opening") {
       newPhase = "round-1";
       sharedState.currentRound = 1;
+      sharedState.currentSubPhase = "investigation";
       message = "Round 1 조사 페이즈가 시작됩니다.";
     } else if (sharedState.phase.startsWith("round-")) {
       const cur = sharedState.currentRound;
-      // TODO: max round 체크는 game.rules에서 참조, 일단 고정 4라운드
-      if (cur >= 4) {
+      if (cur >= maxRound) {
         newPhase = "vote";
+        sharedState.currentSubPhase = undefined;
         message = "투표 페이즈가 시작됩니다.";
       } else {
         newPhase = `round-${cur + 1}` as GamePhase;
         sharedState.currentRound = cur + 1;
+        sharedState.currentSubPhase = "investigation";
         message = `Round ${cur + 1} 조사 페이즈가 시작됩니다.`;
       }
     } else if (sharedState.phase === "vote") {
       newPhase = "ending";
       message = "엔딩입니다. 진실이 밝혀집니다.";
       session.endedAt = new Date().toISOString();
+    }
+  } else if (body.action === "set_subphase") {
+    const sub = body.subPhase as "investigation" | "briefing" | "discussion" | undefined;
+    if (sub && sharedState.phase.startsWith("round-")) {
+      sharedState.currentSubPhase = sub;
+      const labels: Record<string, string> = { investigation: "조사", briefing: "브리핑", discussion: "토론" };
+      message = `${labels[sub]} 페이즈가 시작됩니다.`;
     }
   } else if (body.action === "end_session") {
     session.endedAt = new Date().toISOString();

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "@/hooks/useSSE";
-import type { GamePackage } from "@/types/game";
+import type { GamePackage, GameRules, PhaseConfig } from "@/types/game";
 import type { GameSession, SharedState, CharacterSlot } from "@/types/session";
 
 interface GMDashboardProps {
@@ -43,7 +43,7 @@ function PhaseGuide({ phase, game }: { phase: string; game: GamePackage }) {
       title: "오프닝 — 나레이션 & 자기소개",
       steps: [
         "아래 오프닝 나레이션을 천천히 읽어주세요.",
-        `각 플레이어(${game.players.map((p) => p.name).join(" → ")}) 순으로 캐릭터 이름과 한 줄 자기소개를 합니다.`,
+        `각 플레이어(${(game.players ?? []).map((p) => p.name).join(" → ")}) 순으로 캐릭터 이름과 한 줄 자기소개를 합니다.`,
         "자기소개 후 '라운드 1 시작'을 눌러주세요.",
       ],
       narration: game.scripts?.opening?.narration,
@@ -116,34 +116,264 @@ function PhaseGuide({ phase, game }: { phase: string; game: GamePackage }) {
   );
 }
 
-function advanceLabel(phase: string): string {
+function advanceLabel(phase: string, maxRound: number): string {
   if (phase === "lobby") return "게임 시작";
   if (phase === "opening") return "Round 1 시작";
   if (phase.startsWith("round-")) {
     const n = parseInt(phase.split("-")[1]);
-    return n >= 4 ? "투표 시작" : `Round ${n + 1} 시작`;
+    return n >= maxRound ? "투표 시작" : `Round ${n + 1} 시작`;
   }
   if (phase === "vote") return "결과 공개";
   return "";
 }
 
+// ── 페이즈 타이머 ────────────────────────────────────────────────
+const SUB_PHASE_ORDER: PhaseConfig["type"][] = ["investigation", "briefing", "discussion"];
+const SUB_PHASE_LABELS: Record<PhaseConfig["type"], string> = {
+  investigation: "조사",
+  briefing: "브리핑",
+  discussion: "토론",
+};
+
+function PhaseTimer({
+  phase,
+  rules,
+  onAdvanceRound,
+  onSubPhaseChange,
+  advancing,
+}: {
+  phase: string;
+  rules: GameRules;
+  onAdvanceRound: () => void;
+  onSubPhaseChange: (sub: PhaseConfig["type"]) => void;
+  advancing: boolean;
+}) {
+  const roundNum = phase.startsWith("round-") ? parseInt(phase.split("-")[1]) : 0;
+  const maxRound = rules?.roundCount ?? 4;
+  const isRound = roundNum > 0;
+
+  const [subPhase, setSubPhase] = useState<PhaseConfig["type"]>("investigation");
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
+
+  const subPhaseRef = useRef<PhaseConfig["type"]>("investigation");
+  const autoAdvanceRef = useRef(false);
+  useEffect(() => { autoAdvanceRef.current = autoAdvance; }, [autoAdvance]);
+
+  function getDuration(type: PhaseConfig["type"]): number {
+    const cfg = rules?.phases?.find((p) => p.type === type);
+    return (cfg?.durationMinutes ?? 10) * 60;
+  }
+
+  function doAdvance() {
+    const sp = subPhaseRef.current;
+    const idx = SUB_PHASE_ORDER.indexOf(sp);
+    if (idx < SUB_PHASE_ORDER.length - 1) {
+      const next = SUB_PHASE_ORDER[idx + 1];
+      subPhaseRef.current = next;
+      setSubPhase(next);
+      setSecondsLeft(getDuration(next));
+      setTimerRunning(autoAdvanceRef.current);
+      onSubPhaseChange(next);
+    } else {
+      onAdvanceRound();
+    }
+  }
+
+  // 페이즈(라운드) 변경 시 sub-phase 초기화
+  useEffect(() => {
+    if (!isRound) return;
+    subPhaseRef.current = "investigation";
+    setSubPhase("investigation");
+    setSecondsLeft(getDuration("investigation"));
+    setTimerRunning(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // 첫 마운트 시 초기값 세팅
+  useEffect(() => {
+    if (isRound) setSecondsLeft(getDuration("investigation"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 카운트다운
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(id);
+          setTimerRunning(false);
+          if (autoAdvanceRef.current) setTimeout(() => doAdvance(), 500);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerRunning]);
+
+  if (!isRound) return null;
+
+  const totalSeconds = getDuration(subPhase);
+  const progress = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = secondsLeft % 60;
+  const isExpired = secondsLeft === 0;
+  const isLastSubPhase = subPhase === "discussion";
+
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-dark-300">페이즈 타이머</h3>
+        <label className="flex items-center gap-1.5 text-xs text-dark-400 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={autoAdvance}
+            onChange={(e) => setAutoAdvance(e.target.checked)}
+            className="rounded accent-mystery-500"
+          />
+          자동 넘김
+        </label>
+      </div>
+
+      {/* Sub-phase 진행 표시 */}
+      <div className="flex gap-1">
+        {SUB_PHASE_ORDER.map((sp) => {
+          const idx = SUB_PHASE_ORDER.indexOf(subPhase);
+          const spIdx = SUB_PHASE_ORDER.indexOf(sp);
+          const isDone = spIdx < idx;
+          const isCurrent = sp === subPhase;
+          return (
+            <div
+              key={sp}
+              className={`flex-1 py-1 rounded text-xs text-center border ${
+                isCurrent
+                  ? "border-mystery-600 bg-mystery-900/40 text-mystery-300 font-medium"
+                  : isDone
+                  ? "border-dark-700 bg-dark-800 text-dark-600 line-through"
+                  : "border-dark-700 text-dark-700"
+              }`}
+            >
+              {SUB_PHASE_LABELS[sp]}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 카운트다운 */}
+      <div className="text-center py-1">
+        <div
+          className={`text-5xl font-mono font-bold tabular-nums ${
+            isExpired ? "text-red-400 animate-pulse" : timerRunning ? "text-dark-50" : "text-dark-400"
+          }`}
+        >
+          {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+        </div>
+        <p className="text-xs text-dark-600 mt-1">
+          {SUB_PHASE_LABELS[subPhase]} — {Math.round(getDuration(subPhase) / 60)}분 배정
+        </p>
+      </div>
+
+      {/* 진행 바 */}
+      <div className="h-1 bg-dark-800 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-mystery-600 rounded-full transition-all duration-1000"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* 컨트롤 */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            if (secondsLeft === 0) {
+              setSecondsLeft(getDuration(subPhase));
+              setTimerRunning(true);
+            } else {
+              setTimerRunning((r) => !r);
+            }
+          }}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            timerRunning
+              ? "bg-dark-700 hover:bg-dark-600 text-dark-200"
+              : "bg-mystery-800 hover:bg-mystery-700 text-mystery-100 border border-mystery-700"
+          }`}
+        >
+          {timerRunning ? "⏸ 일시정지" : isExpired ? "↺ 재시작" : "▶ 시작"}
+        </button>
+        <button
+          onClick={doAdvance}
+          disabled={advancing}
+          className="px-4 py-2 text-sm rounded-lg border border-dark-600 text-dark-300 hover:bg-dark-800 transition-colors disabled:opacity-40"
+        >
+          {isLastSubPhase
+            ? roundNum >= maxRound
+              ? "투표 →"
+              : `R${roundNum + 1} 시작 →`
+            : "다음 →"}
+        </button>
+      </div>
+
+      {isExpired && (
+        <p className="text-xs text-red-400 text-center">
+          ⏰ {SUB_PHASE_LABELS[subPhase]} 시간 종료
+          {!autoAdvance && " — 다음 페이즈로 이동하세요"}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── 세션 코드 표시 ─────────────────────────────────────────────
 function SessionCode({ code }: { code: string }) {
   const [codeCopied, setCodeCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [serverIps, setServerIps] = useState<string[]>([]);
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+  const [tunnelLoading, setTunnelLoading] = useState(false);
 
-  useEffect(() => {
+  function fetchServerInfo() {
     fetch("/api/server-info")
       .then((r) => r.json())
-      .then((d) => setServerIps(d.ips ?? []))
+      .then((d) => {
+        setServerIps(d.ips ?? []);
+        setTunnelUrl(d.tunnelUrl ?? null);
+      })
       .catch(() => {});
+  }
+
+  // 마운트 시 서버 정보 로드, 터널 URL 없으면 5초마다 재시도
+  useEffect(() => {
+    fetchServerInfo();
+    const id = setInterval(() => {
+      if (!tunnelUrl) fetchServerInfo();
+    }, 5000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // tunnelUrl 생기면 폴링 중단
+  useEffect(() => {
+    if (tunnelUrl) setTunnelLoading(false);
+  }, [tunnelUrl]);
 
   function copyCode() {
     navigator.clipboard.writeText(code);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2000);
   }
+
+  function copyUrl(url: string) {
+    navigator.clipboard.writeText(url);
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
+  }
+
+  const joinPath = "/join";
 
   return (
     <div className="bg-dark-900 border border-mystery-800 rounded-2xl p-5 text-center space-y-3">
@@ -158,16 +388,45 @@ function SessionCode({ code }: { code: string }) {
         {codeCopied ? "✓ 복사됨" : "코드 복사"}
       </button>
 
-      {/* 서버 IP */}
-      <div className="text-left space-y-1 pt-1 border-t border-dark-800">
-        <p className="text-xs text-dark-600 text-center mb-1">접속 주소 (같은 Wi-Fi 필요)</p>
+      {/* 터널 URL (cloudflared) */}
+      {tunnelUrl ? (
+        <div className="border-t border-dark-800 pt-3 space-y-2">
+          <p className="text-xs text-dark-500">외부 접속 URL (어떤 네트워크든 가능)</p>
+          <p className="text-xs text-emerald-400 font-mono break-all">{tunnelUrl}{joinPath}</p>
+          <button
+            onClick={() => copyUrl(`${tunnelUrl}${joinPath}`)}
+            className="w-full text-sm px-4 py-2 rounded-lg bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800 transition-colors"
+          >
+            {urlCopied ? "✓ 복사됨" : "URL 복사"}
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-dark-800 pt-3">
+          <p className="text-xs text-dark-600 text-center">
+            외부 URL 없음 —{" "}
+            <span className="text-dark-500">
+              <code>npm run dev:tunnel</code> 로 시작하면 활성화
+            </span>
+          </p>
+        </div>
+      )}
+
+      {/* LAN IP */}
+      <div className="border-t border-dark-800 pt-3 space-y-1">
+        <p className="text-xs text-dark-600 text-center">LAN 접속 주소 (같은 Wi-Fi 필요)</p>
         {serverIps.length === 0 ? (
           <p className="text-xs text-dark-700 text-center font-mono">[IP 확인 중…]</p>
         ) : (
           serverIps.map((ip) => (
-            <p key={ip} className="text-xs text-dark-400 font-mono text-center">
-              {ip}:3000/join
-            </p>
+            <div key={ip} className="flex items-center justify-between px-2">
+              <p className="text-xs text-dark-400 font-mono">{ip}:3000{joinPath}</p>
+              <button
+                onClick={() => copyUrl(`http://${ip}:3000${joinPath}`)}
+                className="text-xs text-dark-600 hover:text-dark-300 transition-colors ml-2"
+              >
+                복사
+              </button>
+            </div>
           ))
         )}
       </div>
@@ -312,6 +571,22 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     title: c.title,
   }));
 
+  // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 세션 상태 동기화
+  useEffect(() => {
+    if (!session) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${session.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setSession((prev) =>
+          prev ? { ...prev, sharedState: data.session.sharedState } : prev
+        );
+      } catch {}
+    }, 3000);
+    return () => clearInterval(id);
+  }, [session?.id]);
+
   // SSE 구독
   useSSE(
     session ? `/api/sessions/${session.id}/events` : null,
@@ -357,6 +632,15 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     setAdvancing(false);
   }
 
+  async function advanceSubPhase(sub: PhaseConfig["type"]) {
+    if (!session) return;
+    await fetch(`/api/sessions/${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set_subphase", subPhase: sub }),
+    });
+  }
+
   async function forceRevealVotes() {
     if (!session) return;
     setRevealingVote(true);
@@ -397,13 +681,13 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
           <p className="text-xs text-mystery-500 mb-1">GM 대시보드</p>
           <h1 className="text-2xl font-bold text-dark-50">{game.title}</h1>
           <p className="text-sm text-dark-500 mt-1">
-            {game.players.length}명 · {game.settings.difficulty} · {game.settings.estimatedDuration}분
+            {(game.players ?? []).length}명 · {game.settings.difficulty} · {game.settings.estimatedDuration}분
           </p>
         </div>
         {session && (
           <div className="text-right">
             <p className="text-xs text-dark-500">현재 페이즈</p>
-            <p className="text-lg font-bold text-mystery-300">{phaseLabel(phase)}</p>
+            <p className="text-lg font-bold text-mystery-300">{phaseLabel(phase)}{session?.sharedState.currentSubPhase && phase.startsWith("round-") ? ` · ${{ investigation: "조사", briefing: "브리핑", discussion: "토론" }[session.sharedState.currentSubPhase]}` : ""}</p>
             {phase.startsWith("round-") && (
               <p className="text-xs text-dark-500">
                 Round {session.sharedState.currentRound} / {game.rules?.roundCount ?? 4}
@@ -478,12 +762,21 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                   disabled={advancing}
                   className="w-full py-2.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {advancing ? "처리 중…" : advanceLabel(phase)}
+                  {advancing ? "처리 중…" : advanceLabel(phase, game.rules?.roundCount ?? 4)}
                 </button>
               ) : (
                 <div className="text-center py-2 text-sm text-dark-500">게임 종료</div>
               )}
             </div>
+
+            {/* 페이즈 타이머 */}
+            <PhaseTimer
+              phase={phase}
+              rules={game.rules}
+              onAdvanceRound={advancePhase}
+              onSubPhaseChange={advanceSubPhase}
+              advancing={advancing}
+            />
 
             {/* 페이즈 안내 */}
             <PhaseGuide phase={phase} game={game} />
@@ -529,7 +822,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {session.sharedState.characterSlots.map((slot) => {
-                const character = game.players.find((p) => p.id === slot.playerId);
+                const character = (game.players ?? []).find((p) => p.id === slot.playerId);
                 return (
                   <SlotCard
                     key={slot.playerId}

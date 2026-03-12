@@ -330,7 +330,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
                 className={["relative w-11 h-6 rounded-full transition-colors",
                   rules.privateChat.enabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
               >
-                <span className={["absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                <span className={["absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
                   rules.privateChat.enabled ? "translate-x-6" : "translate-x-1"].join(" ")} />
               </button>
             </div>
@@ -373,7 +373,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
                 className={["relative w-11 h-6 rounded-full transition-colors",
                   rules.cardTrading.enabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
               >
-                <span className={["absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                <span className={["absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
                   rules.cardTrading.enabled ? "translate-x-6" : "translate-x-1"].join(" ")} />
               </button>
             </div>

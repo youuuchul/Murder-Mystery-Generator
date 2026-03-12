@@ -33,11 +33,11 @@ export async function GET(
         )
       );
 
-      // 5초마다 keepalive ping
-      // 짧은 간격으로 Cloudflare 버퍼를 지속적으로 플러시
+      // 5초마다 keepalive ping 이벤트 전송
+      // 프록시 플러시와 클라이언트 dead-connection 감지를 동시에 만족시킨다.
       pingInterval = setInterval(() => {
         try {
-          ctrl.enqueue(encoder.encode(`: ping\n\n`));
+          ctrl.enqueue(encoder.encode(`event: ping\ndata: {}\n\n`));
         } catch {
           clearInterval(pingInterval);
         }

@@ -137,28 +137,33 @@ const SUB_PHASE_LABELS: Record<PhaseConfig["type"], string> = {
 
 function PhaseTimer({
   phase,
+  currentSubPhase,
   rules,
   onAdvanceRound,
   onSubPhaseChange,
   advancing,
 }: {
   phase: string;
+  currentSubPhase?: PhaseConfig["type"];
   rules: GameRules;
-  onAdvanceRound: () => void;
-  onSubPhaseChange: (sub: PhaseConfig["type"]) => void;
+  onAdvanceRound: () => Promise<boolean>;
+  onSubPhaseChange: (sub: PhaseConfig["type"]) => Promise<boolean>;
   advancing: boolean;
 }) {
   const roundNum = phase.startsWith("round-") ? parseInt(phase.split("-")[1]) : 0;
   const maxRound = rules?.roundCount ?? 4;
   const isRound = roundNum > 0;
 
-  const [subPhase, setSubPhase] = useState<PhaseConfig["type"]>("investigation");
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
 
-  const subPhaseRef = useRef<PhaseConfig["type"]>("investigation");
+  const subPhaseRef = useRef<PhaseConfig["type"]>(currentSubPhase ?? "investigation");
   const autoAdvanceRef = useRef(false);
+  const resumeTimerAfterSyncRef = useRef(false);
+
+  const subPhase = currentSubPhase ?? "investigation";
+
   useEffect(() => { autoAdvanceRef.current = autoAdvance; }, [autoAdvance]);
 
   function getDuration(type: PhaseConfig["type"]): number {
@@ -166,36 +171,35 @@ function PhaseTimer({
     return (cfg?.durationMinutes ?? 10) * 60;
   }
 
-  function doAdvance() {
+  async function doAdvance() {
     const sp = subPhaseRef.current;
     const idx = SUB_PHASE_ORDER.indexOf(sp);
     if (idx < SUB_PHASE_ORDER.length - 1) {
       const next = SUB_PHASE_ORDER[idx + 1];
-      subPhaseRef.current = next;
-      setSubPhase(next);
-      setSecondsLeft(getDuration(next));
-      setTimerRunning(autoAdvanceRef.current);
-      onSubPhaseChange(next);
+      resumeTimerAfterSyncRef.current = autoAdvanceRef.current;
+      const advanced = await onSubPhaseChange(next);
+      if (!advanced) {
+        resumeTimerAfterSyncRef.current = false;
+      }
     } else {
-      onAdvanceRound();
+      resumeTimerAfterSyncRef.current = false;
+      await onAdvanceRound();
     }
   }
 
-  // 페이즈(라운드) 변경 시 sub-phase 초기화
   useEffect(() => {
-    if (!isRound) return;
-    subPhaseRef.current = "investigation";
-    setSubPhase("investigation");
-    setSecondsLeft(getDuration("investigation"));
-    setTimerRunning(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+    if (!isRound) {
+      setSecondsLeft(0);
+      setTimerRunning(false);
+      return;
+    }
 
-  // 첫 마운트 시 초기값 세팅
-  useEffect(() => {
-    if (isRound) setSecondsLeft(getDuration("investigation"));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const nextSubPhase = currentSubPhase ?? "investigation";
+    subPhaseRef.current = nextSubPhase;
+    setSecondsLeft(getDuration(nextSubPhase));
+    setTimerRunning(resumeTimerAfterSyncRef.current);
+    resumeTimerAfterSyncRef.current = false;
+  }, [currentSubPhase, isRound, phase, rules]);
 
   // 카운트다운
   useEffect(() => {
@@ -205,15 +209,14 @@ function PhaseTimer({
         if (s <= 1) {
           clearInterval(id);
           setTimerRunning(false);
-          if (autoAdvanceRef.current) setTimeout(() => doAdvance(), 500);
+          if (autoAdvanceRef.current) setTimeout(() => { void doAdvance(); }, 500);
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerRunning]);
+  }, [timerRunning, subPhase]);
 
   if (!isRound) return null;
 
@@ -306,10 +309,10 @@ function PhaseTimer({
           {timerRunning ? "⏸ 일시정지" : isExpired ? "↺ 재시작" : "▶ 시작"}
         </button>
         <button
-          onClick={doAdvance}
-          disabled={advancing}
-          className="px-4 py-2 text-sm rounded-lg border border-dark-600 text-dark-300 hover:bg-dark-800 transition-colors disabled:opacity-40"
-        >
+            onClick={() => { void doAdvance(); }}
+            disabled={advancing}
+            className="px-4 py-2 text-sm rounded-lg border border-dark-600 text-dark-300 hover:bg-dark-800 transition-colors disabled:opacity-40"
+          >
           {isLastSubPhase
             ? roundNum >= maxRound
               ? "투표 →"
@@ -334,32 +337,27 @@ function SessionCode({ code }: { code: string }) {
   const [urlCopied, setUrlCopied] = useState(false);
   const [serverIps, setServerIps] = useState<string[]>([]);
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
-  const [tunnelLoading, setTunnelLoading] = useState(false);
 
-  function fetchServerInfo() {
-    fetch("/api/server-info")
-      .then((r) => r.json())
-      .then((d) => {
-        setServerIps(d.ips ?? []);
-        setTunnelUrl(d.tunnelUrl ?? null);
-      })
-      .catch(() => {});
-  }
-
-  // 마운트 시 서버 정보 로드, 터널 URL 없으면 5초마다 재시도
-  useEffect(() => {
-    fetchServerInfo();
-    const id = setInterval(() => {
-      if (!tunnelUrl) fetchServerInfo();
-    }, 5000);
-    return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchServerInfo = useCallback(async () => {
+    try {
+      const res = await fetch("/api/server-info");
+      if (!res.ok) return;
+      const data = await res.json();
+      setServerIps(data.ips ?? []);
+      setTunnelUrl(data.tunnelUrl ?? null);
+    } catch {}
   }, []);
 
-  // tunnelUrl 생기면 폴링 중단
   useEffect(() => {
-    if (tunnelUrl) setTunnelLoading(false);
-  }, [tunnelUrl]);
+    void fetchServerInfo();
+    if (tunnelUrl) return;
+
+    const id = setInterval(() => {
+      void fetchServerInfo();
+    }, 5000);
+
+    return () => clearInterval(id);
+  }, [fetchServerInfo, tunnelUrl]);
 
   function copyCode() {
     navigator.clipboard.writeText(code);
@@ -622,23 +620,61 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   }
 
   async function advancePhase() {
-    if (!session) return;
+    if (!session) return false;
     setAdvancing(true);
-    await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "advance_phase" }),
-    });
-    setAdvancing(false);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "advance_phase" }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "페이즈 전환 실패");
+        return false;
+      }
+
+      const data = await res.json();
+      setSession((prev) =>
+        prev ? { ...prev, sharedState: data.session.sharedState } : prev
+      );
+      return true;
+    } catch {
+      alert("페이즈 전환 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      setAdvancing(false);
+    }
   }
 
   async function advanceSubPhase(sub: PhaseConfig["type"]) {
-    if (!session) return;
-    await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "set_subphase", subPhase: sub }),
-    });
+    if (!session) return false;
+    setAdvancing(true);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_subphase", subPhase: sub }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "세부 페이즈 전환 실패");
+        return false;
+      }
+
+      const data = await res.json();
+      setSession((prev) =>
+        prev ? { ...prev, sharedState: data.session.sharedState } : prev
+      );
+      return true;
+    } catch {
+      alert("세부 페이즈 전환 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      setAdvancing(false);
+    }
   }
 
   async function forceRevealVotes() {
@@ -772,6 +808,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
             {/* 페이즈 타이머 */}
             <PhaseTimer
               phase={phase}
+              currentSubPhase={session.sharedState.currentSubPhase}
               rules={game.rules}
               onAdvanceRound={advancePhase}
               onSubPhaseChange={advanceSubPhase}

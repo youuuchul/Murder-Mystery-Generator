@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
  * SSE 구독 훅.
  * - named event를 핸들러 맵으로 처리
  * - 연결 끊김 시 3초 후 자동 재연결
- * - 15초 이상 아무 이벤트/ping도 없으면 dead connection으로 판단하고 재연결
+ * - 15초 이상 아무 이벤트/ping 이벤트도 없으면 dead connection으로 판단하고 재연결
  *   (Cloudflare 등 프록시가 스트림을 끊지 않고 버퍼링하는 경우 대응)
  */
 export function useSSE(
@@ -36,8 +36,9 @@ export function useSSE(
     function connect() {
       es = new EventSource(url!);
 
-      // ping 코멘트도 수신으로 간주하여 dead timer 리셋
+      // default message와 서버 keepalive ping 이벤트 모두 수신 신호로 간주한다.
       es.addEventListener("message", resetDeadTimer);
+      es.addEventListener("ping", resetDeadTimer);
 
       // named event handlers
       for (const [event] of Object.entries(handlersRef.current)) {

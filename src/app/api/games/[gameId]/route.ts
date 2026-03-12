@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGame, saveGame, deleteGame } from "@/lib/storage/game-storage";
+import { buildPublicGame } from "@/lib/game-sanitizer";
 import type { GamePackage } from "@/types/game";
 
 type Params = { params: Promise<{ gameId: string }> };
@@ -13,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  return NextResponse.json({ game });
+  return NextResponse.json({ game: buildPublicGame(game) });
 }
 
 /** PUT /api/games/[gameId] — 게임 수정 */

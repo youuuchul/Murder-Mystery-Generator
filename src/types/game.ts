@@ -66,6 +66,8 @@ export interface Story {
   victim: VictimInfo;
   incident: string; // 플레이어 공개 사건 설명
   location: string; // 배경 장소
+  gmOverview?: string; // GM 메인 화면 공통 메모
+  mapImageUrl?: string; // GM 메인 화면 공통 지도/이미지
   timeline: TimelineEvent[];
   culpritPlayerId: string; // GM only — 진짜 범인 player ID
   motive: string; // GM only
@@ -200,12 +202,16 @@ export interface ScriptSegment {
   narration: string;
   videoUrl?: string;
   backgroundMusic?: string;
+  gmNote?: string; // 해당 페이즈의 GM 메인 화면 메모
 }
 
 export interface RoundScript {
   round: number;
   narration: string;
   unlockedLocationIds: string[];
+  videoUrl?: string;
+  backgroundMusic?: string;
+  gmNote?: string; // 해당 라운드의 GM 메인 화면 메모
 }
 
 export interface Scripts {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, updateSession, deleteSession } from "@/lib/storage/session-storage";
 import { getGame } from "@/lib/storage/game-storage";
+import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { GamePhase } from "@/types/session";
 
@@ -18,10 +19,13 @@ export async function GET(req: Request, { params }: Params) {
   if (token) {
     const pState = session.playerStates.find((p) => p.token === token);
     if (!pState) return NextResponse.json({ error: "Invalid token" }, { status: 403 });
+    const game = getGame(session.gameId);
+    if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
     return NextResponse.json({
       sharedState: session.sharedState,
       playerState: pState,
       gameId: session.gameId,
+      game: buildGameForPlayer(game, pState.playerId),
     });
   }
 

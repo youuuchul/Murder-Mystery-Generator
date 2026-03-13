@@ -23,7 +23,7 @@
 
 [콘텐츠 작성 단계 — 순서 중요]
   Step 1. 사건 개요 작성    (범죄 유형, 배경, 동기, 범인)
-  Step 2. 인물 작성         (캐릭터별 배경·비밀·알리바이)
+  Step 2. 인물 작성         (캐릭터별 배경·상세 스토리·비밀)
   Step 3. 단서 카드 작성    (물적 증거, 증언, 현장 단서)
   Step 4. 오프닝 스크립트  (사건 나레이션)
   Step 5. 라운드 이벤트    (각 라운드에서 공개될 단서/사건)
@@ -105,8 +105,8 @@ interface Character {
   name: string;
   role: "victim" | "culprit" | "suspect" | "witness";
   background: string;
+  story: string;                // 캐릭터 상세 스토리
   secret: string;               // 캐릭터만 아는 비밀
-  alibi: string;
   relationships: Relationship[];
   cardImage?: string;           // 카드 이미지 URL
 }

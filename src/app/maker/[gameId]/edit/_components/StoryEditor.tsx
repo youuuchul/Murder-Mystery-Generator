@@ -48,7 +48,6 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
       {/* ── 피해자 정보 ── */}
       <div className="border border-dark-700 rounded-xl p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">💀</span>
           <h3 className="text-sm font-semibold text-dark-100">피해자 정보</h3>
           <span className="text-xs text-dark-500">(게임 시작 시 전원 공개)</span>
         </div>
@@ -115,7 +114,7 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
         </select>
         {story.culpritPlayerId && (
           <p className="text-xs text-mystery-400 mt-1">
-            ✓ {players.find((p) => p.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
+            선택됨: {players.find((p) => p.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
           </p>
         )}
       </Field>

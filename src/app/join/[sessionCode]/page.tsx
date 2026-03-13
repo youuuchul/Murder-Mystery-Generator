@@ -67,7 +67,6 @@ export default function JoinPage() {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-4xl mb-4">😢</p>
           <p className="text-dark-400">{error || "세션 로드 실패"}</p>
         </div>
       </div>
@@ -166,9 +165,9 @@ export default function JoinPage() {
         <div className="border border-dark-800 rounded-xl p-4 space-y-2">
           <h3 className="text-xs font-medium text-dark-500">게임 정보</h3>
           <div className="flex gap-3 text-xs text-dark-500">
-            <span>👥 {game.settings.playerCount}인</span>
-            <span>⏱ {game.settings.estimatedDuration}분</span>
-            <span>🎯 {game.settings.difficulty === "easy" ? "쉬움" : game.settings.difficulty === "normal" ? "보통" : "어려움"}</span>
+            <span>인원 {game.settings.playerCount}인</span>
+            <span>시간 {game.settings.estimatedDuration}분</span>
+            <span>난이도 {game.settings.difficulty === "easy" ? "쉬움" : game.settings.difficulty === "normal" ? "보통" : "어려움"}</span>
           </div>
         </div>
       </div>

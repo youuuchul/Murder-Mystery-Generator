@@ -199,17 +199,17 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
             >
               {playerCountMismatch ? (
                 <>
-                  ⚠ 현재 {characterCount}명의 캐릭터가 등록되어 있습니다. 플레이어 탭에서 캐릭터 수를 맞춰주세요.
+                  현재 {characterCount}명의 캐릭터가 등록되어 있습니다. 플레이어 탭에서 캐릭터 수를 맞춰주세요.
                 </>
               ) : (
-                <>✓ 등록된 캐릭터 {characterCount}명과 일치합니다.</>
+                <>등록된 캐릭터 {characterCount}명과 일치합니다.</>
               )}
             </div>
           )}
 
           {showPlayerCountWarning && (
             <div className="mt-2 px-3 py-2 rounded-lg text-xs bg-orange-950/20 border border-orange-900 text-orange-400">
-              ⚠ 플레이어 수 변경은 캐릭터 목록에 영향을 주지 않습니다. &apos;플레이어&apos; 탭에서 직접 캐릭터를 추가/삭제하세요.
+              플레이어 수 변경은 캐릭터 목록에 영향을 주지 않습니다. &apos;플레이어&apos; 탭에서 직접 캐릭터를 추가/삭제하세요.
             </div>
           )}
         </div>

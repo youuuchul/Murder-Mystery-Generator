@@ -45,8 +45,8 @@ export default function GameCard({ game }: GameCardProps) {
       {/* 썸네일 영역 */}
       <div className="h-32 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-mystery-600 to-transparent" />
-        <span className="text-4xl select-none" aria-hidden="true">
-          🔍
+        <span className="text-xs tracking-[0.24em] uppercase text-mystery-300/70 select-none" aria-hidden="true">
+          FILE
         </span>
       </div>
 
@@ -72,10 +72,10 @@ export default function GameCard({ game }: GameCardProps) {
 
         {/* 통계 */}
         <div className="flex items-center gap-3 text-xs text-dark-400">
-          <span title="인원 수">👥 {game.settings.playerCount}인</span>
-          <span title="소요 시간">⏱ {game.settings.estimatedDuration}분</span>
-          <span title="플레이어">🎭 {game.playerCount}명</span>
-          <span title="단서 수">🗝 {game.clueCount}개</span>
+          <span title="인원 수">인원 {game.settings.playerCount}인</span>
+          <span title="소요 시간">시간 {game.settings.estimatedDuration}분</span>
+          <span title="플레이어">플레이어 {game.playerCount}명</span>
+          <span title="단서 수">단서 {game.clueCount}개</span>
         </div>
 
         {/* 액션 버튼 */}
@@ -99,7 +99,7 @@ export default function GameCard({ game }: GameCardProps) {
             className="text-xs py-1.5 px-2 rounded border border-dark-700 text-dark-500 hover:text-red-400 hover:border-red-800 transition-colors disabled:opacity-50"
             title="삭제"
           >
-            {deleting ? "…" : "🗑"}
+            {deleting ? "삭제 중" : "삭제"}
           </button>
         </div>
       </div>

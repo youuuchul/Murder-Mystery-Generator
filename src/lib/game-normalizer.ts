@@ -1,4 +1,14 @@
-import type { GamePackage, GameRules, GameSettings, GameMetadata, PhaseConfig, RoundScript, ScriptSegment, Story } from "@/types/game";
+import type {
+  GameMetadata,
+  GamePackage,
+  GameRules,
+  GameSettings,
+  PhaseConfig,
+  Player,
+  RoundScript,
+  ScriptSegment,
+  Story,
+} from "@/types/game";
 
 const LEGACY_TAG_MAP: Record<string, string> = {
   "gothic-mansion": "고딕 저택",
@@ -18,6 +28,53 @@ function asTrimmedString(value: unknown): string {
 function asOptionalString(value: unknown): string | undefined {
   const normalized = asTrimmedString(value);
   return normalized || undefined;
+}
+
+function normalizeVictoryCondition(value: unknown): Player["victoryCondition"] {
+  return value === "avoid-arrest"
+    || value === "uncertain"
+    || value === "arrest-culprit"
+    || value === "personal-goal"
+    ? value
+    : "arrest-culprit";
+}
+
+/**
+ * 기존 `alibi` 중심 데이터와 신규 `story` 구조를 함께 받아
+ * 현재 플레이어 편집기/플레이 화면에서 바로 쓸 수 있는 형태로 정규화한다.
+ */
+function normalizePlayer(player: Player | undefined): Player {
+  const legacyAlibi = asOptionalString(player?.alibi);
+
+  return {
+    id: asTrimmedString(player?.id) || crypto.randomUUID(),
+    name: asTrimmedString(player?.name),
+    victoryCondition: normalizeVictoryCondition(player?.victoryCondition),
+    personalGoal: asOptionalString(player?.personalGoal),
+    scoreConditions: Array.isArray(player?.scoreConditions)
+      ? player.scoreConditions.map((condition) => ({
+          description: asTrimmedString(condition?.description),
+          points: Number.isFinite(condition?.points) ? Number(condition.points) : 0,
+        }))
+      : [],
+    background: asTrimmedString(player?.background),
+    story: asTrimmedString(player?.story) || legacyAlibi || "",
+    secret: asTrimmedString(player?.secret),
+    alibi: legacyAlibi,
+    relatedClues: Array.isArray(player?.relatedClues)
+      ? player.relatedClues.map((related) => ({
+          clueId: asTrimmedString(related?.clueId),
+          note: asTrimmedString(related?.note),
+        }))
+      : [],
+    relationships: Array.isArray(player?.relationships)
+      ? player.relationships.map((relationship) => ({
+          playerId: asTrimmedString(relationship?.playerId),
+          description: asTrimmedString(relationship?.description),
+        }))
+      : [],
+    cardImage: asOptionalString(player?.cardImage),
+  };
 }
 
 function normalizeTags(settings: Partial<GameSettings> & { theme?: string; tone?: string }): string[] {
@@ -141,7 +198,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     settings,
     rules,
     story,
-    players: game.players ?? [],
+    players: Array.isArray(game.players) ? game.players.map(normalizePlayer) : [],
     locations: game.locations ?? [],
     clues: game.clues ?? [],
     cards: game.cards ?? {

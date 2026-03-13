@@ -123,8 +123,10 @@ export interface Player {
   personalGoal?: string; // victoryCondition === "personal-goal"일 때 목표 설명
   scoreConditions: ScoreCondition[]; // 승점 조건 목록
   background: string; // 캐릭터 배경 (전원 공개)
-  secret: string; // 본인만 열람
-  alibi: string;
+  story: string; // 캐릭터 상세 스토리 (본인만 열람)
+  secret: string; // 비밀 / 반전 정보 (본인만 열람)
+  /** legacy field — 기존 데이터 호환용 */
+  alibi?: string;
   relatedClues: RelatedClueRef[]; // 연관 단서 카드 + 설명
   relationships: Relationship[];
   cardImage?: string;

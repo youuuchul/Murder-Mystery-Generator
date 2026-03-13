@@ -23,6 +23,7 @@ const VICTORY_OPTIONS: { value: VictoryCondition; label: string; desc: string; c
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 const ta = inp + " resize-none";
 
+/** 메이커 편집기에서 새 캐릭터를 추가할 때 사용하는 기본 템플릿이다. */
 function createPlayer(): Player {
   return {
     id: crypto.randomUUID(),
@@ -31,8 +32,8 @@ function createPlayer(): Player {
     personalGoal: "",
     scoreConditions: [{ description: "범인 검거 성공", points: 3 }],
     background: "",
+    story: "",
     secret: "",
-    alibi: "",
     relatedClues: [],
     relationships: [],
   };
@@ -87,7 +88,7 @@ function PlayerForm({
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="text-xs text-dark-500 hover:text-red-400 transition-colors px-2 py-1">삭제</button>
-          <span className="text-dark-500 text-sm">{expanded ? "▲" : "▼"}</span>
+          <span className="text-dark-500 text-sm">{expanded ? "접기" : "열기"}</span>
         </div>
       </button>
 
@@ -145,21 +146,26 @@ function PlayerForm({
                   onChange={(e) => update("background", e.target.value)}
                   placeholder="다른 플레이어에게도 공개되는 캐릭터 소개" className={ta} />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-dark-400 mb-1">
-                    비밀 <span className="text-mystery-500">(본인만 열람)</span>
-                  </label>
-                  <textarea rows={3} value={player.secret}
-                    onChange={(e) => update("secret", e.target.value)}
-                    placeholder="이 플레이어만 아는 비밀" className={ta} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-dark-400 mb-1">알리바이</label>
-                  <textarea rows={3} value={player.alibi}
-                    onChange={(e) => update("alibi", e.target.value)}
-                    placeholder="사건 발생 시각의 행동" className={ta} />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-dark-400 mb-1">
+                  상세 스토리 <span className="text-mystery-500">(본인만 열람)</span>
+                </label>
+                <textarea rows={5} value={player.story}
+                  onChange={(e) => update("story", e.target.value)}
+                  placeholder="이 캐릭터가 알고 있는 사건 전후 맥락, 감정선, 의심하는 대상, 숨기고 싶은 사정을 자세히 적으세요."
+                  className={ta} />
+                <p className="mt-1 text-[11px] text-dark-500">
+                  사건 시각의 행동이나 변명도 여기 안에 함께 정리합니다.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-dark-400 mb-1">
+                  비밀 / 반전 정보 <span className="text-mystery-500">(본인만 열람)</span>
+                </label>
+                <textarea rows={4} value={player.secret}
+                  onChange={(e) => update("secret", e.target.value)}
+                  placeholder="후반 공개용 비밀, 숨긴 행동, 진범 여부와 연결되는 핵심 정보를 적으세요."
+                  className={ta} />
               </div>
             </div>
           )}
@@ -180,7 +186,7 @@ function PlayerForm({
                   <span className="text-xs text-dark-500 shrink-0">점</span>
                   <button type="button"
                     onClick={() => update("scoreConditions", player.scoreConditions.filter((_, i) => i !== idx))}
-                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">✕</button>
+                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">삭제</button>
                 </div>
               ))}
               <button type="button"
@@ -212,7 +218,7 @@ function PlayerForm({
                     </select>
                     <button type="button"
                       onClick={() => update("relatedClues", player.relatedClues.filter((_, i) => i !== idx))}
-                      className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">✕</button>
+                      className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">삭제</button>
                   </div>
                   <input type="text" value={rc.note}
                     onChange={(e) => updateRelatedClue(idx, { note: e.target.value })}
@@ -251,7 +257,7 @@ function PlayerForm({
                     className="flex-1 bg-dark-800 border border-dark-600 rounded px-2 py-1.5 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-1 focus:ring-mystery-500 transition" />
                   <button type="button"
                     onClick={() => update("relationships", player.relationships.filter((_, i) => i !== idx))}
-                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">✕</button>
+                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors">삭제</button>
                 </div>
               ))}
               <button type="button"
@@ -282,7 +288,6 @@ export default function PlayerEditor({ players, clues, onChange, onSave, saving 
 
       {players.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-dark-700 rounded-xl">
-          <p className="text-4xl mb-3">🎭</p>
           <p className="text-dark-500">등록된 플레이어가 없습니다.</p>
           <button type="button" onClick={() => onChange([...players, createPlayer()])}
             className="mt-2 text-sm text-mystery-400 hover:text-mystery-300 transition-colors">

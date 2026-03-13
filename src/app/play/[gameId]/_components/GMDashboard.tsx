@@ -45,6 +45,7 @@ interface PhaseBoardContent {
   guideText?: string;
   videoUrl?: string;
   backgroundMusic?: string;
+  showSharedImage?: boolean;
 }
 
 /** GM 메인 화면에서 재생 가능한 URL을 embed/video 형태로 정규화한다. */
@@ -93,6 +94,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       guideText: game.scripts.lobby.gmNote,
       videoUrl: game.scripts.lobby.videoUrl,
       backgroundMusic: game.scripts.lobby.backgroundMusic,
+      showSharedImage: true,
     };
   }
 
@@ -106,6 +108,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       guideText: game.scripts.opening.gmNote,
       videoUrl: game.scripts.opening.videoUrl,
       backgroundMusic: game.scripts.opening.backgroundMusic,
+      showSharedImage: false,
     };
   }
 
@@ -120,6 +123,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       guideText: roundScript?.gmNote,
       videoUrl: roundScript?.videoUrl,
       backgroundMusic: roundScript?.backgroundMusic,
+      showSharedImage: true,
     };
   }
 
@@ -133,6 +137,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       guideText: game.scripts.vote.gmNote,
       videoUrl: game.scripts.vote.videoUrl,
       backgroundMusic: game.scripts.vote.backgroundMusic,
+      showSharedImage: true,
     };
   }
 
@@ -161,6 +166,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       guideText: guideParts.length > 0 ? guideParts.join("\n\n") : undefined,
       videoUrl: branchScript?.videoUrl ?? game.scripts.ending.videoUrl,
       backgroundMusic: branchScript?.backgroundMusic ?? game.scripts.ending.backgroundMusic,
+      showSharedImage: false,
     };
   }
 
@@ -168,6 +174,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
     title: "세션 준비",
     badge: "Ready",
     narrationBlocks: [],
+    showSharedImage: true,
   };
 }
 
@@ -218,6 +225,7 @@ function MediaPanel({ source, title }: { source: VideoSource | null; title: stri
 
 function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardContent }) {
   const videoSource = resolveVideoSource(content.videoUrl);
+  const showSharedImage = content.showSharedImage ?? true;
   return (
     <div className="rounded-2xl border border-dark-800 overflow-hidden bg-[linear-gradient(145deg,rgba(51,65,85,0.18),rgba(10,14,23,0.94))]">
       <div className="border-b border-dark-800/80 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
@@ -237,20 +245,22 @@ function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardCont
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
-            <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
-            {game.story.mapImageUrl ? (
-              <img
-                src={game.story.mapImageUrl}
-                alt={`${game.title} 공통 이미지`}
-                className="w-full rounded-xl border border-dark-700 object-cover"
-              />
-            ) : (
-              <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-600">
-                연결된 이미지가 없습니다.
-              </div>
-            )}
-          </div>
+          {showSharedImage && (
+            <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+              <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
+              {game.story.mapImageUrl ? (
+                <img
+                  src={game.story.mapImageUrl}
+                  alt={`${game.title} 공통 이미지`}
+                  className="w-full rounded-xl border border-dark-700 object-cover"
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-600">
+                  연결된 이미지가 없습니다.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
             <p className="text-xs text-dark-500">배경 음악</p>
@@ -523,6 +533,19 @@ function SessionCode({ code }: { code: string }) {
   const [urlCopied, setUrlCopied] = useState(false);
   const [serverIps, setServerIps] = useState<string[]>([]);
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+  const [localPort, setLocalPort] = useState("3000");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const nextPort = window.location.port;
+    if (nextPort) {
+      setLocalPort(nextPort);
+      return;
+    }
+
+    setLocalPort(window.location.protocol === "https:" ? "443" : "80");
+  }, []);
 
   const fetchServerInfo = useCallback(async () => {
     try {
@@ -558,6 +581,7 @@ function SessionCode({ code }: { code: string }) {
   }
 
   const joinPath = "/join";
+  const portSuffix = localPort === "80" || localPort === "443" ? "" : `:${localPort}`;
 
   return (
     <div className="bg-dark-900 border border-mystery-800 rounded-2xl p-5 text-center space-y-3">
@@ -569,7 +593,7 @@ function SessionCode({ code }: { code: string }) {
         onClick={copyCode}
         className="text-sm px-4 py-2 rounded-lg bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700 transition-colors"
       >
-        {codeCopied ? "✓ 복사됨" : "코드 복사"}
+        {codeCopied ? "복사됨" : "코드 복사"}
       </button>
 
       {/* 터널 URL (cloudflared) */}
@@ -581,7 +605,7 @@ function SessionCode({ code }: { code: string }) {
             onClick={() => copyUrl(`${tunnelUrl}${joinPath}`)}
             className="w-full text-sm px-4 py-2 rounded-lg bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800 transition-colors"
           >
-            {urlCopied ? "✓ 복사됨" : "URL 복사"}
+            {urlCopied ? "복사됨" : "URL 복사"}
           </button>
         </div>
       ) : (
@@ -603,9 +627,9 @@ function SessionCode({ code }: { code: string }) {
         ) : (
           serverIps.map((ip) => (
             <div key={ip} className="flex items-center justify-between px-2">
-              <p className="text-xs text-dark-400 font-mono">{ip}:3000{joinPath}</p>
+              <p className="text-xs text-dark-400 font-mono">{ip}{portSuffix}{joinPath}</p>
               <button
-                onClick={() => copyUrl(`http://${ip}:3000${joinPath}`)}
+                onClick={() => copyUrl(`http://${ip}${portSuffix}${joinPath}`)}
                 className="text-xs text-dark-600 hover:text-dark-300 transition-colors ml-2"
               >
                 복사
@@ -665,7 +689,7 @@ function SlotCard({
           <p className="font-semibold text-dark-100 text-sm">{playerName}</p>
           {slot.isLocked ? (
             <p className="text-xs text-mystery-400 mt-0.5">
-              ✓ {slot.playerName} 참가 중
+              {slot.playerName} 참가 중
             </p>
           ) : (
             <p className="text-xs text-dark-600 mt-0.5">대기 중…</p>
@@ -712,19 +736,19 @@ function SlotCard({
 
 // ── 이벤트 로그 ─────────────────────────────────────────────────
 function EventLog({ entries }: { entries: GameSession["sharedState"]["eventLog"] }) {
-  const icons: Record<string, string> = {
-    phase_changed: "⚡",
-    card_received: "🎴",
-    card_transferred: "🔄",
-    clue_revealed: "🔍",
-    player_joined: "👤",
-    system: "🔧",
+  const labels: Record<string, string> = {
+    phase_changed: "페이즈",
+    card_received: "획득",
+    card_transferred: "양도",
+    clue_revealed: "공개",
+    player_joined: "참가",
+    system: "시스템",
   };
   return (
     <div className="h-48 overflow-y-auto space-y-1 p-3 bg-dark-950 rounded-lg border border-dark-800">
       {[...entries].reverse().map((e) => (
         <div key={e.id} className="flex gap-2 text-xs text-dark-400">
-          <span className="shrink-0">{icons[e.type] ?? "•"}</span>
+          <span className="shrink-0 text-dark-600">[{labels[e.type] ?? "기록"}]</span>
           <span className="truncate">{e.message}</span>
           <span className="shrink-0 text-dark-700 ml-auto">
             {new Date(e.timestamp).toLocaleTimeString("ko-KR", {
@@ -937,7 +961,6 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
       {/* 세션 없음 */}
       {!session ? (
         <div className="text-center py-20 border-2 border-dashed border-dark-700 rounded-2xl">
-          <p className="text-4xl mb-4">🎭</p>
           <p className="text-dark-400 mb-6">아직 활성 세션이 없습니다.</p>
           <button
             onClick={createSession}

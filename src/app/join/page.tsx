@@ -30,7 +30,6 @@ export default function JoinEntryPage() {
     <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <p className="text-5xl mb-4">🔍</p>
           <h1 className="text-2xl font-bold text-dark-50">게임 참가</h1>
           <p className="text-dark-500 text-sm mt-1">GM에게 받은 6자리 코드를 입력하세요</p>
         </div>

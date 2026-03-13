@@ -36,6 +36,7 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
     victoryCondition: "uncertain",
     personalGoal: undefined,
     scoreConditions: [],
+    story: "",
     secret: "",
     alibi: "",
     relatedClues: [],

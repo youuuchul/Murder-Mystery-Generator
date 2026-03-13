@@ -9,9 +9,6 @@ export default function GameGrid({ games }: GameGridProps) {
   if (games.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="text-6xl mb-4 select-none" aria-hidden="true">
-          🕵️
-        </div>
         <h3 className="text-xl font-semibold text-dark-300 mb-2">
           아직 만든 게임이 없습니다
         </h3>

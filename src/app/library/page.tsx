@@ -13,7 +13,6 @@ export default function LibraryPage() {
       <header className="border-b border-dark-800 bg-dark-950/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl select-none" aria-hidden="true">🔮</span>
             <h1 className="text-lg font-semibold text-dark-50">
               Murder Mystery
             </h1>

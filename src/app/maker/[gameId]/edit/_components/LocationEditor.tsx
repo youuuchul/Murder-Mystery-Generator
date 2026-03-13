@@ -16,11 +16,11 @@ interface LocationEditorProps {
   saving: boolean;
 }
 
-const CLUE_TYPES: { value: Clue["type"]; label: string; emoji: string }[] = [
-  { value: "physical", label: "물적 증거", emoji: "🔪" },
-  { value: "testimony", label: "증언", emoji: "💬" },
-  { value: "document", label: "문서", emoji: "📄" },
-  { value: "scene", label: "현장 단서", emoji: "🔍" },
+const CLUE_TYPES: { value: Clue["type"]; label: string }[] = [
+  { value: "physical", label: "물적 증거" },
+  { value: "testimony", label: "증언" },
+  { value: "document", label: "문서" },
+  { value: "scene", label: "현장 단서" },
 ];
 
 const inputClass =
@@ -91,7 +91,6 @@ function ConditionForm({
         className="w-full flex items-center justify-between px-3 py-2 bg-dark-800/30 hover:bg-dark-800/50 transition-colors text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm">{enabled ? "🔐" : "🔓"}</span>
           <span className="text-xs font-medium text-dark-400">
             {label}: {enabled ? "조건 설정됨" : "조건 없음 (자유 접근)"}
           </span>
@@ -245,7 +244,6 @@ function LocationBlock({
         className="w-full flex items-center justify-between px-4 py-3 bg-dark-800/60 hover:bg-dark-800 transition-colors text-left"
       >
         <div className="flex items-center gap-3">
-          <span className="text-lg">🗺️</span>
           <span className="font-medium text-dark-100">
             {location.name || <span className="text-dark-500 italic">장소 이름 없음</span>}
           </span>
@@ -264,7 +262,7 @@ function LocationBlock({
           )}
           {location.ownerPlayerId && (
             <span className="text-xs text-orange-400 bg-orange-950/40 border border-orange-800 px-2 py-0.5 rounded-full">
-              🔒 {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "소유자"} 접근 불가
+              {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "소유자"} 접근 불가
             </span>
           )}
         </div>
@@ -276,7 +274,7 @@ function LocationBlock({
           >
             삭제
           </button>
-          <span className="text-dark-500 text-sm">{expanded ? "▲" : "▼"}</span>
+          <span className="text-dark-500 text-sm">{expanded ? "접기" : "열기"}</span>
         </div>
       </button>
 
@@ -332,7 +330,7 @@ function LocationBlock({
             </select>
             {location.ownerPlayerId && (
               <p className="text-xs text-orange-400 mt-1">
-                ⚠ {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "해당 캐릭터"}
+                {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "해당 캐릭터"}
                 은(는) 이 장소에서 단서를 획득할 수 없습니다.
               </p>
             )}
@@ -431,9 +429,11 @@ function ClueForm({
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-dark-800/30 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm">{typeInfo?.emoji ?? "🔍"}</span>
           <span className="text-sm text-dark-200">
             {clue.title || <span className="text-dark-500 italic">제목 없음</span>}
+          </span>
+          <span className="text-[11px] text-dark-500 border border-dark-700 bg-dark-800 px-1.5 py-0.5 rounded">
+            {typeInfo?.label ?? "유형 없음"}
           </span>
           {clue.isSecret && (
             <span className="text-xs text-yellow-400 border border-yellow-800 bg-yellow-950/30 px-1.5 py-0.5 rounded">
@@ -442,7 +442,7 @@ function ClueForm({
           )}
           {clue.condition && (
             <span className="text-xs text-mystery-400 border border-mystery-800 bg-mystery-950/30 px-1.5 py-0.5 rounded">
-              🔐 조건
+              잠금 조건
             </span>
           )}
         </div>
@@ -454,7 +454,7 @@ function ClueForm({
           >
             삭제
           </button>
-          <span className="text-dark-600 text-xs">{expanded ? "▲" : "▼"}</span>
+          <span className="text-dark-600 text-xs">{expanded ? "접기" : "열기"}</span>
         </div>
       </button>
 
@@ -480,7 +480,7 @@ function ClueForm({
               >
                 {CLUE_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
-                    {t.emoji} {t.label}
+                    {t.label}
                   </option>
                 ))}
               </select>
@@ -651,7 +651,7 @@ export default function LocationEditor({
                     : "border-dark-600 text-dark-500 hover:border-dark-500",
                 ].join(" ")}
               >
-                🚫 불가 (기본)
+                불가 (기본)
               </button>
               <button
                 type="button"
@@ -663,7 +663,7 @@ export default function LocationEditor({
                     : "border-dark-600 text-dark-500 hover:border-dark-500",
                 ].join(" ")}
               >
-                ✅ 허용
+                허용
               </button>
             </div>
           </div>
@@ -672,7 +672,6 @@ export default function LocationEditor({
 
       {locations.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-dark-700 rounded-xl">
-          <p className="text-4xl mb-3">🗺️</p>
           <p className="text-dark-500">아직 등록된 장소가 없습니다.</p>
           <p className="text-xs text-dark-600 mt-1 max-w-xs mx-auto">
             장소를 추가하고 각 장소에 단서 카드를 배치하세요.

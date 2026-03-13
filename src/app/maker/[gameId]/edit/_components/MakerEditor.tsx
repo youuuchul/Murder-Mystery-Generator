@@ -9,6 +9,7 @@ import LocationEditor from "./LocationEditor";
 import ScriptEditor from "./ScriptEditor";
 import Button from "@/components/ui/Button";
 import type { GamePackage } from "@/types/game";
+import { validateMakerGame } from "@/lib/maker-validation";
 
 interface MakerEditorProps {
   initialGame: GamePackage;
@@ -21,6 +22,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const validation = validateMakerGame(game);
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
     setGame((prev) => ({ ...prev, ...partial }));
@@ -53,10 +55,20 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           currentStep={currentStep}
           onStepClick={(step) => setCurrentStep(step)}
           allClickable
+          stepIssues={validation.stepIssues}
         />
       </div>
 
-      {savedAt && <p className="text-xs text-dark-500 text-right">{savedAt} 저장됨</p>}
+      {(savedAt || validation.issues.length > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {savedAt ? <p className="text-xs text-dark-500">{savedAt} 저장됨</p> : <span />}
+          {validation.issues.length > 0 && (
+            <p className="text-xs text-dark-500">
+              검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
         {currentStep === 1 && (

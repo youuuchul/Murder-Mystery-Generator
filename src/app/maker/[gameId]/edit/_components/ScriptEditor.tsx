@@ -14,6 +14,14 @@ interface ScriptEditorProps {
 }
 
 type Tab = "lobby" | "opening" | "rounds" | "vote" | "ending";
+type EditorStatus = "empty" | "partial" | "complete";
+
+interface SegmentGuidance {
+  intro: string;
+  narrationPrompt: string;
+  narrationExample: string;
+  guideExample: string;
+}
 
 const textareaClass =
   "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-3 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition resize-none text-sm leading-relaxed";
@@ -21,49 +29,238 @@ const textareaClass =
 const inputClass =
   "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
+const SEGMENT_GUIDANCE: Record<"lobby" | "opening" | "vote" | "ending" | "endingSuccess" | "endingFail", SegmentGuidance> = {
+  lobby: {
+    intro: "대기실은 입장 확인과 시작 직전 안내에 집중하면 됩니다.",
+    narrationPrompt: "참가자들이 준비를 마칠 때 GM이 읽어 줄 짧은 안내 문구를 적어주세요.",
+    narrationExample: "모든 참가자 입장을 확인합니다.\n캐릭터 선택과 이름 입력이 끝나면 곧 오프닝을 시작합니다.",
+    guideExample: "1. 접속 완료 인원 확인\n2. 세션 코드 재안내\n3. 준비가 끝나면 오프닝으로 이동",
+  },
+  opening: {
+    intro: "오프닝은 사건 분위기와 현재 상황을 한 번에 잡아주는 구간입니다.",
+    narrationPrompt: "사건 발생 시점, 장소 분위기, 플레이어가 처음 받아야 할 인상을 중심으로 작성하세요.",
+    narrationExample: "밤이 깊어질 무렵, 저택의 거실에 모두가 다시 모였습니다.\n잠시 후 한 비명이 울리고, 평온하던 저녁은 사건의 시작으로 바뀝니다.",
+    guideExample: "1. 오프닝 영상 또는 음악 재생\n2. 사건 설명 낭독\n3. 피해자 정보와 첫 행동 규칙 안내",
+  },
+  vote: {
+    intro: "투표 구간은 규칙을 짧고 분명하게 다시 알려주는 편이 좋습니다.",
+    narrationPrompt: "누구에게 어떻게 투표하는지, 언제 결과가 공개되는지를 간결하게 적어주세요.",
+    narrationExample: "이제 각자 범인이라고 생각하는 인물 한 명에게 투표합니다.\n자기 자신은 선택할 수 없으며, 모두가 완료하면 결과가 공개됩니다.",
+    guideExample: "1. 투표 규칙 재안내\n2. 전원 제출 여부 확인\n3. 필요 시 강제 공개 버튼 사용",
+  },
+  ending: {
+    intro: "공통 엔딩은 결과와 무관하게 모든 플레이어가 같이 듣는 마무리 문장입니다.",
+    narrationPrompt: "결과 공개 직전 분위기를 정리하는 문장이나 사건을 닫는 공통 문장을 작성하세요.",
+    narrationExample: "모든 선택이 끝났습니다.\n이제 사건의 결말과 각자의 선택이 어떤 결과를 만들었는지 확인합니다.",
+    guideExample: "1. 결과 공개 전 주목 유도\n2. 공통 엔딩 낭독\n3. 이후 성공/실패 분기 엔딩으로 연결",
+  },
+  endingSuccess: {
+    intro: "검거 성공 엔딩은 단서가 어떻게 맞물렸는지 보여주는 구간입니다.",
+    narrationPrompt: "범인이 특정된 이유와 사건이 정리되는 느낌을 중심으로 써주세요.",
+    narrationExample: "흩어져 있던 단서들이 하나로 이어지며 범인의 동선이 드러났습니다.\n마침내 방 안의 침묵은 진실을 인정하는 순간으로 바뀝니다.",
+    guideExample: "1. 핵심 단서 연결 요약\n2. 범인 검거 결과 설명\n3. 플레이어 승점 정리로 연결",
+  },
+  endingFail: {
+    intro: "도주 성공 엔딩은 왜 수사가 실패했는지와 남는 여운을 정리하는 편이 좋습니다.",
+    narrationPrompt: "결정적 증거가 부족했던 이유와 범인이 빠져나간 뒤의 분위기를 써주세요.",
+    narrationExample: "결정적인 한 조각이 끝내 맞춰지지 않았고, 범인은 혼란 속에서 흔적을 지웠습니다.\n남겨진 사람들은 늦게 도착한 진실의 조각만 바라보게 됩니다.",
+    guideExample: "1. 실패 원인 또는 놓친 단서 언급\n2. 범인 도주 결과 설명\n3. 플레이어 승점 정리로 연결",
+  },
+};
+
+/**
+ * 공백만 있는 값도 비어 있는 것으로 본다.
+ */
+function hasContent(value?: string): boolean {
+  return Boolean(value?.trim());
+}
+
+/**
+ * 나레이션/가이드 기준으로 세그먼트 작성 상태를 계산한다.
+ */
+function getSegmentStatus(segment: ScriptSegment): EditorStatus {
+  const filled = [segment.narration, segment.gmNote].filter(hasContent).length;
+
+  if (filled === 0) return "empty";
+  if (filled === 2) return "complete";
+  return "partial";
+}
+
+/**
+ * 라운드 스크립트의 핵심 필드 작성 상태를 계산한다.
+ */
+function getRoundStatus(round: RoundScript): EditorStatus {
+  const filled = [round.narration, round.gmNote].filter(hasContent).length;
+
+  if (filled === 0) return "empty";
+  if (filled === 2) return "complete";
+  return "partial";
+}
+
+/**
+ * 탭 요약에 사용할 상태 배지 문구를 만든다.
+ */
+function statusLabel(status: EditorStatus): string {
+  if (status === "complete") return "작성됨";
+  if (status === "partial") return "작성 중";
+  return "미작성";
+}
+
+/**
+ * 상태에 따라 재사용하는 배지 색상을 정한다.
+ */
+function statusClassName(status: EditorStatus): string {
+  if (status === "complete") {
+    return "border-emerald-800 bg-emerald-950/20 text-emerald-300";
+  }
+  if (status === "partial") {
+    return "border-yellow-800 bg-yellow-950/20 text-yellow-300";
+  }
+  return "border-dark-700 bg-dark-900 text-dark-400";
+}
+
+function StatusBadge({ status }: { status: EditorStatus }) {
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusClassName(status)}`}>
+      {statusLabel(status)}
+    </span>
+  );
+}
+
+function FieldHeader({
+  label,
+  filled,
+  optional,
+}: {
+  label: string;
+  filled: boolean;
+  optional?: boolean;
+}) {
+  const status = filled ? "작성됨" : optional ? "비워 둠" : "미작성";
+  const className = filled
+    ? "border-emerald-800 bg-emerald-950/20 text-emerald-300"
+    : optional
+      ? "border-dark-700 bg-dark-900 text-dark-500"
+      : "border-yellow-800 bg-yellow-950/20 text-yellow-300";
+
+  return (
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <label className="block text-sm font-medium text-dark-200">{label}</label>
+      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${className}`}>
+        {status}
+      </span>
+    </div>
+  );
+}
+
+function ExamplePanel({
+  title,
+  description,
+  example,
+}: {
+  title: string;
+  description: string;
+  example: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
+      <p className="text-xs font-medium text-dark-300">{title}</p>
+      <p className="text-xs text-dark-500">{description}</p>
+      <p className="text-sm leading-relaxed text-dark-400 whitespace-pre-line">{example}</p>
+    </div>
+  );
+}
+
 function SegmentEditor({
   label,
   phaseLabel,
   segment,
+  guidance,
   onChange,
 }: {
   label: string;
   phaseLabel: string;
   segment: ScriptSegment;
+  guidance: SegmentGuidance;
   onChange: (segment: ScriptSegment) => void;
 }) {
+  const status = getSegmentStatus(segment);
+  const hasNarration = hasContent(segment.narration);
+  const hasGuide = hasContent(segment.gmNote);
+  const hasMusic = hasContent(segment.backgroundMusic);
+  const hasVideo = hasContent(segment.videoUrl);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-dark-100">{label} 작성 가이드</p>
+            <p className="mt-1 text-xs text-dark-500">{guidance.intro}</p>
+          </div>
+          <StatusBadge status={status} />
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-[11px]">
+          <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            나레이션 {hasNarration ? "작성됨" : "미작성"}
+          </span>
+          <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            진행 가이드 {hasGuide ? "작성됨" : "미작성"}
+          </span>
+          <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
+          </span>
+          <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            영상 {hasVideo ? "연결됨" : "비워 둠"}
+          </span>
+        </div>
+      </div>
+
       <div>
-        <label className="block text-sm font-medium text-dark-200 mb-2">{label} 나레이션</label>
+        <FieldHeader label={`${label} 나레이션`} filled={hasNarration} />
         <textarea
           rows={8}
           value={segment.narration}
           onChange={(e) => onChange({ ...segment, narration: e.target.value })}
-          placeholder={`${label}에서 GM이 읽어줄 나레이션을 작성하세요.`}
+          placeholder={guidance.narrationPrompt}
           className={textareaClass}
         />
-        <p className="text-xs text-dark-500 mt-1">{segment.narration.length}자</p>
+        <p className="mt-1 text-xs text-dark-500">{segment.narration.length}자</p>
+        {!hasNarration && (
+          <div className="mt-3">
+            <ExamplePanel
+              title="예시 나레이션"
+              description="아직 비어 있다면 아래 흐름을 참고해서 문장을 시작하면 됩니다."
+              example={guidance.narrationExample}
+            />
+          </div>
+        )}
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-dark-400 mb-1">
-          {phaseLabel} 진행 가이드 <span className="text-dark-600">(GM 화면 동기화)</span>
-        </label>
+        <FieldHeader label={`${phaseLabel} 진행 가이드`} filled={hasGuide} />
         <textarea
           rows={5}
           value={segment.gmNote ?? ""}
           onChange={(e) => onChange({ ...segment, gmNote: e.target.value || undefined })}
-          placeholder={`이 페이즈에서 GM이 확인할 진행 순서나 주의사항을 직접 작성하세요.\n예) 1. 전원 입장 확인\n2. 참가 코드 재안내\n3. 다음 단계로 이동`}
+          placeholder="GM이 실제로 확인할 진행 순서, 주의사항, 다음 전환 조건을 적어주세요."
           className={textareaClass}
         />
+        {!hasGuide && (
+          <div className="mt-3">
+            <ExamplePanel
+              title="예시 진행 가이드"
+              description="GM 화면에 그대로 보이므로 체크리스트처럼 짧게 쓰는 편이 읽기 쉽습니다."
+              example={guidance.guideExample}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-dark-400 mb-1">
-            배경 음악 URL <span className="text-dark-600">(선택)</span>
-          </label>
+          <FieldHeader label="배경 음악 URL" filled={hasMusic} optional />
           <input
             type="url"
             value={segment.backgroundMusic ?? ""}
@@ -71,11 +268,10 @@ function SegmentEditor({
             placeholder="https://..."
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-dark-600">비워 두면 이 페이즈에서는 배경 음악 패널이 숨겨집니다.</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-dark-400 mb-1">
-            영상 URL <span className="text-dark-600">(선택)</span>
-          </label>
+          <FieldHeader label="영상 URL" filled={hasVideo} optional />
           <input
             type="url"
             value={segment.videoUrl ?? ""}
@@ -83,6 +279,7 @@ function SegmentEditor({
             placeholder="https://..."
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-dark-600">YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다.</p>
         </div>
       </div>
     </div>
@@ -100,6 +297,9 @@ function RoundScriptForm({
 }) {
   const [expanded, setExpanded] = useState(round.round === 1);
   const unlockedLocations = locations.filter((location) => location.unlocksAtRound === round.round);
+  const status = getRoundStatus(round);
+  const hasNarration = hasContent(round.narration);
+  const hasGuide = hasContent(round.gmNote);
 
   return (
     <div className="border border-dark-700 rounded-xl overflow-hidden">
@@ -108,24 +308,53 @@ function RoundScriptForm({
         onClick={() => setExpanded((value) => !value)}
         className="w-full flex items-center justify-between px-4 py-3 bg-dark-800/50 hover:bg-dark-800 transition-colors text-left"
       >
-        <span className="font-medium text-dark-100">Round {round.round}</span>
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-dark-100">Round {round.round}</span>
+          <StatusBadge status={status} />
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-dark-500">{round.narration ? `${round.narration.length}자` : "미작성"}</span>
-          <span className="text-dark-500 text-sm">{expanded ? "▲" : "▼"}</span>
+          <span className="text-dark-500 text-sm">{expanded ? "접기" : "열기"}</span>
         </div>
       </button>
 
       {expanded && (
         <div className="p-4 space-y-4">
+          <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-dark-100">Round {round.round} 작성 메모</p>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                  나레이션 {hasNarration ? "작성됨" : "미작성"}
+                </span>
+                <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                  진행 가이드 {hasGuide ? "작성됨" : "미작성"}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-dark-500">
+              각 라운드는 시작 멘트, 열린 장소 안내, 종료 직전 공지 순서로 적으면 읽기 편합니다.
+            </p>
+          </div>
+
           <div>
-            <label className="block text-xs font-medium text-dark-400 mb-1">라운드 나레이션</label>
+            <FieldHeader label="라운드 나레이션" filled={hasNarration} />
             <textarea
               rows={4}
               value={round.narration}
               onChange={(e) => onChange({ ...round, narration: e.target.value })}
-              placeholder={`Round ${round.round} 시작 시 GM이 읽어줄 내용`}
+              placeholder={`Round ${round.round} 시작 시 플레이어에게 바로 읽어 줄 내용을 적어주세요.`}
               className={textareaClass}
             />
+            {!hasNarration && (
+              <div className="mt-3">
+                <ExamplePanel
+                  title={`Round ${round.round} 나레이션 예시`}
+                  description="새로 열린 장소와 이번 라운드의 행동 목표를 먼저 알려주면 흐름이 깔끔합니다."
+                  example={`조사 시간이 다시 시작됩니다.\n이번 라운드에 새로 열린 공간을 확인하고 제한 시간 안에 단서를 확보해 주세요.`}
+                />
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
@@ -150,23 +379,28 @@ function RoundScriptForm({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-dark-400 mb-1">
-              Round {round.round} 진행 가이드 <span className="text-dark-600">(GM 화면 동기화)</span>
-            </label>
+            <FieldHeader label={`Round ${round.round} 진행 가이드`} filled={hasGuide} />
             <textarea
               rows={4}
               value={round.gmNote ?? ""}
               onChange={(e) => onChange({ ...round, gmNote: e.target.value || undefined })}
-              placeholder={`Round ${round.round}에서 GM이 확인할 진행 순서와 유의사항을 작성하세요.`}
+              placeholder={`Round ${round.round}에서 GM이 확인할 진행 순서와 종료 기준을 적어주세요.`}
               className={textareaClass}
             />
+            {!hasGuide && (
+              <div className="mt-3">
+                <ExamplePanel
+                  title={`Round ${round.round} 진행 가이드 예시`}
+                  description="GM 전용 체크리스트처럼 짧게 적어 두면 실제 세션에서 읽기가 빠릅니다."
+                  example={`1. 라운드 시작 선언\n2. 열린 장소 확인\n3. 종료 3분 전 공지\n4. 타이머 종료 후 다음 단계 준비`}
+                />
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1">
-                배경 음악 URL <span className="text-dark-600">(선택)</span>
-              </label>
+              <FieldHeader label="배경 음악 URL" filled={hasContent(round.backgroundMusic)} optional />
               <input
                 type="url"
                 value={round.backgroundMusic ?? ""}
@@ -176,9 +410,7 @@ function RoundScriptForm({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1">
-                영상 URL <span className="text-dark-600">(선택)</span>
-              </label>
+              <FieldHeader label="영상 URL" filled={hasContent(round.videoUrl)} optional />
               <input
                 type="url"
                 value={round.videoUrl ?? ""}
@@ -192,6 +424,36 @@ function RoundScriptForm({
       )}
     </div>
   );
+}
+
+/**
+ * 라운드 탭 배지에 쓸 전체 상태를 집계한다.
+ */
+function getRoundsTabStatus(rounds: RoundScript[]): EditorStatus {
+  const completeCount = rounds.filter((round) => getRoundStatus(round) === "complete").length;
+
+  if (completeCount === 0 && rounds.every((round) => getRoundStatus(round) === "empty")) {
+    return "empty";
+  }
+  if (completeCount === rounds.length) {
+    return "complete";
+  }
+  return "partial";
+}
+
+/**
+ * 엔딩 탭은 공통/성공/실패 세그먼트를 묶어서 상태를 계산한다.
+ */
+function getEndingTabStatus(scripts: Scripts): EditorStatus {
+  const states = [
+    getSegmentStatus(scripts.ending),
+    getSegmentStatus(scripts.endingSuccess ?? { narration: "", gmNote: "" }),
+    getSegmentStatus(scripts.endingFail ?? { narration: "", gmNote: "" }),
+  ];
+
+  if (states.every((state) => state === "empty")) return "empty";
+  if (states.every((state) => state === "complete")) return "complete";
+  return "partial";
 }
 
 export default function ScriptEditor({
@@ -226,12 +488,13 @@ export default function ScriptEditor({
 
   const roundCount = Math.max(rounds, scripts.rounds.length, 1);
   const normalizedRounds = ensureRounds(roundCount);
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "lobby", label: "대기실" },
-    { id: "opening", label: "오프닝" },
-    { id: "rounds", label: `라운드 (${roundCount}개)` },
-    { id: "vote", label: "투표" },
-    { id: "ending", label: "엔딩" },
+  const roundStatuses = normalizedRounds.map((round) => getRoundStatus(round));
+  const tabs: { id: Tab; label: string; status: EditorStatus }[] = [
+    { id: "lobby", label: "대기실", status: getSegmentStatus(scripts.lobby) },
+    { id: "opening", label: "오프닝", status: getSegmentStatus(scripts.opening) },
+    { id: "rounds", label: `라운드 (${roundCount}개)`, status: getRoundsTabStatus(normalizedRounds) },
+    { id: "vote", label: "투표", status: getSegmentStatus(scripts.vote) },
+    { id: "ending", label: "엔딩", status: getEndingTabStatus(scripts) },
   ];
 
   return (
@@ -239,7 +502,7 @@ export default function ScriptEditor({
       <div>
         <h2 className="text-xl font-bold text-dark-50">스크립트</h2>
         <p className="text-sm text-dark-500 mt-1">
-          각 페이즈의 나레이션, GM 진행 가이드, 영상, 배경음악을 작성합니다.
+          각 페이즈의 나레이션, GM 진행 가이드, 영상, 배경음악을 작성합니다. 미작성 구간은 탭과 배지에서 바로 확인할 수 있습니다.
         </p>
       </div>
 
@@ -250,11 +513,14 @@ export default function ScriptEditor({
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={[
-              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
+              "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               activeTab === tab.id ? "bg-dark-600 text-dark-50 shadow-sm" : "text-dark-400 hover:text-dark-200",
             ].join(" ")}
           >
-            {tab.label}
+            <span className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center">
+              <span>{tab.label}</span>
+              <StatusBadge status={tab.status} />
+            </span>
           </button>
         ))}
       </div>
@@ -264,6 +530,7 @@ export default function ScriptEditor({
           label="대기실"
           phaseLabel="대기실"
           segment={scripts.lobby}
+          guidance={SEGMENT_GUIDANCE.lobby}
           onChange={(lobby) => onChange({ ...scripts, lobby })}
         />
       )}
@@ -273,13 +540,20 @@ export default function ScriptEditor({
           label="오프닝"
           phaseLabel="오프닝"
           segment={scripts.opening}
+          guidance={SEGMENT_GUIDANCE.opening}
           onChange={(opening) => onChange({ ...scripts, opening })}
         />
       )}
 
       {activeTab === "rounds" && (
         <div className="space-y-3">
-          <p className="text-xs text-dark-500">라운드 수를 변경하려면 기본 설정에서 수정하세요.</p>
+          <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
+            <p className="text-sm font-semibold text-dark-100">라운드 작성 현황</p>
+            <p className="text-xs text-dark-500">
+              라운드 수를 변경하려면 기본 설정에서 수정하세요. 현재 {normalizedRounds.length}개 라운드 중{" "}
+              {roundStatuses.filter((status) => status !== "complete").length}개가 아직 덜 작성되었습니다.
+            </p>
+          </div>
           {normalizedRounds.map((round, idx) => (
             <RoundScriptForm
               key={round.round}
@@ -299,6 +573,7 @@ export default function ScriptEditor({
           label="투표"
           phaseLabel="투표"
           segment={scripts.vote}
+          guidance={SEGMENT_GUIDANCE.vote}
           onChange={(vote) => onChange({ ...scripts, vote })}
         />
       )}
@@ -309,31 +584,40 @@ export default function ScriptEditor({
             label="공통 엔딩"
             phaseLabel="엔딩 공통"
             segment={scripts.ending}
+            guidance={SEGMENT_GUIDANCE.ending}
             onChange={(ending) => onChange({ ...scripts, ending })}
           />
 
           <div className="border border-blue-800/50 rounded-xl p-5 space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-blue-300">범인 검거 성공 엔딩</p>
-              <p className="text-xs text-dark-500 mt-0.5">다수가 범인을 지목해 검거에 성공했을 때 사용됩니다.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-blue-300">범인 검거 성공 엔딩</p>
+                <p className="text-xs text-dark-500 mt-0.5">다수가 범인을 지목해 검거에 성공했을 때 사용됩니다.</p>
+              </div>
+              <StatusBadge status={getSegmentStatus(scripts.endingSuccess ?? { narration: "", gmNote: "" })} />
             </div>
             <SegmentEditor
               label="검거 성공"
               phaseLabel="검거 성공"
               segment={scripts.endingSuccess ?? { narration: "", videoUrl: undefined, backgroundMusic: undefined }}
+              guidance={SEGMENT_GUIDANCE.endingSuccess}
               onChange={(endingSuccess) => onChange({ ...scripts, endingSuccess })}
             />
           </div>
 
           <div className="border border-red-800/50 rounded-xl p-5 space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-red-300">범인 도주 성공 엔딩</p>
-              <p className="text-xs text-dark-500 mt-0.5">범인이 특정되지 않거나 다수가 틀렸을 때 사용됩니다.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-300">범인 도주 성공 엔딩</p>
+                <p className="text-xs text-dark-500 mt-0.5">범인이 특정되지 않거나 다수가 틀렸을 때 사용됩니다.</p>
+              </div>
+              <StatusBadge status={getSegmentStatus(scripts.endingFail ?? { narration: "", gmNote: "" })} />
             </div>
             <SegmentEditor
               label="도주 성공"
               phaseLabel="도주 성공"
               segment={scripts.endingFail ?? { narration: "", videoUrl: undefined, backgroundMusic: undefined }}
+              guidance={SEGMENT_GUIDANCE.endingFail}
               onChange={(endingFail) => onChange({ ...scripts, endingFail })}
             />
           </div>

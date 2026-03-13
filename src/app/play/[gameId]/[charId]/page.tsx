@@ -41,17 +41,17 @@ const VICTORY_LABEL: Record<string, string> = {
   "personal-goal":  "개인 목표",
 };
 
-const TYPE_EMOJI: Record<string, string> = {
-  physical: "🔪", testimony: "💬", document: "📄", scene: "🔍",
-};
 const TYPE_LABEL: Record<string, string> = {
   physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서",
 };
 
 type Tab = "character" | "inventory" | "locations" | "vote";
 
-// ── 개인 비밀 토글 ──────────────────────────────────────────────
-function SecretToggle({ secret }: { secret: string }) {
+/**
+ * 길이가 긴 개인 정보를 기본 접힘 상태로 보여줘
+ * 모바일 플레이 화면이 과하게 길어지지 않도록 제어한다.
+ */
+function PrivateTextToggle({ title, content }: { title: string; content: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-mystery-900 rounded-xl overflow-hidden">
@@ -60,12 +60,12 @@ function SecretToggle({ secret }: { secret: string }) {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 bg-mystery-950/30 hover:bg-mystery-950/50 transition-colors text-left"
       >
-        <span className="text-sm font-medium text-mystery-400">🔒 나만 아는 비밀 / 개인 스토리</span>
-        <span className="text-dark-500 text-xs ml-2 shrink-0">{open ? "접기 ▲" : "펼치기 ▼"}</span>
+        <span className="text-sm font-medium text-mystery-400">{title}</span>
+        <span className="text-dark-500 text-xs ml-2 shrink-0">{open ? "접기" : "펼치기"}</span>
       </button>
       {open && (
         <div className="px-4 py-4 bg-mystery-950/20">
-          <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{secret}</p>
+          <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
         </div>
       )}
     </div>
@@ -118,7 +118,6 @@ function CardDetailModal({
     setTransferring(false);
   }
 
-  const typeEmoji: Record<string, string> = { physical: "🔪", testimony: "💬", document: "📄", scene: "🔍" };
   const typeLabel: Record<string, string> = { physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서" };
 
   return (
@@ -132,7 +131,6 @@ function CardDetailModal({
       >
         {/* 카드 헤더 */}
         <div className="flex items-start gap-4">
-          <span className="text-4xl">{typeEmoji[clue?.type ?? ""] ?? "🗒"}</span>
           <div className="flex-1">
             <p className="font-bold text-dark-50 text-lg leading-tight">{clue?.title ?? "(제목 없음)"}</p>
             <p className="text-xs text-dark-500 mt-0.5">
@@ -140,7 +138,7 @@ function CardDetailModal({
               {item.fromPlayerId && " · 이전받음"}
             </p>
           </div>
-          <button onClick={onClose} className="text-dark-500 hover:text-dark-300 text-2xl leading-none">✕</button>
+          <button onClick={onClose} className="text-dark-500 hover:text-dark-300 text-sm leading-none">닫기</button>
         </div>
 
         {/* 카드 내용 */}
@@ -156,7 +154,7 @@ function CardDetailModal({
                 onClick={() => setShowTransferForm(true)}
                 className="w-full py-3 border border-dark-600 rounded-xl text-dark-400 text-sm hover:border-dark-400 hover:text-dark-200 transition-colors"
               >
-                🤝 이 카드 양도하기
+                이 카드 양도하기
               </button>
             ) : (
               <div className="space-y-2">
@@ -272,7 +270,7 @@ function VoteResultScreen({
             <div key={t.playerId}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-dark-200 flex items-center gap-1.5">
-                  {isCulprit && <span className="text-xs text-mystery-400">👤 진범</span>}
+                  {isCulprit && <span className="text-xs text-mystery-400">진범</span>}
                   {player?.name ?? "(알 수 없음)"}
                 </span>
                 <span className="text-xs text-dark-400">{t.count}표 ({pct}%)</span>
@@ -316,7 +314,6 @@ function VoteResultScreen({
             : "border-red-700 bg-red-950/20"
         }`}
       >
-        <p className="text-4xl mb-3">{reveal.majorityCorrect ? "🎉" : "💀"}</p>
         <p className="text-xl font-bold text-dark-50">
           {reveal.majorityCorrect ? "진범 검거 성공" : "진범 도주 성공"}
         </p>
@@ -366,7 +363,6 @@ function VoteScreen({
     return (
       <div className="space-y-4">
         <div className="text-center py-8 border border-mystery-800 rounded-xl bg-mystery-950/10">
-          <p className="text-2xl mb-2">✓</p>
           <p className="text-mystery-300 font-semibold">투표 완료</p>
           <p className="text-dark-500 text-sm mt-1">
             {game.players.find((p) => p.id === selectedId)?.name}에게 투표했습니다
@@ -394,7 +390,6 @@ function VoteScreen({
   return (
     <div className="space-y-4">
       <div className="text-center py-4">
-        <p className="text-2xl mb-1">🗳</p>
         <p className="text-dark-200 font-semibold">범인이라 생각하는 사람은?</p>
         <p className="text-dark-500 text-xs mt-1">
           {sharedState.voteCount} / {totalPlayers}명 투표 완료
@@ -561,7 +556,6 @@ export default function PlayerView() {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-4xl mb-4">😢</p>
           <p className="text-dark-400">{error || "데이터 로드 실패"}</p>
         </div>
       </div>
@@ -695,7 +689,7 @@ export default function PlayerView() {
             onClick={() => setTab("vote")}
             className="w-full py-3 bg-yellow-950/20 border border-yellow-700 rounded-xl text-yellow-300 text-sm font-medium animate-pulse"
           >
-            🗳 투표 페이즈 — 탭하여 투표하기
+            투표 페이즈 - 탭하여 투표하기
           </button>
         )}
 
@@ -734,10 +728,6 @@ export default function PlayerView() {
             <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
               <p className="text-xs text-dark-500 mb-2">배경 (전원 공개)</p>
               <p className="text-sm leading-relaxed text-dark-200">{character.background || "—"}</p>
-            </div>
-            <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-              <p className="text-xs text-dark-500 mb-2">알리바이</p>
-              <p className="text-sm leading-relaxed text-dark-200">{character.alibi || "—"}</p>
             </div>
             {character.relatedClues.length > 0 && (
               <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
@@ -779,10 +769,18 @@ export default function PlayerView() {
               </div>
             )}
 
-            {/* 개인 비밀 — 토글 (길 수 있으므로 접기/펼치기) */}
-            {character.secret && (
-              <SecretToggle secret={character.secret} />
-            )}
+            {character.story ? (
+              <PrivateTextToggle
+                title="상세 스토리 (본인만 열람)"
+                content={character.story}
+              />
+            ) : null}
+            {character.secret ? (
+              <PrivateTextToggle
+                title="비밀 / 반전 정보 (본인만 열람)"
+                content={character.secret}
+              />
+            ) : null}
           </div>
         )}
 
@@ -791,7 +789,6 @@ export default function PlayerView() {
           <div className="space-y-3">
             {inventory.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-dark-800 rounded-xl">
-                <p className="text-3xl mb-3">🗂</p>
                 <p className="text-dark-600 text-sm">보유한 단서 카드가 없습니다.</p>
                 {isRound && <p className="text-dark-700 text-xs mt-1">장소 탐색 탭에서 단서를 획득하세요.</p>}
               </div>
@@ -806,7 +803,6 @@ export default function PlayerView() {
                     className="w-full text-left bg-dark-900 border border-dark-700 rounded-xl p-4 hover:border-dark-500 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{TYPE_EMOJI[clue.type] ?? "🗒"}</span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-dark-100 truncate">{clue.title}</p>
                         <p className="text-xs text-dark-500 mt-0.5">
@@ -843,7 +839,7 @@ export default function PlayerView() {
                     }`}>
                       <p className={`text-xs ${full ? "text-red-400" : "text-dark-400"}`}>
                         {full
-                          ? `⛔ 이번 라운드 획득 한도(${limit}개) 도달 — 다음 라운드에 초기화됩니다`
+                          ? `이번 라운드 획득 한도(${limit}개) 도달 - 다음 라운드에 초기화됩니다`
                           : `이번 라운드 단서 획득`}
                       </p>
                       <span className={`text-sm font-bold shrink-0 ml-2 ${full ? "text-red-300" : "text-mystery-300"}`}>
@@ -856,7 +852,7 @@ export default function PlayerView() {
                 {ownedLocations.length > 0 && (
                   <div className="bg-orange-950/20 border border-orange-900/50 rounded-xl p-3">
                     <p className="text-xs text-orange-400">
-                      ⚠ 자신의 공간({ownedLocations.join(", ")})에는 접근할 수 없습니다.
+                      자신의 공간({ownedLocations.join(", ")})에는 접근할 수 없습니다.
                     </p>
                   </div>
                 )}
@@ -890,7 +886,6 @@ export default function PlayerView() {
                           : "border-dark-800"
                       }`}>
                         <div className="px-4 py-3 bg-dark-800/60 flex items-center gap-2 flex-wrap">
-                          <span>{locationLocked ? "🔒" : "🗺️"}</span>
                           <span className={`font-medium ${locationLocked ? "text-dark-400" : "text-dark-100"}`}>
                             {loc.name}
                           </span>
@@ -917,7 +912,7 @@ export default function PlayerView() {
                           <div className={`px-4 py-2 text-xs ${
                             locationLocked ? "text-red-400 bg-red-950/10" : "text-yellow-400/80 bg-yellow-950/10"
                           }`}>
-                            {locationLocked ? "🔐 " : "💡 "}{loc.accessCondition.hint}
+                            {loc.accessCondition.hint}
                           </div>
                         )}
                         {loc.description && (
@@ -963,7 +958,7 @@ export default function PlayerView() {
                                     ) : clue.condition ? (
                                       <>
                                         <p className="text-sm text-dark-400 font-medium">
-                                          {clueLocked ? "🔐" : clueCondMet === true ? "🔓" : "🔒"} 조건부 단서 #{idx + 1}
+                                          조건부 단서 #{idx + 1}
                                         </p>
                                         {clue.condition.hint && (
                                           <p className="text-xs text-yellow-500/80 mt-0.5">{clue.condition.hint}</p>
@@ -977,7 +972,7 @@ export default function PlayerView() {
                                     )}
                                   </div>
                                   {alreadyHas ? (
-                                    <span className="text-xs text-mystery-500 shrink-0">✓ 보유</span>
+                                    <span className="text-xs text-mystery-500 shrink-0">보유 중</span>
                                   ) : takenByOther ? (
                                     <span className="text-xs text-dark-600 shrink-0">보유됨</span>
                                   ) : locationLocked ? (

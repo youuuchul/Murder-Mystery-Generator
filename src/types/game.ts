@@ -50,11 +50,22 @@ export interface GameRules {
   allowLocationRevisit: boolean; // 같은 라운드에 같은 장소 재방문 허용
 }
 
-// ─── 스토리 ──────────────────────────────────────────────────
+// ─── 스토리 & 타임라인 ───────────────────────────────────────
 
+/** legacy field — 기존 사건 타임라인 데이터 호환용 */
 export interface TimelineEvent {
   time: string;
   description: string;
+}
+
+export interface TimelineSlot {
+  id: string;
+  label: string;
+}
+
+export interface StoryTimeline {
+  enabled: boolean;
+  slots: TimelineSlot[];
 }
 
 /** 피해자 정보 — 사건 개요에서 작성, 게임 시작 시 전원 공개 */
@@ -71,7 +82,7 @@ export interface Story {
   location: string; // 배경 장소
   gmOverview?: string; // GM 메인 화면 공통 메모
   mapImageUrl?: string; // GM 메인 화면 공통 지도/이미지
-  timeline: TimelineEvent[];
+  timeline: StoryTimeline;
   culpritPlayerId: string; // GM only — 진짜 범인 player ID
   motive: string; // GM only
   method: string; // GM only
@@ -116,6 +127,11 @@ export interface Relationship {
   description: string;
 }
 
+export interface PlayerTimelineEntry {
+  slotId: string;
+  action: string;
+}
+
 export interface Player {
   id: string;
   name: string; // 캐릭터 이름
@@ -127,6 +143,7 @@ export interface Player {
   secret: string; // 비밀 / 반전 정보 (본인만 열람)
   /** legacy field — 기존 데이터 호환용 */
   alibi?: string;
+  timelineEntries: PlayerTimelineEntry[]; // 슬롯별 행동 타임라인
   relatedClues: RelatedClueRef[]; // 연관 단서 카드 + 설명
   relationships: Relationship[];
   cardImage?: string;
@@ -156,6 +173,7 @@ export interface Location {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string;            // 장소 대표 이미지
   unlocksAtRound: number | null;
   clueIds: string[];
   ownerPlayerId?: string;         // 이 장소 소유자 — 해당 플레이어는 접근 불가
@@ -167,6 +185,7 @@ export interface Clue {
   title: string;
   description: string;
   type: "physical" | "testimony" | "document" | "scene";
+  imageUrl?: string;          // 플레이어 인벤토리/상세에 노출할 단서 이미지
   locationId: string;
   pointsTo?: string;           // GM 메모
   isSecret?: boolean;          // GM 직접 배포용
@@ -186,6 +205,7 @@ export interface ClueCard {
   title: string;
   description: string;
   type: Clue["type"];
+  imageUrl?: string;
 }
 
 export interface EventCard {

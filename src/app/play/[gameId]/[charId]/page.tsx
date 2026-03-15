@@ -45,7 +45,7 @@ const TYPE_LABEL: Record<string, string> = {
   physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서",
 };
 
-type Tab = "character" | "inventory" | "locations" | "vote";
+type Tab = "character" | "timeline" | "inventory" | "locations" | "vote";
 
 /**
  * 길이가 긴 개인 정보를 기본 접힘 상태로 보여줘
@@ -68,6 +68,35 @@ function PrivateTextToggle({ title, content }: { title: string; content: string 
           <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 카드/장소 이미지를 플레이어 화면 전반에서 같은 톤으로 렌더링한다.
+ * 단서 목록 썸네일, 상세 카드, 장소 대표 이미지에 공통 사용한다.
+ */
+function ImageFrame({
+  src,
+  alt,
+  compact = false,
+}: {
+  src: string;
+  alt: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40 shrink-0",
+        compact ? "w-16 h-16" : "w-full aspect-[4/3]",
+      ].join(" ")}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-cover"
+      />
     </div>
   );
 }
@@ -142,7 +171,13 @@ function CardDetailModal({
         </div>
 
         {/* 카드 내용 */}
-        <div className="bg-dark-800 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4 space-y-4">
+          {clue?.imageUrl ? (
+            <ImageFrame
+              src={clue.imageUrl}
+              alt={clue.title || "단서 카드 이미지"}
+            />
+          ) : null}
           <p className="text-dark-200 text-sm leading-relaxed">{clue?.description ?? "—"}</p>
         </div>
 
@@ -613,6 +648,7 @@ export default function PlayerView() {
 
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: "character", label: "캐릭터 카드" },
+    { id: "timeline", label: "타임라인", hidden: !game.story.timeline.enabled || game.story.timeline.slots.length === 0 },
     { id: "inventory", label: `인벤토리 (${inventory.length})` },
     { id: "locations", label: "장소 탐색" },
     { id: "vote", label: "투표", hidden: phase !== "vote" },
@@ -768,7 +804,6 @@ export default function PlayerView() {
                 ))}
               </div>
             )}
-
             {character.story ? (
               <PrivateTextToggle
                 title="상세 스토리 (본인만 열람)"
@@ -803,6 +838,19 @@ export default function PlayerView() {
                     className="w-full text-left bg-dark-900 border border-dark-700 rounded-xl p-4 hover:border-dark-500 transition-colors"
                   >
                     <div className="flex items-center gap-3">
+                      {clue.imageUrl ? (
+                        <ImageFrame
+                          src={clue.imageUrl}
+                          alt={clue.title || "단서 카드 이미지"}
+                          compact
+                        />
+                      ) : (
+                        <div className="w-16 h-16 shrink-0 rounded-xl border border-dark-800 bg-dark-950/60 flex items-center justify-center">
+                          <span className="text-[11px] text-dark-600 text-center leading-tight px-2">
+                            이미지 없음
+                          </span>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-dark-100 truncate">{clue.title}</p>
                         <p className="text-xs text-dark-500 mt-0.5">
@@ -815,6 +863,46 @@ export default function PlayerView() {
                 );
               })
             )}
+          </div>
+        )}
+
+        {/* ── 타임라인 ── */}
+        {tab === "timeline" && game.story.timeline.enabled && game.story.timeline.slots.length > 0 && (
+          <div className="space-y-3">
+            <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
+                <span className="text-[11px] text-dark-600">
+                  {character.timelineEntries.filter((entry) => entry.action.trim().length > 0).length}
+                  / {game.story.timeline.slots.length}
+                </span>
+              </div>
+            </div>
+            {(() => {
+              const filledTimeline = game.story.timeline.slots
+                .map((slot) => ({
+                  slot,
+                  entry: character.timelineEntries.find((item) => item.slotId === slot.id),
+                }))
+                .filter(({ entry }) => Boolean(entry?.action.trim()));
+
+              if (filledTimeline.length === 0) {
+                return (
+                  <div className="bg-dark-900 border border-dashed border-dark-800 rounded-xl p-6 text-center">
+                    <p className="text-sm text-dark-500">표시할 행동 타임라인이 없습니다.</p>
+                  </div>
+                );
+              }
+
+              return filledTimeline.map(({ slot, entry }) => (
+                <div key={slot.id} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+                  <p className="text-xs font-medium text-mystery-400">{slot.label || "이름 없는 슬롯"}</p>
+                  <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
+                    {entry?.action}
+                  </p>
+                </div>
+              ));
+            })()}
           </div>
         )}
 
@@ -913,6 +1001,14 @@ export default function PlayerView() {
                             locationLocked ? "text-red-400 bg-red-950/10" : "text-yellow-400/80 bg-yellow-950/10"
                           }`}>
                             {loc.accessCondition.hint}
+                          </div>
+                        )}
+                        {loc.imageUrl && (
+                          <div className="px-4 pt-4">
+                            <ImageFrame
+                              src={loc.imageUrl}
+                              alt={loc.name || "장소 이미지"}
+                            />
                           </div>
                         )}
                         {loc.description && (

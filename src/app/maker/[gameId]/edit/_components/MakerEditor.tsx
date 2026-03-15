@@ -7,6 +7,7 @@ import StoryEditor from "./StoryEditor";
 import PlayerEditor from "./PlayerEditor";
 import LocationEditor from "./LocationEditor";
 import ScriptEditor from "./ScriptEditor";
+import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
 import type { GamePackage } from "@/types/game";
 import { validateMakerGame } from "@/lib/maker-validation";
@@ -49,92 +50,102 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-dark-900 border border-dark-800 rounded-2xl p-5">
-        <StepWizard
-          currentStep={currentStep}
-          onStepClick={(step) => setCurrentStep(step)}
-          allClickable
-          stepIssues={validation.stepIssues}
-        />
-      </div>
+    <>
+      <div className="space-y-6">
+        <div className="bg-dark-900 border border-dark-800 rounded-2xl p-5">
+          <StepWizard
+            currentStep={currentStep}
+            onStepClick={(step) => setCurrentStep(step)}
+            allClickable
+            stepIssues={validation.stepIssues}
+          />
+        </div>
 
-      {(savedAt || validation.issues.length > 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {savedAt ? <p className="text-xs text-dark-500">{savedAt} 저장됨</p> : <span />}
-          {validation.issues.length > 0 && (
-            <p className="text-xs text-dark-500">
-              검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
-            </p>
+        {(savedAt || validation.issues.length > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {savedAt ? <p className="text-xs text-dark-500">{savedAt} 저장됨</p> : <span />}
+            {validation.issues.length > 0 && (
+              <p className="text-xs text-dark-500">
+                검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
+          {currentStep === 1 && (
+            <SettingsEditor
+              game={game}
+              onChange={updateGame}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
+          )}
+          {currentStep === 2 && (
+            <StoryEditor
+              story={game.story}
+              players={game.players ?? []}
+              onChange={(story) => updateGame({ story })}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
+          )}
+          {currentStep === 3 && (
+            <PlayerEditor
+              players={game.players ?? []}
+              clues={game.clues}
+              timeline={game.story.timeline}
+              onChange={(players) => updateGame({ players })}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
+          )}
+          {currentStep === 4 && (
+            <LocationEditor
+              gameId={game.id}
+              locations={game.locations ?? []}
+              clues={game.clues}
+              characters={game.players ?? []}
+              rules={game.rules}
+              onChangeLocations={(locations) => updateGame({ locations })}
+              onChangeClues={(clues) => updateGame({ clues })}
+              onChangeRules={(rules) => updateGame({ rules })}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
+          )}
+          {currentStep === 5 && (
+            <ScriptEditor
+              scripts={game.scripts}
+              rounds={game.rules?.roundCount ?? 4}
+              locations={game.locations ?? []}
+              onChange={(scripts) => updateGame({ scripts })}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
           )}
         </div>
-      )}
 
-      <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
-        {currentStep === 1 && (
-          <SettingsEditor
-            game={game}
-            onChange={updateGame}
-            onSave={() => save({ ...game })}
-            saving={saving}
-          />
-        )}
-        {currentStep === 2 && (
-          <StoryEditor
-            story={game.story}
-            players={game.players ?? []}
-            onChange={(story) => updateGame({ story })}
-            onSave={() => save({ ...game })}
-            saving={saving}
-          />
-        )}
-        {currentStep === 3 && (
-          <PlayerEditor
-            players={game.players ?? []}
-            clues={game.clues}
-            onChange={(players) => updateGame({ players })}
-            onSave={() => save({ ...game })}
-            saving={saving}
-          />
-        )}
-        {currentStep === 4 && (
-          <LocationEditor
-            locations={game.locations ?? []}
-            clues={game.clues}
-            characters={game.players ?? []}
-            rules={game.rules}
-            onChangeLocations={(locations) => updateGame({ locations })}
-            onChangeClues={(clues) => updateGame({ clues })}
-            onChangeRules={(rules) => updateGame({ rules })}
-            onSave={() => save({ ...game })}
-            saving={saving}
-          />
-        )}
-        {currentStep === 5 && (
-          <ScriptEditor
-            scripts={game.scripts}
-            rounds={game.rules?.roundCount ?? 4}
-            locations={game.locations ?? []}
-            onChange={(scripts) => updateGame({ scripts })}
-            onSave={() => save({ ...game })}
-            saving={saving}
-          />
-        )}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))} disabled={currentStep <= 1}>
-          ← 이전
-        </Button>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => save()} loading={saving}>저장</Button>
-          {currentStep < STEP_COUNT ? (
-            <Button onClick={() => setCurrentStep((s) => s + 1)}>다음 →</Button>
-          ) : (
-            <Button onClick={() => save()} loading={saving}>완료 & 저장</Button>
-          )}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))} disabled={currentStep <= 1}>
+            ← 이전
+          </Button>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => save()} loading={saving}>저장</Button>
+            {currentStep < STEP_COUNT ? (
+              <Button onClick={() => setCurrentStep((s) => s + 1)}>다음 →</Button>
+            ) : (
+              <Button onClick={() => save()} loading={saving}>완료 & 저장</Button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      <MakerAssistantDock
+        game={game}
+        currentStep={currentStep}
+        validationIssueCount={validation.issues.length}
+      />
+    </>
   );
 }

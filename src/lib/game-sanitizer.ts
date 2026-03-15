@@ -39,6 +39,7 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
     story: "",
     secret: "",
     alibi: "",
+    timelineEntries: [],
     relatedClues: [],
     relationships: [],
     cardImage: undefined,

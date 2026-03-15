@@ -1,13 +1,21 @@
 import type {
+  Clue,
+  ClueCard,
+  ClueCondition,
   GameMetadata,
   GamePackage,
   GameRules,
   GameSettings,
+  Location,
   PhaseConfig,
   Player,
+  PlayerTimelineEntry,
   RoundScript,
   ScriptSegment,
   Story,
+  StoryTimeline,
+  TimelineEvent,
+  TimelineSlot,
 } from "@/types/game";
 
 const LEGACY_TAG_MAP: Record<string, string> = {
@@ -40,10 +48,100 @@ function normalizeVictoryCondition(value: unknown): Player["victoryCondition"] {
 }
 
 /**
- * 기존 `alibi` 중심 데이터와 신규 `story` 구조를 함께 받아
+ * 새 타임라인 슬롯 기본값을 만든다.
+ * 라벨만 주어지면 고유 ID는 여기서 생성한다.
+ */
+function createTimelineSlot(label = ""): TimelineSlot {
+  return {
+    id: crypto.randomUUID(),
+    label,
+  };
+}
+
+/**
+ * 타임라인 슬롯 1개를 현재 편집기 구조에 맞게 정규화한다.
+ * 비어 있는 라벨은 유지하되, 저장 시 상위 단계에서 필터링할 수 있게 한다.
+ */
+function normalizeTimelineSlot(slot: TimelineSlot | undefined): TimelineSlot {
+  return {
+    id: asTrimmedString(slot?.id) || crypto.randomUUID(),
+    label: asTrimmedString(slot?.label),
+  };
+}
+
+/**
+ * 예전 `TimelineEvent[]` 형식과 현재 `StoryTimeline` 형식을 모두 받아
+ * 새 타임라인 설정 객체로 변환한다.
+ */
+function normalizeStoryTimeline(timeline: Story["timeline"] | TimelineEvent[] | undefined): StoryTimeline {
+  if (Array.isArray(timeline)) {
+    const legacySlots = timeline
+      .map((event) => createTimelineSlot(asTrimmedString(event?.time) || asTrimmedString(event?.description)))
+      .filter((slot) => Boolean(slot.label));
+
+    return {
+      enabled: legacySlots.length > 0,
+      slots: legacySlots,
+    };
+  }
+
+  const slots = Array.isArray(timeline?.slots)
+    ? timeline.slots.map(normalizeTimelineSlot).filter((slot) => Boolean(slot.label))
+    : [];
+
+  return {
+    enabled: timeline?.enabled ?? false,
+    slots,
+  };
+}
+
+/**
+ * 플레이어 행동 타임라인을 현재 스토리 슬롯과 맞춰 정렬한다.
+ * 슬롯이 추가/삭제돼도 플레이어 데이터가 바로 같은 순서를 따르도록 보정한다.
+ */
+function normalizePlayerTimelineEntries(
+  entries: PlayerTimelineEntry[] | undefined,
+  slots: TimelineSlot[]
+): PlayerTimelineEntry[] {
+  const source = Array.isArray(entries) ? entries : [];
+
+  return slots.map((slot) => {
+    const matched = source.find((entry) => asTrimmedString(entry?.slotId) === slot.id);
+    return {
+      slotId: slot.id,
+      action: asTrimmedString(matched?.action),
+    };
+  });
+}
+
+/**
+ * 단서/장소 잠금 조건을 현재 런타임에서 다루기 쉬운 형태로 정리한다.
+ * 비어 있는 값은 제거하고, 필요한 ID 목록만 남긴다.
+ */
+function normalizeClueCondition(condition: ClueCondition | undefined): ClueCondition | undefined {
+  if (!condition) {
+    return undefined;
+  }
+
+  const type = condition.type === "character_has_item" ? "character_has_item" : "has_items";
+
+  return {
+    type,
+    requiredClueIds: Array.isArray(condition.requiredClueIds)
+      ? condition.requiredClueIds.map((id) => asTrimmedString(id)).filter(Boolean)
+      : [],
+    targetCharacterId: type === "character_has_item"
+      ? asOptionalString(condition.targetCharacterId)
+      : undefined,
+    hint: asOptionalString(condition.hint),
+  };
+}
+
+/**
+ * 기존 `alibi` 중심 데이터와 신규 `story/timeline` 구조를 함께 받아
  * 현재 플레이어 편집기/플레이 화면에서 바로 쓸 수 있는 형태로 정규화한다.
  */
-function normalizePlayer(player: Player | undefined): Player {
+function normalizePlayer(player: Player | undefined, timelineSlots: TimelineSlot[]): Player {
   const legacyAlibi = asOptionalString(player?.alibi);
 
   return {
@@ -61,6 +159,7 @@ function normalizePlayer(player: Player | undefined): Player {
     story: asTrimmedString(player?.story) || legacyAlibi || "",
     secret: asTrimmedString(player?.secret),
     alibi: legacyAlibi,
+    timelineEntries: normalizePlayerTimelineEntries(player?.timelineEntries, timelineSlots),
     relatedClues: Array.isArray(player?.relatedClues)
       ? player.relatedClues.map((related) => ({
           clueId: asTrimmedString(related?.clueId),
@@ -74,6 +173,65 @@ function normalizePlayer(player: Player | undefined): Player {
         }))
       : [],
     cardImage: asOptionalString(player?.cardImage),
+  };
+}
+
+/**
+ * 장소 데이터의 공백 문자열과 잘못된 배열 값을 정리한다.
+ * 단서 ID 목록은 이후 에디터/플레이 화면에서 그대로 참조한다.
+ */
+function normalizeLocation(location: Location | undefined): Location {
+  return {
+    id: asTrimmedString(location?.id) || crypto.randomUUID(),
+    name: asTrimmedString(location?.name),
+    description: asTrimmedString(location?.description),
+    imageUrl: asOptionalString(location?.imageUrl),
+    unlocksAtRound: Number.isInteger(location?.unlocksAtRound) ? Number(location?.unlocksAtRound) : null,
+    clueIds: Array.isArray(location?.clueIds)
+      ? location.clueIds.map((id) => asTrimmedString(id)).filter(Boolean)
+      : [],
+    ownerPlayerId: asOptionalString(location?.ownerPlayerId),
+    accessCondition: normalizeClueCondition(location?.accessCondition),
+  };
+}
+
+/**
+ * 단서 이미지를 포함해 단서 카드 원본 데이터를 정규화한다.
+ * 오래된 저장본과 섞여도 플레이어 인벤토리에서 바로 쓸 수 있게 보정한다.
+ */
+function normalizeClue(clue: Clue | undefined): Clue {
+  return {
+    id: asTrimmedString(clue?.id) || crypto.randomUUID(),
+    title: asTrimmedString(clue?.title),
+    description: asTrimmedString(clue?.description),
+    type: clue?.type === "testimony"
+      || clue?.type === "document"
+      || clue?.type === "scene"
+      ? clue.type
+      : "physical",
+    imageUrl: asOptionalString(clue?.imageUrl),
+    locationId: asTrimmedString(clue?.locationId),
+    pointsTo: asOptionalString(clue?.pointsTo),
+    isSecret: clue?.isSecret === true,
+    condition: normalizeClueCondition(clue?.condition),
+  };
+}
+
+/**
+ * 카드셋의 단서 카드 캐시도 이미지 필드를 유지하도록 정리한다.
+ * 현재 UI는 주로 `game.clues`를 쓰지만 저장 포맷 일관성을 위해 함께 보정한다.
+ */
+function normalizeClueCard(card: ClueCard | undefined): ClueCard {
+  return {
+    clueId: asTrimmedString(card?.clueId),
+    title: asTrimmedString(card?.title),
+    description: asTrimmedString(card?.description),
+    type: card?.type === "testimony"
+      || card?.type === "document"
+      || card?.type === "scene"
+      ? card.type
+      : "physical",
+    imageUrl: asOptionalString(card?.imageUrl),
   };
 }
 
@@ -176,6 +334,8 @@ export function normalizeGame(game: GamePackage): GamePackage {
       : undefined,
   };
 
+  const timeline = normalizeStoryTimeline(game.story?.timeline);
+
   const story: Story = {
     synopsis: asTrimmedString(game.story?.synopsis),
     victim: {
@@ -187,7 +347,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     location: asTrimmedString(game.story?.location),
     gmOverview: asOptionalString(game.story?.gmOverview) ?? asOptionalString(game.story?.synopsis),
     mapImageUrl: asOptionalString(game.story?.mapImageUrl),
-    timeline: [],
+    timeline,
     culpritPlayerId: asTrimmedString(game.story?.culpritPlayerId),
     motive: asTrimmedString(game.story?.motive),
     method: asTrimmedString(game.story?.method),
@@ -198,13 +358,15 @@ export function normalizeGame(game: GamePackage): GamePackage {
     settings,
     rules,
     story,
-    players: Array.isArray(game.players) ? game.players.map(normalizePlayer) : [],
-    locations: game.locations ?? [],
-    clues: game.clues ?? [],
-    cards: game.cards ?? {
-      characterCards: [],
-      clueCards: [],
-      eventCards: [],
+    players: Array.isArray(game.players)
+      ? game.players.map((player) => normalizePlayer(player, story.timeline.slots))
+      : [],
+    locations: Array.isArray(game.locations) ? game.locations.map(normalizeLocation) : [],
+    clues: Array.isArray(game.clues) ? game.clues.map(normalizeClue) : [],
+    cards: {
+      characterCards: Array.isArray(game.cards?.characterCards) ? game.cards.characterCards : [],
+      clueCards: Array.isArray(game.cards?.clueCards) ? game.cards.clueCards.map(normalizeClueCard) : [],
+      eventCards: Array.isArray(game.cards?.eventCards) ? game.cards.eventCards : [],
     },
     scripts,
   };

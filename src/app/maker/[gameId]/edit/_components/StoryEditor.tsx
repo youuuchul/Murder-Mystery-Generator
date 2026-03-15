@@ -1,7 +1,7 @@
 "use client";
 
 import Button from "@/components/ui/Button";
-import type { Story, Player, VictimInfo } from "@/types/game";
+import type { Story, Player, VictimInfo, StoryTimeline, TimelineSlot } from "@/types/game";
 
 interface StoryEditorProps {
   story: Story;
@@ -28,6 +28,20 @@ function Field({ label, hint, required, children }: {
 const ta = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition resize-none";
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const sel = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
+const DEFAULT_TIMELINE_SLOT_LABELS = ["19:00", "19:30", "20:00", "20:30"];
+
+/** 타임라인 슬롯 1개를 생성한다. */
+function createTimelineSlot(label = ""): TimelineSlot {
+  return {
+    id: crypto.randomUUID(),
+    label,
+  };
+}
+
+/** 타임라인을 처음 켰을 때 바로 쓸 수 있는 기본 슬롯 세트를 만든다. */
+function createDefaultTimelineSlots(): TimelineSlot[] {
+  return DEFAULT_TIMELINE_SLOT_LABELS.map((label) => createTimelineSlot(label));
+}
 
 export default function StoryEditor({ story, players, onChange, onSave, saving }: StoryEditorProps) {
   function update<K extends keyof Story>(key: K, value: Story[K]) {
@@ -36,6 +50,28 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
 
   function updateVictim<K extends keyof VictimInfo>(key: K, value: VictimInfo[K]) {
     onChange({ ...story, victim: { ...story.victim, [key]: value } });
+  }
+
+  function updateTimeline(nextTimeline: StoryTimeline) {
+    onChange({ ...story, timeline: nextTimeline });
+  }
+
+  function updateTimelineSlot(slotId: string, label: string) {
+    updateTimeline({
+      ...story.timeline,
+      slots: story.timeline.slots.map((slot) => (
+        slot.id === slotId ? { ...slot, label } : slot
+      )),
+    });
+  }
+
+  function toggleTimeline(enabled: boolean) {
+    updateTimeline({
+      enabled,
+      slots: enabled && story.timeline.slots.length === 0
+        ? createDefaultTimelineSlots()
+        : story.timeline.slots,
+    });
   }
 
   return (
@@ -94,6 +130,98 @@ export default function StoryEditor({ story, players, onChange, onSave, saving }
             placeholder="https://..."
             className={inp} />
         </Field>
+      </div>
+
+      <div className="border border-dark-700 rounded-xl p-5 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">행동 타임라인</h3>
+            <p className="text-xs text-dark-500 mt-1">
+              시간대 슬롯은 여기서 관리하고, 캐릭터별 행동 입력은 Step 3(플레이어)에서 연결합니다.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => toggleTimeline(false)}
+              className={[
+                "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+                !story.timeline.enabled
+                  ? "border-dark-500 bg-dark-800 text-dark-100"
+                  : "border-dark-700 text-dark-500 hover:text-dark-300",
+              ].join(" ")}
+            >
+              사용 안 함
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleTimeline(true)}
+              className={[
+                "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+                story.timeline.enabled
+                  ? "border-mystery-600 bg-mystery-900/30 text-mystery-200"
+                  : "border-dark-700 text-dark-500 hover:text-dark-300",
+              ].join(" ")}
+            >
+              사용
+            </button>
+          </div>
+        </div>
+
+        {story.timeline.enabled ? (
+          <div className="space-y-3">
+            {story.timeline.slots.length === 0 ? (
+              <div className="text-center py-6 border border-dashed border-dark-700 rounded-xl">
+                <p className="text-xs text-dark-600">시간대 슬롯이 없습니다. 첫 슬롯을 추가하세요.</p>
+              </div>
+            ) : (
+              story.timeline.slots.map((slot, index) => (
+                <div key={slot.id} className="flex items-center gap-2">
+                  <span className="w-14 shrink-0 text-xs text-dark-500 text-right">슬롯 {index + 1}</span>
+                  <input
+                    type="text"
+                    value={slot.label}
+                    onChange={(e) => updateTimelineSlot(slot.id, e.target.value)}
+                    placeholder="예: 20:00 ~ 20:30"
+                    className={inp}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateTimeline({
+                      ...story.timeline,
+                      slots: story.timeline.slots.filter((item) => item.id !== slot.id),
+                    })}
+                    className="text-xs text-dark-500 hover:text-red-400 transition-colors shrink-0 px-1"
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-dark-600">
+                슬롯 순서는 플레이어 화면에서도 같은 순서로 표시됩니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => updateTimeline({
+                  ...story.timeline,
+                  slots: [...story.timeline.slots, createTimelineSlot()],
+                })}
+                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors shrink-0"
+              >
+                + 시간대 슬롯 추가
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
+            <p className="text-xs text-dark-600">
+              현재 타임라인을 사용하지 않습니다. 켜면 기본 시간대 슬롯을 만들고 플레이어별 행동 입력을 활성화합니다.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── 범인 선택 ── */}

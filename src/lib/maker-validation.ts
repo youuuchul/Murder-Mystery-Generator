@@ -52,6 +52,15 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 2, "error", "배경 장소를 입력하세요.");
   }
 
+  if (game.story.timeline.enabled && game.story.timeline.slots.length === 0) {
+    addIssue(issues, 2, "error", "타임라인을 사용하려면 시간대 슬롯을 1개 이상 추가하세요.");
+  }
+
+  const blankTimelineSlots = game.story.timeline.slots.filter((slot) => isBlank(slot.label)).length;
+  if (blankTimelineSlots > 0) {
+    addIssue(issues, 2, "warning", `이름이 비어 있는 타임라인 슬롯이 ${blankTimelineSlots}개 있습니다.`);
+  }
+
   if (playerCount === 0) {
     addIssue(issues, 2, "warning", "플레이어를 추가해야 범인을 지정할 수 있습니다.");
   } else if (isBlank(game.story.culpritPlayerId)) {
@@ -65,6 +74,12 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     const backgroundlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.background));
     const storylessPlayers = countPlayersBy(game.players, (player) => isBlank(player.story));
     const secretlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.secret));
+    const timelineMissingPlayers = game.story.timeline.enabled
+      ? countPlayersBy(
+          game.players,
+          (player) => !player.timelineEntries?.some((entry) => !isBlank(entry.action))
+        )
+      : 0;
 
     if (playerCount !== expectedPlayerCount) {
       addIssue(
@@ -89,6 +104,10 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
 
     if (secretlessPlayers > 0) {
       addIssue(issues, 3, "warning", `비밀 / 반전 정보가 비어 있는 캐릭터가 ${secretlessPlayers}명 있습니다.`);
+    }
+
+    if (timelineMissingPlayers > 0) {
+      addIssue(issues, 3, "warning", `행동 타임라인이 비어 있는 캐릭터가 ${timelineMissingPlayers}명 있습니다.`);
     }
   }
 

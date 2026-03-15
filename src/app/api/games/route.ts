@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
         location: "",
         gmOverview: "",
         mapImageUrl: undefined,
-        timeline: [],
+        timeline: {
+          enabled: false,
+          slots: [],
+        },
         culpritPlayerId: "",
         motive: "",
         method: "",

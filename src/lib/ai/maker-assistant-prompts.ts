@@ -1,29 +1,30 @@
 import type { MakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import {
   MAKER_ASSISTANT_TASK_LABELS,
-  type MakerAssistantResult,
   type MakerAssistantTask,
 } from "@/types/assistant";
 
-const RESPONSE_SHAPE_EXAMPLE: MakerAssistantResult = {
-  summary: "전체 상태를 요약한 짧은 설명",
-  findings: [
-    {
-      severity: "warning",
-      title: "예시 이슈 제목",
-      detail: "왜 이 점이 문제인지 또는 어떤 보강이 필요한지 설명",
-      relatedStep: 3,
-    },
-  ],
-  suggestedActions: [
-    {
-      label: "예시 작업",
-      reason: "왜 이 작업을 지금 먼저 해야 하는지 설명",
-      step: 3,
-    },
-  ],
-  followUpQuestions: ["추가로 물어볼 만한 질문"],
-};
+const RESPONSE_FORMAT_GUIDE = [
+  "반드시 아래 텍스트 형식으로만 답하라.",
+  "SUMMARY:",
+  "요약 문장 2~4개를 이어서 작성",
+  "",
+  "FINDINGS:",
+  "FINDING|warning|3|null|null|null|예시 제목|예시 상세 설명",
+  "",
+  "ACTIONS:",
+  "ACTION|3|예시 작업|왜 지금 이 작업을 해야 하는지",
+  "",
+  "QUESTIONS:",
+  "QUESTION|다음에 물어볼 질문",
+  "",
+  "규칙:",
+  "- 각 FINDING, ACTION, QUESTION은 한 줄이어야 한다.",
+  "- relatedStep, relatedPlayerId, relatedClueId, relatedSlotId가 없으면 null을 사용한다.",
+  "- title, detail, label, reason, question 안에는 | 문자를 쓰지 말고 필요하면 / 로 바꾼다.",
+  "- 해당 항목이 없으면 섹션 제목만 남기고 다음 섹션으로 넘어간다.",
+  "- JSON, 마크다운, 코드펜스는 금지한다.",
+].join("\n");
 
 /**
  * 제작 도우미 전용 시스템 프롬프트를 만든다.
@@ -35,15 +36,12 @@ export function buildMakerAssistantSystemPrompt(task: MakerAssistantTask): strin
     "반드시 제공된 게임 데이터만 근거로 판단하고, 데이터에 없는 사실은 추정이라고 명시한다.",
     "이미 deterministic validation으로 잡히는 단순 필수값 누락만 반복하지 말고, 의미적 모순, 약한 연결, 구체적 보강안을 우선 본다.",
     getTaskGuidelines(task),
-    "반드시 JSON 객체만 반환하고, 마크다운/코드펜스/서론/맺음말을 넣지 마라.",
-    "JSON shape는 정확히 다음 필드만 사용한다:",
-    JSON.stringify(RESPONSE_SHAPE_EXAMPLE, null, 2),
+    RESPONSE_FORMAT_GUIDE,
     "제약:",
     "- summary는 2~4문장으로 작성한다.",
     "- findings는 최대 6개로 제한한다.",
     "- suggestedActions는 최대 4개로 제한한다.",
     "- relatedStep이 있으면 1~5 사이 숫자를 사용한다.",
-    "- followUpQuestions는 비어 있어도 된다.",
   ].join("\n");
 }
 

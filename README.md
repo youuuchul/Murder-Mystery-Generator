@@ -28,6 +28,7 @@
 | Styling | Tailwind CSS | 모바일 우선, 다크 테마 |
 | Storage | 로컬 JSON 파일 | `data/games/`, `data/sessions/` |
 | 실시간 | SSE (Server-Sent Events) | 페이즈·카드·투표 실시간 동기화 |
+| AI | OpenAI Responses API (`gpt-5-mini`) | 메이커 제작 도우미 |
 | 패키지 | npm | — |
 
 ---
@@ -47,6 +48,7 @@
   - **LLM 제작 도우미**: 메이커 편집 화면 우하단 드로어형 assistant
     - 현재 편집 중인 로컬 상태 기준으로 **모순 점검 / 단서 제안 / 다음 작업 추천**
     - 자유 질문 + 빠른 액션 버튼 지원
+    - `gpt-5-mini` 기반, line-based structured parsing fallback으로 응답 복구
 - 장소/단서: 장소별 단서 카드 배치, 라운드 잠금, 소유자 제한, GM 비밀 배포용 단서
   - **단서 획득 규칙**: 라운드당 최대 획득 수 설정 (0=무제한), 동일 장소 재방문 허용/불가
   - **장소 대표 이미지 업로드**: 제작 화면에서 파일 업로드 후 플레이어 장소 카드에 표시
@@ -106,6 +108,7 @@ Murder-Mystery_Generator/
 │   │   │   └── [sessionCode]/page.tsx # 캐릭터 선택
 │   │   └── api/
 │   │       ├── games/[gameId]/        # 게임 CRUD
+│   │       ├── maker-assistant/       # 메이커 제작 도우미 API
 │   │       ├── server-info/           # LAN IP 반환
 │   │       ├── join/[sessionCode]/    # 세션 조회 (민감정보 제거)
 │   │       └── sessions/[sessionId]/
@@ -116,6 +119,7 @@ Murder-Mystery_Generator/
 │   │           └── vote/route.ts      # 투표/집계
 │   ├── hooks/useSSE.ts                # Named event SSE 훅
 │   ├── lib/
+│   │   ├── ai/                        # OpenAI client, prompt, context, schema
 │   │   ├── sse/broadcaster.ts         # SSE 구독자 레지스트리
 │   │   └── storage/
 │   │       ├── game-storage.ts        # JSON 게임 파일 I/O
@@ -172,6 +176,7 @@ npm run dev:tunnel
 
 - 상세 명세: [`docs/SPEC.md`](docs/SPEC.md)
 - LLM 제작 도우미 설계: [`docs/LLM_MAKER_ASSISTANT_PLAN.md`](docs/LLM_MAKER_ASSISTANT_PLAN.md)
+- LLM 제작 도우미 코드 README: [`src/lib/ai/README.md`](src/lib/ai/README.md)
 - 환경 변수 예시: [`.env.example`](.env.example)
 - 작업 기록: [`ai_history/`](ai_history/)
 

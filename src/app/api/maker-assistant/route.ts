@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { zodTextFormat } from "openai/helpers/zod";
 import { ZodError } from "zod";
 import {
   getMakerAssistantModel,
@@ -14,7 +13,6 @@ import {
 } from "@/lib/ai/maker-assistant-prompts";
 import {
   makerAssistantRequestSchema,
-  makerAssistantResultSchema,
   parseMakerAssistantResult,
 } from "@/lib/ai/maker-assistant-schema";
 import type { MakerAssistantResponse, MakerAssistantResult } from "@/types/assistant";
@@ -106,30 +104,43 @@ async function resolveMakerAssistantResult(
     console.warn("[maker-assistant] repairing malformed JSON output", parseError);
   }
 
-  const repaired = await client.responses.parse({
-    model: getMakerAssistantModel(),
-    store: false,
-    instructions: [
-      "주어진 초안 텍스트를 같은 의미의 유효한 JSON 객체로만 변환하라.",
-      "마크다운, 코드펜스, 설명 문장을 절대 추가하지 마라.",
-      "필드 구조는 제공된 schema와 정확히 일치해야 한다.",
-      "정보가 없으면 null 또는 빈 배열을 사용하라.",
-    ].join("\n"),
-    input: rawText,
-    text: {
-      format: zodTextFormat(makerAssistantResultSchema, "maker_assistant_result"),
-    },
-    reasoning: {
-      effort: "low",
-    },
-    max_output_tokens: 900,
-  });
+  let repairSource = rawText;
 
-  if (!repaired.output_parsed) {
-    throw new Error("모델 응답을 구조화된 결과로 복구하지 못했습니다.");
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const repaired = await client.responses.create({
+      model: getMakerAssistantModel(),
+      store: false,
+      instructions: [
+        "주어진 초안 텍스트를 아래 line 포맷으로만 다시 정리하라.",
+        "JSON, 마크다운, 코드펜스, 설명 문장은 금지한다.",
+        "SUMMARY:",
+        "요약 문장",
+        "FINDINGS:",
+        "FINDING|warning|3|null|null|null|제목|상세 설명",
+        "ACTIONS:",
+        "ACTION|3|작업 라벨|이유",
+        "QUESTIONS:",
+        "QUESTION|추가 질문",
+        "필드 값이 없으면 null을 사용하고, title/detail/label/reason/question 안에는 | 문자를 쓰지 말라.",
+      ].join("\n"),
+      input: repairSource,
+      reasoning: {
+        effort: "low",
+      },
+      max_output_tokens: 900,
+    });
+
+    const repairedText = extractResponseText(repaired);
+
+    try {
+      return parseMakerAssistantResult(repairedText);
+    } catch (repairError) {
+      console.warn(`[maker-assistant] repair attempt ${attempt} failed`, repairError);
+      repairSource = repairedText;
+    }
   }
 
-  return repaired.output_parsed;
+  throw new Error("모델 응답을 유효한 JSON 결과로 복구하지 못했습니다.");
 }
 
 /** raw response의 message/output_text 블록을 합쳐 텍스트 본문만 꺼낸다. */

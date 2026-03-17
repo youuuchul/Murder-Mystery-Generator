@@ -2,8 +2,14 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "@/hooks/useSSE";
-import type { GamePackage, GameRules, ScriptSegment } from "@/types/game";
-import type { GameSession, SharedState, CharacterSlot } from "@/types/session";
+import {
+  ENDING_STAGE_LABELS,
+  getNextEndingStage,
+  normalizeEndingStage,
+  resolveActiveEndingBranch,
+} from "@/lib/ending-flow";
+import type { GamePackage, GameRules } from "@/types/game";
+import type { EndingStage, GameSession, SharedState, CharacterSlot } from "@/types/session";
 
 interface GMDashboardProps {
   game: GamePackage;
@@ -88,9 +94,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
     return {
       title: "대기실",
       badge: "Lobby",
-      narrationBlocks: game.scripts.lobby.narration
-        ? [{ label: "대기실 나레이션", text: game.scripts.lobby.narration }]
-        : [],
+      narrationBlocks: [],
       guideText: game.scripts.lobby.gmNote,
       videoUrl: game.scripts.lobby.videoUrl,
       backgroundMusic: game.scripts.lobby.backgroundMusic,
@@ -103,7 +107,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       title: "오프닝",
       badge: "Opening",
       narrationBlocks: game.scripts.opening.narration
-        ? [{ label: "오프닝 나레이션", text: game.scripts.opening.narration }]
+        ? [{ label: "스토리 텍스트", text: game.scripts.opening.narration }]
         : [],
       guideText: game.scripts.opening.gmNote,
       videoUrl: game.scripts.opening.videoUrl,
@@ -118,7 +122,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       title: `Round ${roundNum}`,
       badge: SUB_PHASE_LABELS[subPhase],
       narrationBlocks: roundScript?.narration
-        ? [{ label: `Round ${roundNum} 나레이션`, text: roundScript.narration }]
+        ? [{ label: `Round ${roundNum} 이벤트`, text: roundScript.narration }]
         : [],
       guideText: roundScript?.gmNote,
       videoUrl: roundScript?.videoUrl,
@@ -142,30 +146,17 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
   }
 
   if (phase === "ending") {
-    const branchScript: ScriptSegment | undefined = sharedState.voteReveal
-      ? sharedState.voteReveal.majorityCorrect
-        ? game.scripts.endingSuccess
-        : game.scripts.endingFail
-      : undefined;
-    const guideParts = [game.scripts.ending.gmNote, branchScript?.gmNote].filter(Boolean);
+    const endingStage = normalizeEndingStage(sharedState.endingStage);
+    const branch = resolveActiveEndingBranch(game, sharedState.voteReveal);
 
     return {
       title: "엔딩",
-      badge: sharedState.voteReveal?.majorityCorrect ? "Success" : "Ending",
-      narrationBlocks: [
-        game.scripts.ending.narration
-          ? { label: "공통 엔딩", text: game.scripts.ending.narration }
-          : null,
-        branchScript?.narration
-          ? {
-              label: sharedState.voteReveal?.majorityCorrect ? "검거 성공 엔딩" : "도주 성공 엔딩",
-              text: branchScript.narration,
-            }
-          : null,
-      ].filter((block): block is { label: string; text: string } => Boolean(block)),
-      guideText: guideParts.length > 0 ? guideParts.join("\n\n") : undefined,
-      videoUrl: branchScript?.videoUrl ?? game.scripts.ending.videoUrl,
-      backgroundMusic: branchScript?.backgroundMusic ?? game.scripts.ending.backgroundMusic,
+      badge: ENDING_STAGE_LABELS[endingStage],
+      narrationBlocks: branch?.storyText
+        ? [{ label: branch.label || "분기 엔딩", text: branch.storyText }]
+        : [],
+      videoUrl: branch?.videoUrl,
+      backgroundMusic: branch?.backgroundMusic,
       showSharedImage: false,
     };
   }
@@ -225,97 +216,172 @@ function MediaPanel({ source, title }: { source: VideoSource | null; title: stri
 
 function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardContent }) {
   const videoSource = resolveVideoSource(content.videoUrl);
-  const showSharedImage = content.showSharedImage ?? true;
+  const showSharedImage = Boolean(content.showSharedImage ?? true) && Boolean(game.story.mapImageUrl);
+  const hasBackgroundMusic = Boolean(content.backgroundMusic?.trim());
+  const hasNarrationBlocks = content.narrationBlocks.length > 0;
+  const hasMediaPanels = Boolean(videoSource) || showSharedImage || hasBackgroundMusic;
+
   return (
     <div className="rounded-2xl border border-dark-800 overflow-hidden bg-[linear-gradient(145deg,rgba(51,65,85,0.18),rgba(10,14,23,0.94))]">
       <div className="border-b border-dark-800/80 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs tracking-[0.22em] uppercase text-mystery-400/80">GM Board</p>
-          <h3 className="text-xl font-bold text-dark-50 mt-1">{content.title}</h3>
+          <h3 className="text-xl font-bold text-dark-50">{content.title}</h3>
         </div>
         <span className="rounded-full border border-mystery-700/60 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-300">
           {content.badge}
         </span>
       </div>
 
-      <div className="grid gap-4 p-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
-          <p className="text-xs text-dark-500">페이즈 영상</p>
-          <MediaPanel source={videoSource} title={content.title} />
+      {hasNarrationBlocks && (
+        <div className="border-b border-dark-800/80 px-5 py-4 space-y-3">
+          {content.narrationBlocks.map((block) => (
+            <div key={block.label} className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+              <p className="text-xs text-mystery-500">{block.label}</p>
+              <p className="mt-2 text-sm leading-relaxed text-dark-200 whitespace-pre-line">{block.text}</p>
+            </div>
+          ))}
         </div>
+      )}
 
-        <div className="space-y-4">
-          {showSharedImage && (
+      {hasMediaPanels && (
+        <div
+          className={[
+            "grid gap-4 p-5",
+            videoSource && (showSharedImage || hasBackgroundMusic) ? "xl:grid-cols-[1.15fr_0.85fr]" : "",
+          ].join(" ")}
+        >
+          {videoSource && (
             <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
-              <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
-              {game.story.mapImageUrl ? (
-                <img
-                  src={game.story.mapImageUrl}
-                  alt={`${game.title} 공통 이미지`}
-                  className="w-full rounded-xl border border-dark-700 object-cover"
-                />
-              ) : (
-                <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-600">
-                  연결된 이미지가 없습니다.
+              <p className="text-xs text-dark-500">페이즈 영상</p>
+              <MediaPanel source={videoSource} title={content.title} />
+            </div>
+          )}
+
+          {(showSharedImage || hasBackgroundMusic) && (
+            <div className="space-y-4">
+              {showSharedImage && (
+                <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
+                  <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
+                  <img
+                    src={game.story.mapImageUrl}
+                    alt={`${game.title} 공통 이미지`}
+                    className="w-full rounded-xl border border-dark-700 object-cover"
+                  />
+                </div>
+              )}
+
+              {hasBackgroundMusic && content.backgroundMusic && (
+                <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
+                  <p className="text-xs text-dark-500">배경 음악</p>
+                  <a
+                    href={content.backgroundMusic}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-emerald-800 bg-emerald-950/20 px-4 py-3 text-sm font-medium text-emerald-300 hover:bg-emerald-950/30 transition-colors"
+                  >
+                    배경 음악 열기
+                  </a>
                 </div>
               )}
             </div>
           )}
-
-          <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4">
-            <p className="text-xs text-dark-500">배경 음악</p>
-            {content.backgroundMusic ? (
-              <a
-                href={content.backgroundMusic}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-emerald-800 bg-emerald-950/20 px-4 py-3 text-sm font-medium text-emerald-300 hover:bg-emerald-950/30 transition-colors"
-              >
-                배경 음악 열기
-              </a>
-            ) : (
-              <p className="mt-3 text-sm text-dark-600">연결된 음악이 없습니다.</p>
-            )}
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function PhaseGuide({ content }: { content: PhaseBoardContent }) {
-  const hasNarration = content.narrationBlocks.length > 0;
-  const hasGuide = Boolean(content.guideText?.trim());
+  if (!content.guideText?.trim()) {
+    return null;
+  }
+
   return (
     <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-dark-200">페이즈 가이드</h3>
+        <h3 className="text-sm font-semibold text-dark-200">진행 가이드</h3>
         <span className="rounded-full border border-dark-700 px-2 py-0.5 text-[11px] text-dark-400">
           {content.badge}
         </span>
       </div>
 
-      {hasGuide ? (
-        <p className="text-sm leading-relaxed text-dark-300 whitespace-pre-line">{content.guideText}</p>
-      ) : (
-        <p className="text-sm text-dark-600">제작 화면의 스크립트 탭에서 이 페이즈 가이드를 입력하세요.</p>
-      )}
+      <p className="text-sm leading-relaxed text-dark-300 whitespace-pre-line">{content.guideText}</p>
+    </div>
+  );
+}
 
-      {hasNarration && (
-        <details className="border-t border-dark-700 pt-3">
-          <summary className="text-xs text-mystery-500 cursor-pointer hover:text-mystery-300 select-none">
-            나레이션 보기 ▾
-          </summary>
-          <div className="mt-2 space-y-3">
-            {content.narrationBlocks.map((block) => (
-              <div key={block.label} className="rounded-lg bg-dark-800 p-3">
-                <p className="text-[11px] text-dark-500">{block.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-dark-300 whitespace-pre-line">{block.text}</p>
-              </div>
-            ))}
+/** 다음 엔딩 단계 버튼에 표시할 문구를 현재 단계 기준으로 계산한다. */
+function endingAdvanceLabel(stage: EndingStage): string {
+  if (stage === "personal") {
+    return "개인 엔딩 공개";
+  }
+
+  if (stage === "author-notes") {
+    return "작가 노트 공개";
+  }
+
+  return "엔딩 공개 완료";
+}
+
+/** GM이 모든 개인 엔딩을 캐릭터별 토글로 확인하는 패널이다. */
+function PersonalEndingOverview({ game }: { game: GamePackage }) {
+  const endings = game.ending.personalEndings.filter((ending) => ending.text.trim());
+
+  if (endings.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-dark-200">개인 엔딩</h3>
+        <span className="text-xs text-dark-500">{endings.length}개</span>
+      </div>
+
+      <div className="space-y-2">
+        {endings.map((ending) => {
+          const player = game.players.find((item) => item.id === ending.playerId);
+          return (
+            <details key={ending.playerId} className="rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-dark-100">{player?.name || "(이름 없음)"}</p>
+                  {ending.title && <p className="text-xs text-mystery-500 mt-1">{ending.title}</p>}
+                </div>
+                <span className="text-xs text-dark-500">열기</span>
+              </summary>
+              <p className="mt-3 text-sm leading-relaxed text-dark-300 whitespace-pre-line">{ending.text}</p>
+            </details>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** GM 전용 작가 노트를 보기 좋은 카드 목록으로 출력한다. */
+function AuthorNotesOverview({ game }: { game: GamePackage }) {
+  const notes = game.ending.authorNotes.filter((note) => note.title.trim() || note.content.trim());
+
+  if (notes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-dark-200">작가 노트</h3>
+        <span className="text-xs text-dark-500">{notes.length}개</span>
+      </div>
+
+      <div className="space-y-3">
+        {notes.map((note) => (
+          <div key={note.id} className="rounded-xl border border-dark-800 bg-dark-950/60 p-4 space-y-2">
+            <p className="text-sm font-medium text-mystery-300">{note.title || "제목 없음"}</p>
+            <p className="text-sm leading-relaxed text-dark-300 whitespace-pre-line">{note.content}</p>
           </div>
-        </details>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
@@ -770,6 +836,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const [session, setSession] = useState<GameSession | null>(initialSession);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [advancingEndingStage, setAdvancingEndingStage] = useState(false);
   const [revealingVote, setRevealingVote] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [endingSession, setEndingSession] = useState(false);
@@ -894,6 +961,33 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     setRevealingVote(false);
   }
 
+  async function advanceEndingStage() {
+    if (!session) return;
+    setAdvancingEndingStage(true);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "advance_ending_stage" }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "엔딩 단계 전환 실패");
+        return;
+      }
+
+      const data = await res.json();
+      setSession((prev) =>
+        prev ? { ...prev, sharedState: data.session.sharedState } : prev
+      );
+    } catch {
+      alert("엔딩 단계 전환 중 오류가 발생했습니다.");
+    } finally {
+      setAdvancingEndingStage(false);
+    }
+  }
+
   async function endSession() {
     if (!session) return;
     if (!confirm("세션을 강제 종료하시겠습니까? 플레이어들이 엔딩 화면으로 이동합니다.")) return;
@@ -919,6 +1013,8 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const totalPlayers = session?.sharedState.characterSlots.filter((s) => s.isLocked).length ?? 0;
   const voteCount = session?.sharedState.voteCount ?? 0;
   const phaseContent = session ? getPhaseBoardContent(game, session.sharedState) : null;
+  const currentEndingStage = normalizeEndingStage(session?.sharedState.endingStage);
+  const nextEndingStage = session ? getNextEndingStage(game, currentEndingStage) : null;
   const currentSubPhaseLabel =
     session && phase.startsWith("round-")
       ? SUB_PHASE_LABELS[normalizeSubPhase(session.sharedState.currentSubPhase)]
@@ -1023,7 +1119,22 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                   {advancing ? "처리 중…" : advanceLabel(phase, game.rules?.roundCount ?? 4)}
                 </button>
               ) : (
-                <div className="text-center py-2 text-sm text-dark-500">게임 종료</div>
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-dark-800 bg-dark-950/50 px-3 py-3 text-sm text-dark-300">
+                    현재 단계: <span className="font-medium text-mystery-300">{ENDING_STAGE_LABELS[currentEndingStage]}</span>
+                  </div>
+                  {nextEndingStage ? (
+                    <button
+                      onClick={advanceEndingStage}
+                      disabled={advancingEndingStage}
+                      className="w-full py-2.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {advancingEndingStage ? "처리 중…" : endingAdvanceLabel(nextEndingStage)}
+                    </button>
+                  ) : (
+                    <div className="text-center py-2 text-sm text-dark-500">모든 엔딩 단계 공개 완료</div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1073,6 +1184,12 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
           {/* 오른쪽: 플레이어 슬롯 */}
           <div className="lg:col-span-2 space-y-4">
             {phaseContent && <GMBoard game={game} content={phaseContent} />}
+            {phase === "ending" && (currentEndingStage === "personal" || currentEndingStage === "author-notes" || currentEndingStage === "complete") && (
+              <PersonalEndingOverview game={game} />
+            )}
+            {phase === "ending" && (currentEndingStage === "author-notes" || currentEndingStage === "complete") && (
+              <AuthorNotesOverview game={game} />
+            )}
 
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-dark-300">

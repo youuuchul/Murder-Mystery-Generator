@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession, updateSession, deleteSession } from "@/lib/storage/session-storage";
 import { getGame } from "@/lib/storage/game-storage";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
+import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { GamePhase } from "@/types/session";
 
@@ -86,10 +87,7 @@ export async function PATCH(req: Request, { params }: Params) {
         message = `Round ${cur + 1} 조사 페이즈가 시작됩니다.`;
       }
     } else if (sharedState.phase === "vote") {
-      newPhase = "ending";
-      sharedState.endingStage = "branch";
-      message = "엔딩입니다. 진실이 밝혀집니다.";
-      session.endedAt = new Date().toISOString();
+      return NextResponse.json({ error: "투표 결과를 먼저 공개하세요." }, { status: 400 });
     }
   } else if (body.action === "set_subphase") {
     const sub = normalizeSubPhase(body.subPhase);
@@ -98,6 +96,24 @@ export async function PATCH(req: Request, { params }: Params) {
       const labels: Record<string, string> = { investigation: "조사", discussion: "토론" };
       message = `${labels[sub]} 페이즈가 시작됩니다.`;
     }
+  } else if (body.action === "advance_ending_stage") {
+    if (sharedState.phase !== "ending") {
+      return NextResponse.json({ error: "엔딩 페이즈가 아닙니다." }, { status: 400 });
+    }
+
+    if (!game || !sharedState.voteReveal) {
+      return NextResponse.json({ error: "엔딩 결과 데이터가 없습니다." }, { status: 400 });
+    }
+
+    const currentStage = normalizeEndingStage(sharedState.endingStage);
+    const nextStage = getNextEndingStage(game, currentStage);
+
+    if (!nextStage) {
+      return NextResponse.json({ error: "더 진행할 엔딩 단계가 없습니다." }, { status: 400 });
+    }
+
+    sharedState.endingStage = nextStage;
+    message = `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`;
   } else if (body.action === "end_session") {
     session.endedAt = new Date().toISOString();
     newPhase = "ending";
@@ -106,12 +122,14 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   sharedState.phase = newPhase;
-  sharedState.eventLog.push({
-    id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
-    message,
-    type: "phase_changed",
-  });
+  if (message) {
+    sharedState.eventLog.push({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      message,
+      type: "phase_changed",
+    });
+  }
 
   updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });

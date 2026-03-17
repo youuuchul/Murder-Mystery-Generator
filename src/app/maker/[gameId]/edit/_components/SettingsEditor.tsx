@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import Button from "@/components/ui/Button";
 import type { GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
@@ -45,6 +45,7 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
 
   const [showPlayerCountWarning, setShowPlayerCountWarning] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const privateChat = rules?.privateChat ?? {
     enabled: true,
@@ -85,6 +86,44 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
     updateSettings("tags", settings.tags.filter((item) => item !== tag));
   }
 
+  /**
+   * 표지 이미지를 업로드하고 내부 에셋 URL을 설정값에 연결한다.
+   * 라이브러리 썸네일은 이 URL을 그대로 사용한다.
+   */
+  async function handleCoverUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "covers");
+
+    setUploadingCover(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? "표지 업로드 실패");
+        return;
+      }
+
+      updateSettings("coverImageUrl", data.url);
+    } catch (error) {
+      console.error("표지 업로드 실패:", error);
+      alert("표지 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
   const roundTotalMin = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
   const totalMin = roundTotalMin * rules.roundCount;
   const playerCountMismatch = characterCount > 0 && characterCount !== settings.playerCount;
@@ -105,6 +144,53 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
           placeholder="예: 저택의 밤, 사라진 다이아몬드"
           className={`w-full ${inputClass}`}
         />
+      </div>
+
+      <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">표지 이미지</h3>
+            <p className="text-xs text-dark-500 mt-1">
+              라이브러리 카드 썸네일에 표시됩니다. 업로드 후 저장하면 바로 반영됩니다.
+            </p>
+          </div>
+          <label className="shrink-0">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleCoverUpload}
+              disabled={uploadingCover}
+            />
+            <span className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-dark-600 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
+              {uploadingCover ? "업로드 중…" : "표지 업로드"}
+            </span>
+          </label>
+        </div>
+
+        {settings.coverImageUrl ? (
+          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
+            <img
+              src={settings.coverImageUrl}
+              alt={game.title || "시나리오 표지 미리보기"}
+              className="w-full h-52 object-cover"
+            />
+            <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-dark-700 bg-dark-900/60">
+              <p className="text-xs text-dark-500 truncate">{settings.coverImageUrl}</p>
+              <button
+                type="button"
+                onClick={() => updateSettings("coverImageUrl", undefined)}
+                className="text-xs text-dark-500 hover:text-red-400 transition-colors shrink-0"
+              >
+                이미지 제거
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="h-40 rounded-xl border border-dashed border-dark-700 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center">
+            <span className="text-xs tracking-[0.24em] uppercase text-mystery-300/70">FILE</span>
+          </div>
+        )}
       </div>
 
       <div>

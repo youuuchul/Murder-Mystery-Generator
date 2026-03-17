@@ -203,11 +203,13 @@ export interface Clue {
   id: string;
   title: string;
   description: string;
-  type: "physical" | "testimony" | "document" | "scene";
+  type: "physical" | "testimony" | "scene";
   imageUrl?: string;          // 플레이어 인벤토리/상세에 노출할 단서 이미지
   locationId: string;
-  pointsTo?: string;           // GM 메모
-  isSecret?: boolean;          // GM 직접 배포용
+  /** legacy field — 기존 데이터 호환용 */
+  pointsTo?: string;
+  /** legacy field — 기존 데이터 호환용 */
+  isSecret?: boolean;
   condition?: ClueCondition;   // 획득 조건 (없으면 자유 획득)
 }
 

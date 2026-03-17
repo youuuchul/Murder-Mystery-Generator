@@ -51,7 +51,7 @@ function evaluateCondition(
  * POST /api/sessions/[sessionId]/cards
  *
  * action: "acquire"    — 플레이어가 장소에서 단서 획득
- * action: "distribute" — GM이 비밀 단서를 특정 플레이어에게 배포
+ * action: "distribute" — legacy GM 단서 배포
  * action: "transfer"   — 플레이어 간 카드 이전
  */
 export async function POST(req: Request, { params }: Params) {
@@ -113,9 +113,9 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: "조사 페이즈가 아닙니다" }, { status: 400 });
     }
 
-    // 비밀 단서는 GM만 배포
-    if (clue.isSecret) {
-      return NextResponse.json({ error: "GM 직접 배포 단서입니다." }, { status: 403 });
+    // 현장 단서는 공개형이므로 장소 화면에서 바로 확인한다.
+    if (clue.type === "scene") {
+      return NextResponse.json({ error: "현장 단서는 획득하지 않고 장소에서 바로 확인합니다." }, { status: 400 });
     }
 
     // 단서 획득 조건 체크

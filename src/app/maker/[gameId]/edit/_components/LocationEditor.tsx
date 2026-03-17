@@ -20,7 +20,6 @@ interface LocationEditorProps {
 const CLUE_TYPES: { value: Clue["type"]; label: string }[] = [
   { value: "physical", label: "물적 증거" },
   { value: "testimony", label: "증언" },
-  { value: "document", label: "문서" },
   { value: "scene", label: "현장 단서" },
 ];
 
@@ -46,8 +45,6 @@ function createClue(locationId: string): Clue {
     type: "physical",
     imageUrl: undefined,
     locationId,
-    pointsTo: "",
-    isSecret: false,
   };
 }
 
@@ -511,6 +508,7 @@ function ClueForm({
 }) {
   const [expanded, setExpanded] = useState(true);
   const typeInfo = CLUE_TYPES.find((t) => t.value === clue.type);
+  const isSceneClue = clue.type === "scene";
 
   function update<K extends keyof Clue>(key: K, value: Clue[K]) {
     onChange({ ...clue, [key]: value });
@@ -530,17 +528,12 @@ function ClueForm({
           <span className="text-[11px] text-dark-500 border border-dark-700 bg-dark-800 px-1.5 py-0.5 rounded">
             {typeInfo?.label ?? "유형 없음"}
           </span>
-          {clue.isSecret && (
-            <span className="text-xs text-yellow-400 border border-yellow-800 bg-yellow-950/30 px-1.5 py-0.5 rounded">
-              비밀
-            </span>
-          )}
           {clue.imageUrl && (
             <span className="text-xs text-sky-400 border border-sky-900 bg-sky-950/30 px-1.5 py-0.5 rounded">
               이미지
             </span>
           )}
-          {clue.condition && (
+          {clue.condition && !isSceneClue && (
             <span className="text-xs text-mystery-400 border border-mystery-800 bg-mystery-950/30 px-1.5 py-0.5 rounded">
               잠금 조건
             </span>
@@ -575,7 +568,14 @@ function ClueForm({
               <label className="block text-xs text-dark-500 mb-1">유형</label>
               <select
                 value={clue.type}
-                onChange={(e) => update("type", e.target.value as Clue["type"])}
+                onChange={(e) => {
+                  const nextType = e.target.value as Clue["type"];
+                  onChange({
+                    ...clue,
+                    type: nextType,
+                    condition: nextType === "scene" ? undefined : clue.condition,
+                  });
+                }}
                 className={inputClass}
               >
                 {CLUE_TYPES.map((t) => (
@@ -593,10 +593,16 @@ function ClueForm({
               rows={3}
               value={clue.description}
               onChange={(e) => update("description", e.target.value)}
-              placeholder="플레이어가 카드를 획득했을 때 보게 되는 내용"
+              placeholder={isSceneClue ? "장소에서 바로 확인할 공개 현장 정보" : "플레이어가 카드를 획득했을 때 보게 되는 내용"}
               className={inputClass + " resize-none"}
             />
           </div>
+
+          {isSceneClue && (
+            <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-3 text-xs text-sky-300">
+              현장 단서는 인벤토리에 들어가지 않습니다. 장소가 열리면 플레이어가 해당 장소에서 바로 내용을 확인합니다.
+            </div>
+          )}
 
           <div>
             <label className="block text-xs text-dark-500 mb-1">
@@ -625,45 +631,23 @@ function ClueForm({
             )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <label className="block text-xs text-dark-500 mb-1">
-                연관 정보 <span className="text-dark-600">(GM 메모용)</span>
+          {/* 단서 획득 조건 */}
+          {!isSceneClue && (
+            <div>
+              <label className="block text-xs text-dark-500 mb-2">
+                단서 획득 조건
+                <span className="text-dark-600 font-normal ml-1">— 조건 충족 시에만 획득 가능</span>
               </label>
-              <input
-                type="text"
-                value={clue.pointsTo ?? ""}
-                onChange={(e) => update("pointsTo", e.target.value)}
-                placeholder="어떤 캐릭터/사건을 가리키는지"
-                className={inputClass}
+              <ConditionForm
+                label="획득 조건"
+                condition={clue.condition}
+                onChange={(c) => update("condition", c)}
+                allClues={allClues}
+                allCharacters={allCharacters}
+                excludeClueId={clue.id}
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer mt-4">
-              <input
-                type="checkbox"
-                checked={clue.isSecret ?? false}
-                onChange={(e) => update("isSecret", e.target.checked)}
-                className="accent-mystery-500 w-4 h-4"
-              />
-              <span className="text-xs text-dark-400">GM 직접 배포</span>
-            </label>
-          </div>
-
-          {/* 단서 획득 조건 */}
-          <div>
-            <label className="block text-xs text-dark-500 mb-2">
-              단서 획득 조건
-              <span className="text-dark-600 font-normal ml-1">— 조건 충족 시에만 획득 가능</span>
-            </label>
-            <ConditionForm
-              label="획득 조건"
-              condition={clue.condition}
-              onChange={(c) => update("condition", c)}
-              allClues={allClues}
-              allCharacters={allCharacters}
-              excludeClueId={clue.id}
-            />
-          </div>
+          )}
         </div>
       )}
     </div>

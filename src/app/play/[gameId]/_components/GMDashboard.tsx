@@ -712,36 +712,10 @@ function SessionCode({ code }: { code: string }) {
 function SlotCard({
   slot,
   playerName,
-  onDistribute,
-  secretClues,
-  sessionId,
 }: {
   slot: CharacterSlot;
   playerName: string;
-  onDistribute: () => void;
-  secretClues: { id: string; title: string }[];
-  sessionId: string;
 }) {
-  const [distributing, setDistributing] = useState(false);
-  const [selectedClue, setSelectedClue] = useState("");
-
-  async function handleDistribute() {
-    if (!selectedClue) return;
-    setDistributing(true);
-    await fetch(`/api/sessions/${sessionId}/cards`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "distribute",
-        clueId: selectedClue,
-        targetPlayerId: slot.playerId,
-      }),
-    });
-    setSelectedClue("");
-    setDistributing(false);
-    onDistribute();
-  }
-
   return (
     <div
       className={`border rounded-xl p-4 space-y-3 transition-colors ${
@@ -771,31 +745,6 @@ function SlotCard({
           {slot.isLocked ? "참가" : "미참가"}
         </span>
       </div>
-
-      {/* GM 단서 배포 */}
-      {slot.isLocked && secretClues.length > 0 && (
-        <div className="flex gap-2">
-          <select
-            value={selectedClue}
-            onChange={(e) => setSelectedClue(e.target.value)}
-            className="flex-1 bg-dark-800 border border-dark-600 rounded px-2 py-1.5 text-dark-300 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
-          >
-            <option value="">— 단서 선택 —</option>
-            {secretClues.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title || "(제목 없음)"}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleDistribute}
-            disabled={!selectedClue || distributing}
-            className="text-xs px-3 py-1.5 rounded bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700 disabled:opacity-40 transition-colors"
-          >
-            배포
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -841,11 +790,6 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const [deleting, setDeleting] = useState(false);
   const [endingSession, setEndingSession] = useState(false);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
-
-  const secretClues = game.clues.filter((c) => c.isSecret).map((c) => ({
-    id: c.id,
-    title: c.title,
-  }));
 
   // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 세션 상태 동기화
   useEffect(() => {
@@ -1275,9 +1219,6 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                     key={slot.playerId}
                     slot={slot}
                     playerName={character?.name || "(이름 없음)"}
-                    onDistribute={() => {}}
-                    secretClues={secretClues}
-                    sessionId={session.id}
                   />
                 );
               })}

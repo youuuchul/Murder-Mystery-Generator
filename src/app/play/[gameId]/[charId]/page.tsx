@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import { ENDING_STAGE_LABELS, normalizeEndingStage, resolveActiveEndingBranch } from "@/lib/ending-flow";
-import type { GamePackage, Player, ClueCondition } from "@/types/game";
+import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
 import type { EndingStage, SharedState, InventoryCard, VoteReveal } from "@/types/session";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -43,7 +43,7 @@ const VICTORY_LABEL: Record<string, string> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서",
+  physical: "물적 증거", testimony: "증언", scene: "현장 단서",
 };
 
 type Tab = "character" | "inventory" | "locations" | "vote";
@@ -306,7 +306,7 @@ function CardDetailModal({
     setTransferring(false);
   }
 
-  const typeLabel: Record<string, string> = { physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서" };
+  const typeLabel: Record<string, string> = { physical: "물적 증거", testimony: "증언", scene: "현장 단서" };
 
   return (
     <div
@@ -382,6 +382,45 @@ function CardDetailModal({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** 현장 단서를 인벤토리와 분리해 읽기 전용 모달로 보여준다. */
+function SceneClueModal({
+  clue,
+  onClose,
+}: {
+  clue: Clue;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end"
+      onClick={onClose}
+    >
+      <div
+        className="bg-dark-900 border-t border-dark-700 rounded-t-3xl p-6 space-y-5 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <p className="font-bold text-dark-50 text-lg leading-tight">{clue.title || "(제목 없음)"}</p>
+            <p className="text-xs text-dark-500 mt-0.5">현장 단서</p>
+          </div>
+          <button onClick={onClose} className="text-dark-500 hover:text-dark-300 text-sm leading-none">닫기</button>
+        </div>
+
+        <div className="bg-dark-800 rounded-xl p-4 space-y-4">
+          {clue.imageUrl ? (
+            <ImageFrame
+              src={clue.imageUrl}
+              alt={clue.title || "현장 단서 이미지"}
+            />
+          ) : null}
+          <p className="text-dark-200 text-sm leading-relaxed whitespace-pre-line">{clue.description || "—"}</p>
+        </div>
       </div>
     </div>
   );
@@ -669,6 +708,7 @@ export default function PlayerView() {
   const [characterPanel, setCharacterPanel] = useState<CharacterPanel>("profile");
   const [acquiring, setAcquiring] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
+  const [selectedSceneClue, setSelectedSceneClue] = useState<Clue | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem(`mm_${sessionId}`) ?? "";
@@ -1127,7 +1167,7 @@ export default function PlayerView() {
                   </div>
                 ) : (
                   accessibleLocations.map((loc) => {
-                    const locClues = game.clues.filter((c) => c.locationId === loc.id && !c.isSecret);
+                    const locClues = game.clues.filter((c) => c.locationId === loc.id);
                     const visitedThisRound = (roundVisited[String(currentRound)] ?? []).includes(loc.id);
                     const globalAcquired = sharedState.acquiredClueIds ?? [];
                     const allowRevisit = game.rules?.allowLocationRevisit ?? true;
@@ -1196,18 +1236,21 @@ export default function PlayerView() {
                             <p className="text-xs text-dark-700 text-center py-2">단서 없음</p>
                           ) : (
                             locClues.map((clue, idx) => {
+                              const isSceneClue = clue.type === "scene";
                               const alreadyHas = inventoryIds.has(clue.id);
-                              const takenByOther = !alreadyHas && globalAcquired.includes(clue.id);
+                              const takenByOther = !isSceneClue && !alreadyHas && globalAcquired.includes(clue.id);
 
                               // 단서 획득 조건 체크
                               const clueCondMet = checkConditionLocally(clue.condition);
-                              const clueLocked = clueCondMet === false; // has_items 조건이 명확히 미충족
+                              const clueLocked = !isSceneClue && clueCondMet === false; // has_items 조건이 명확히 미충족
 
                               return (
                                 <div
                                   key={clue.id}
                                   className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${
-                                    alreadyHas
+                                    isSceneClue
+                                      ? "border-sky-900/50 bg-sky-950/10"
+                                      : alreadyHas
                                       ? "border-mystery-800 bg-mystery-950/20 opacity-70"
                                       : takenByOther
                                       ? "border-dark-800 bg-dark-800/20 opacity-50"
@@ -1219,7 +1262,14 @@ export default function PlayerView() {
                                   }`}
                                 >
                                   <div className="min-w-0 flex-1">
-                                    {alreadyHas ? (
+                                    {isSceneClue ? (
+                                      <>
+                                        <p className="text-sm text-sky-300 font-medium truncate">
+                                          {clue.title || `현장 단서 ${idx + 1}`}
+                                        </p>
+                                        <p className="text-xs text-dark-500 mt-0.5">공개 정보 · 획득되지 않음</p>
+                                      </>
+                                    ) : alreadyHas ? (
                                       <p className="text-sm text-mystery-300 font-medium truncate">
                                         {clue.title || "(카드)"}
                                       </p>
@@ -1244,7 +1294,15 @@ export default function PlayerView() {
                                       </>
                                     )}
                                   </div>
-                                  {alreadyHas ? (
+                                  {isSceneClue ? (
+                                    <button
+                                      onClick={() => setSelectedSceneClue(clue)}
+                                      disabled={locationLocked}
+                                      className="text-xs px-3 py-1.5 rounded-lg bg-sky-900/50 hover:bg-sky-900/70 text-sky-200 border border-sky-800 shrink-0 transition-colors disabled:opacity-40"
+                                    >
+                                      내용 확인
+                                    </button>
+                                  ) : alreadyHas ? (
                                     <span className="text-xs text-mystery-500 shrink-0">보유 중</span>
                                   ) : takenByOther ? (
                                     <span className="text-xs text-dark-600 shrink-0">보유됨</span>
@@ -1305,6 +1363,13 @@ export default function PlayerView() {
             setInventory((prev) => prev.filter((i) => i.cardId !== cardId));
             setSelectedCard(null);
           }}
+        />
+      )}
+
+      {selectedSceneClue && (
+        <SceneClueModal
+          clue={selectedSceneClue}
+          onClose={() => setSelectedSceneClue(null)}
         />
       )}
     </div>

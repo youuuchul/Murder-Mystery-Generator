@@ -149,8 +149,6 @@ export function buildMakerAssistantContext(
     locationId: clue.locationId,
     locationName:
       normalizedGame.locations.find((location) => location.id === clue.locationId)?.name ?? "",
-    pointsTo: clue.pointsTo ?? "",
-    isSecret: clue.isSecret === true,
   }));
 
   return context;

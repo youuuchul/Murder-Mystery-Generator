@@ -6,6 +6,26 @@ import type { VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 
+/**
+ * 현재 검거 대상과 설정된 엔딩 분기 목록을 바탕으로 적용할 분기 ID를 찾는다.
+ * 동률 GM 선택 UI는 이후 단계에서 붙일 예정이라 현재는 확정된 검거 대상 1명만 받는다.
+ */
+function resolveEndingBranchId(
+  game: NonNullable<ReturnType<typeof getGame>>,
+  arrestedPlayerId: string,
+  resultType: "culprit-captured" | "wrong-arrest"
+): string | undefined {
+  if (resultType === "culprit-captured") {
+    return game.ending.branches.find((branch) => branch.triggerType === "culprit-captured")?.id;
+  }
+
+  return game.ending.branches.find((branch) => (
+    branch.triggerType === "specific-player-arrested"
+    && branch.targetPlayerId === arrestedPlayerId
+  ))?.id
+    ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
+}
+
 function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSession>>) {
   if (!session) return;
 
@@ -32,18 +52,33 @@ function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSe
   const totalVotes = Object.keys(session.votes).length;
   const culpritVotes = tallyMap.get(culpritPlayerId)?.count ?? 0;
   const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
+  const arrestedPlayerId = tally[0]?.playerId ?? "";
+  const resultType = arrestedPlayerId === culpritPlayerId
+    ? "culprit-captured"
+    : "wrong-arrest";
+  const resolvedBranchId = game && arrestedPlayerId
+    ? resolveEndingBranchId(game, arrestedPlayerId, resultType)
+    : undefined;
 
-  const reveal: VoteReveal = { tally, culpritPlayerId, majorityCorrect };
+  const reveal: VoteReveal = {
+    tally,
+    culpritPlayerId,
+    arrestedPlayerId,
+    resultType,
+    resolvedBranchId,
+    majorityCorrect,
+  };
   session.sharedState.voteReveal = reveal;
   session.sharedState.phase = "ending";
+  session.sharedState.endingStage = "branch";
   session.endedAt = new Date().toISOString();
 
   session.sharedState.eventLog.push({
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    message: majorityCorrect
-      ? "진범이 밝혀졌습니다! 수사관들의 승리입니다."
-      : "진범이 도주에 성공했습니다.",
+    message: resultType === "culprit-captured"
+      ? "범인이 검거됐습니다."
+      : "검거된 인물은 있었지만 진범은 아니었습니다.",
     type: "vote_revealed",
   });
 

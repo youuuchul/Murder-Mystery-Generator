@@ -437,8 +437,12 @@ function PlayerForm({
               {player.relationships.map((rel, idx) => (
                 <div key={idx} className="flex gap-2">
                   <select
-                    value={rel.playerId}
-                    onChange={(e) => updateRel(idx, { playerId: e.target.value })}
+                    value={rel.targetId || rel.playerId || ""}
+                    onChange={(e) => updateRel(idx, {
+                      targetType: "player",
+                      targetId: e.target.value,
+                      playerId: e.target.value,
+                    })}
                     className="w-36 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
                   >
                     <option value="">캐릭터 선택</option>
@@ -464,7 +468,10 @@ function PlayerForm({
               ))}
               <button
                 type="button"
-                onClick={() => update("relationships", [...player.relationships, { playerId: "", description: "" }])}
+                onClick={() => update("relationships", [
+                  ...player.relationships,
+                  { targetType: "player", targetId: "", playerId: "", description: "" },
+                ])}
                 className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
               >
                 + 관계 추가

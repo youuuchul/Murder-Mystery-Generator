@@ -5,10 +5,11 @@ import type { MakerAssistantTask } from "@/types/assistant";
 
 const STEP_LABELS: Record<number, string> = {
   1: "기본 설정",
-  2: "사건 개요",
+  2: "사건 개요 / 오프닝",
   3: "플레이어",
   4: "장소/단서",
   5: "스크립트",
+  6: "엔딩",
 };
 
 export interface MakerAssistantContext {
@@ -42,7 +43,9 @@ export interface MakerAssistantContext {
     blankTimelineSlots: number;
     locationsWithoutClues: number;
     cluesWithoutDescription: number;
-    roundsWithoutNarration: number;
+    roundsWithoutEventText: number;
+    namelessNpcs: number;
+    endingBranchCount: number;
   };
   story: Record<string, unknown>;
   players?: Record<string, unknown>[];
@@ -91,14 +94,20 @@ export function buildMakerAssistantContext(
     completion: buildCompletionSummary(normalizedGame),
     story: {
       victim: normalizedGame.story.victim,
+      npcs: normalizedGame.story.npcs,
       incident: normalizedGame.story.incident,
-      location: normalizedGame.story.location,
       culpritPlayerId: normalizedGame.story.culpritPlayerId,
       culpritPlayerName:
         normalizedGame.players.find((player) => player.id === normalizedGame.story.culpritPlayerId)?.name
         ?? "",
       motive: normalizedGame.story.motive,
       method: normalizedGame.story.method,
+      endingBranches: normalizedGame.ending.branches.map((branch) => ({
+        id: branch.id,
+        label: branch.label,
+        triggerType: branch.triggerType,
+        targetPlayerId: branch.targetPlayerId ?? "",
+      })),
       timelineSlots: normalizedGame.story.timeline.slots.map((slot) => ({
         id: slot.id,
         label: slot.label,
@@ -159,7 +168,9 @@ function buildCompletionSummary(game: GamePackage): MakerAssistantContext["compl
     blankTimelineSlots: game.story.timeline.slots.filter((slot) => !slot.label.trim()).length,
     locationsWithoutClues: game.locations.filter((location) => location.clueIds.length === 0).length,
     cluesWithoutDescription: game.clues.filter((clue) => !clue.description.trim()).length,
-    roundsWithoutNarration: game.scripts.rounds.filter((round) => !round.narration.trim()).length,
+    roundsWithoutEventText: game.scripts.rounds.filter((round) => !round.narration.trim()).length,
+    namelessNpcs: game.story.npcs.filter((npc) => !npc.name.trim()).length,
+    endingBranchCount: game.ending.branches.length,
   };
 }
 

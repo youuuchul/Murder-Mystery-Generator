@@ -87,6 +87,7 @@ export async function PATCH(req: Request, { params }: Params) {
       }
     } else if (sharedState.phase === "vote") {
       newPhase = "ending";
+      sharedState.endingStage = "branch";
       message = "엔딩입니다. 진실이 밝혀집니다.";
       session.endedAt = new Date().toISOString();
     }
@@ -100,6 +101,7 @@ export async function PATCH(req: Request, { params }: Params) {
   } else if (body.action === "end_session") {
     session.endedAt = new Date().toISOString();
     newPhase = "ending";
+    sharedState.endingStage = "complete";
     message = "GM이 세션을 종료했습니다.";
   }
 

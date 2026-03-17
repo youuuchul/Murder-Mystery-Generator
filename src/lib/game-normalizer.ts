@@ -1,7 +1,10 @@
 import type {
+  AuthorNote,
   Clue,
   ClueCard,
   ClueCondition,
+  EndingBranch,
+  EndingConfig,
   GameMetadata,
   GamePackage,
   GameRules,
@@ -10,8 +13,11 @@ import type {
   PhaseConfig,
   Player,
   PlayerTimelineEntry,
+  Relationship,
   RoundScript,
   ScriptSegment,
+  StoryNpc,
+  PersonalEnding,
   Story,
   StoryTimeline,
   TimelineEvent,
@@ -45,6 +51,14 @@ function normalizeVictoryCondition(value: unknown): Player["victoryCondition"] {
     || value === "personal-goal"
     ? value
     : "arrest-culprit";
+}
+
+function normalizeEndingTriggerType(value: unknown): EndingBranch["triggerType"] {
+  return value === "culprit-captured"
+    || value === "specific-player-arrested"
+    || value === "wrong-arrest-fallback"
+    ? value
+    : "wrong-arrest-fallback";
 }
 
 /**
@@ -95,6 +109,16 @@ function normalizeStoryTimeline(timeline: Story["timeline"] | TimelineEvent[] | 
   };
 }
 
+/** 공개 NPC 1개를 현재 편집기 구조로 정리한다. */
+function normalizeStoryNpc(npc: StoryNpc | undefined): StoryNpc {
+  return {
+    id: asTrimmedString(npc?.id) || crypto.randomUUID(),
+    name: asTrimmedString(npc?.name),
+    background: asTrimmedString(npc?.background),
+    imageUrl: asOptionalString(npc?.imageUrl),
+  };
+}
+
 /**
  * 플레이어 행동 타임라인을 현재 스토리 슬롯과 맞춰 정렬한다.
  * 슬롯이 추가/삭제돼도 플레이어 데이터가 바로 같은 순서를 따르도록 보정한다.
@@ -112,6 +136,28 @@ function normalizePlayerTimelineEntries(
       action: asTrimmedString(matched?.action),
     };
   });
+}
+
+/**
+ * 구형 `playerId` 관계와 신규 `targetType/targetId` 관계를 함께 받아
+ * 플레이어/피해자/NPC 공통 대상 구조로 맞춘다.
+ */
+function normalizeRelationship(relationship: Relationship | undefined): Relationship {
+  const legacyPlayerId = asTrimmedString(relationship?.playerId);
+  const targetType = relationship?.targetType === "victim"
+    || relationship?.targetType === "npc"
+    ? relationship.targetType
+    : "player";
+  const targetId = asTrimmedString(relationship?.targetId)
+    || legacyPlayerId
+    || (targetType === "victim" ? "victim" : "");
+
+  return {
+    targetType,
+    targetId,
+    description: asTrimmedString(relationship?.description),
+    playerId: legacyPlayerId || undefined,
+  };
 }
 
 /**
@@ -134,6 +180,41 @@ function normalizeClueCondition(condition: ClueCondition | undefined): ClueCondi
       ? asOptionalString(condition.targetCharacterId)
       : undefined,
     hint: asOptionalString(condition.hint),
+  };
+}
+
+/** 엔딩 분기 1개를 현재 엔딩 에디터에서 바로 쓸 수 있는 형태로 정리한다. */
+function normalizeEndingBranch(branch: EndingBranch | undefined): EndingBranch {
+  const triggerType = normalizeEndingTriggerType(branch?.triggerType);
+
+  return {
+    id: asTrimmedString(branch?.id) || crypto.randomUUID(),
+    label: asTrimmedString(branch?.label),
+    triggerType,
+    targetPlayerId: triggerType === "specific-player-arrested"
+      ? asOptionalString(branch?.targetPlayerId)
+      : undefined,
+    storyText: asTrimmedString(branch?.storyText),
+    videoUrl: asOptionalString(branch?.videoUrl),
+    backgroundMusic: asOptionalString(branch?.backgroundMusic),
+  };
+}
+
+/** 플레이어 개인 엔딩 1개를 정리한다. */
+function normalizePersonalEnding(ending: PersonalEnding | undefined): PersonalEnding {
+  return {
+    playerId: asTrimmedString(ending?.playerId),
+    title: asOptionalString(ending?.title),
+    text: asTrimmedString(ending?.text),
+  };
+}
+
+/** 작가 추가 설명 1개를 정리한다. */
+function normalizeAuthorNote(note: AuthorNote | undefined): AuthorNote {
+  return {
+    id: asTrimmedString(note?.id) || crypto.randomUUID(),
+    title: asTrimmedString(note?.title),
+    content: asTrimmedString(note?.content),
   };
 }
 
@@ -167,10 +248,7 @@ function normalizePlayer(player: Player | undefined, timelineSlots: TimelineSlot
         }))
       : [],
     relationships: Array.isArray(player?.relationships)
-      ? player.relationships.map((relationship) => ({
-          playerId: asTrimmedString(relationship?.playerId),
-          description: asTrimmedString(relationship?.description),
-        }))
+      ? player.relationships.map(normalizeRelationship)
       : [],
     cardImage: asOptionalString(player?.cardImage),
   };
@@ -232,6 +310,61 @@ function normalizeClueCard(card: ClueCard | undefined): ClueCard {
       ? card.type
       : "physical",
     imageUrl: asOptionalString(card?.imageUrl),
+  };
+}
+
+/**
+ * 구형 `scripts.endingSuccess/endingFail`를 새 엔딩 분기 기본값으로 옮긴다.
+ * 새 `ending.branches`가 비어 있는 경우에만 fallback으로 사용한다.
+ */
+function buildLegacyEndingBranches(scripts: GamePackage["scripts"] | undefined): EndingBranch[] {
+  const branches: EndingBranch[] = [];
+
+  if (asTrimmedString(scripts?.endingSuccess?.narration)) {
+    branches.push({
+      id: crypto.randomUUID(),
+      label: "범인 검거",
+      triggerType: "culprit-captured",
+      storyText: asTrimmedString(scripts?.endingSuccess?.narration),
+      videoUrl: asOptionalString(scripts?.endingSuccess?.videoUrl),
+      backgroundMusic: asOptionalString(scripts?.endingSuccess?.backgroundMusic),
+    });
+  }
+
+  if (asTrimmedString(scripts?.endingFail?.narration)) {
+    branches.push({
+      id: crypto.randomUUID(),
+      label: "오검거 기본 분기",
+      triggerType: "wrong-arrest-fallback",
+      storyText: asTrimmedString(scripts?.endingFail?.narration),
+      videoUrl: asOptionalString(scripts?.endingFail?.videoUrl),
+      backgroundMusic: asOptionalString(scripts?.endingFail?.backgroundMusic),
+    });
+  }
+
+  return branches;
+}
+
+/** 새 엔딩 설정과 구형 엔딩 스크립트를 함께 받아 현재 엔딩 구조로 정규화한다. */
+function normalizeEndingConfig(
+  incoming: GamePackage["ending"] | undefined,
+  scripts: GamePackage["scripts"] | undefined
+): EndingConfig {
+  const explicitBranches = Array.isArray(incoming?.branches)
+    ? incoming.branches.map(normalizeEndingBranch)
+    : [];
+  const legacyBranches = buildLegacyEndingBranches(scripts);
+
+  return {
+    branches: explicitBranches.length > 0 ? explicitBranches : legacyBranches,
+    personalEndingsEnabled: incoming?.personalEndingsEnabled ?? false,
+    personalEndings: Array.isArray(incoming?.personalEndings)
+      ? incoming.personalEndings.map(normalizePersonalEnding)
+      : [],
+    authorNotesEnabled: incoming?.authorNotesEnabled ?? false,
+    authorNotes: Array.isArray(incoming?.authorNotes)
+      ? incoming.authorNotes.map(normalizeAuthorNote)
+      : [],
   };
 }
 
@@ -341,10 +474,14 @@ export function normalizeGame(game: GamePackage): GamePackage {
     victim: {
       name: asTrimmedString(game.story?.victim?.name),
       background: asTrimmedString(game.story?.victim?.background),
-      deathCircumstances: asTrimmedString(game.story?.victim?.deathCircumstances),
+      imageUrl: asOptionalString(game.story?.victim?.imageUrl),
+      deathCircumstances: asOptionalString(game.story?.victim?.deathCircumstances),
     },
+    npcs: Array.isArray(game.story?.npcs)
+      ? game.story.npcs.map(normalizeStoryNpc)
+      : [],
     incident: asTrimmedString(game.story?.incident),
-    location: asTrimmedString(game.story?.location),
+    location: asOptionalString(game.story?.location),
     gmOverview: asOptionalString(game.story?.gmOverview) ?? asOptionalString(game.story?.synopsis),
     mapImageUrl: asOptionalString(game.story?.mapImageUrl),
     timeline,
@@ -369,6 +506,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
       eventCards: Array.isArray(game.cards?.eventCards) ? game.cards.eventCards : [],
     },
     scripts,
+    ending: normalizeEndingConfig(game.ending, game.scripts),
   };
 }
 

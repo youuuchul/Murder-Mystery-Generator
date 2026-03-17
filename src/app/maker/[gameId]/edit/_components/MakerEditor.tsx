@@ -7,6 +7,7 @@ import StoryEditor from "./StoryEditor";
 import PlayerEditor from "./PlayerEditor";
 import LocationEditor from "./LocationEditor";
 import ScriptEditor from "./ScriptEditor";
+import EndingEditor from "./EndingEditor";
 import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
 import type { GamePackage } from "@/types/game";
@@ -16,7 +17,7 @@ interface MakerEditorProps {
   initialGame: GamePackage;
 }
 
-const STEP_COUNT = 5;
+const STEP_COUNT = 6;
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [game, setGame] = useState<GamePackage>(initialGame);
@@ -84,8 +85,15 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           {currentStep === 2 && (
             <StoryEditor
               story={game.story}
+              opening={game.scripts.opening}
               players={game.players ?? []}
-              onChange={(story) => updateGame({ story })}
+              onChangeStory={(story) => updateGame({ story })}
+              onChangeOpening={(opening) => updateGame({
+                scripts: {
+                  ...game.scripts,
+                  opening,
+                },
+              })}
               onSave={() => save({ ...game })}
               saving={saving}
             />
@@ -120,6 +128,15 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}
               onChange={(scripts) => updateGame({ scripts })}
+              onSave={() => save({ ...game })}
+              saving={saving}
+            />
+          )}
+          {currentStep === 6 && (
+            <EndingEditor
+              ending={game.ending}
+              players={game.players ?? []}
+              onChange={(ending) => updateGame({ ending })}
               onSave={() => save({ ...game })}
               saving={saving}
             />

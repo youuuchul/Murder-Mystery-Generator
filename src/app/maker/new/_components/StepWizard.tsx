@@ -11,10 +11,11 @@ interface Step {
 
 const STEPS: Step[] = [
   { id: 1, label: "기본 설정", description: "태그·인원·난이도·시간" },
-  { id: 2, label: "사건 개요", description: "피해자·사건 설명·대표 이미지" },
+  { id: 2, label: "사건 개요 / 오프닝", description: "피해자·NPC·사건 설명·오프닝" },
   { id: 3, label: "플레이어", description: "캐릭터별 배경·상세 스토리·비밀" },
   { id: 4, label: "단서 카드", description: "물적 증거·증언·현장 단서" },
-  { id: 5, label: "스크립트", description: "페이즈 가이드·미디어" },
+  { id: 5, label: "스크립트", description: "라운드 가이드·미디어·이벤트" },
+  { id: 6, label: "엔딩", description: "분기 엔딩·개인 엔딩·작가 노트" },
 ];
 
 interface StepWizardProps {

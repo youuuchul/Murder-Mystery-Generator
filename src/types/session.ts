@@ -38,10 +38,19 @@ export interface VoteTally {
   voterNames: string[]; // 투표한 실제 참여자 이름 목록
 }
 
+export type EndingStage = "branch" | "personal" | "author-notes" | "complete";
+
 export interface VoteReveal {
   tally: VoteTally[];
   culpritPlayerId: string; // 진짜 범인 (game.story.culpritPlayerId)
-  majorityCorrect: boolean; // 과반수 이상이 진범에게 투표했는지
+  /** 현재 공개된 최종 검거 대상 캐릭터 ID */
+  arrestedPlayerId?: string;
+  /** 엔딩 분기 판정 결과 */
+  resultType?: "culprit-captured" | "wrong-arrest";
+  /** 적용된 엔딩 브랜치 ID */
+  resolvedBranchId?: string;
+  /** legacy field — 기존 데이터 호환용 */
+  majorityCorrect?: boolean;
 }
 
 /** 세션 공개 상태 — 모든 참여자에게 브로드캐스트 */
@@ -56,6 +65,7 @@ export interface SharedState {
   eventLog: EventLogEntry[];
   characterSlots: CharacterSlot[];
   voteCount: number;
+  endingStage?: EndingStage;
   voteReveal?: VoteReveal;
 }
 

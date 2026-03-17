@@ -783,7 +783,8 @@ export default function PlayerView() {
               <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
                 <p className="text-xs text-dark-500">관계</p>
                 {character.relationships.map((rel, i) => {
-                  const other = game.players.find((p) => p.id === rel.playerId);
+                  const otherId = rel.targetId || rel.playerId;
+                  const other = game.players.find((p) => p.id === otherId);
                   return (
                     <div key={i} className="flex gap-3 text-sm">
                       <span className="text-dark-400 font-medium shrink-0">{other?.name ?? "(알 수 없음)"}</span>

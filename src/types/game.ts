@@ -14,6 +14,7 @@ export interface GamePackage {
   clues: Clue[];
   cards: CardSet;
   scripts: Scripts;
+  ending: EndingConfig;
 }
 
 // ─── 설정 ────────────────────────────────────────────────────
@@ -72,14 +73,26 @@ export interface StoryTimeline {
 export interface VictimInfo {
   name: string;
   background: string; // 피해자 배경 (공개)
-  deathCircumstances: string; // 사망 경위 (공개)
+  imageUrl?: string;
+  /** legacy field — 기존 데이터 호환용 */
+  deathCircumstances?: string;
+}
+
+/** 공개 인물(NPC) 정보 — 플레이어 화면 인물 정보 탭에 노출 */
+export interface StoryNpc {
+  id: string;
+  name: string;
+  background: string;
+  imageUrl?: string;
 }
 
 export interface Story {
   synopsis: string; // 메이커 전용 — 전체 진실 메모
   victim: VictimInfo;
+  npcs: StoryNpc[];
   incident: string; // 플레이어 공개 사건 설명
-  location: string; // 배경 장소
+  /** legacy field — 기존 데이터 호환용 */
+  location?: string;
   gmOverview?: string; // GM 메인 화면 공통 메모
   mapImageUrl?: string; // GM 메인 화면 공통 지도/이미지
   timeline: StoryTimeline;
@@ -122,9 +135,14 @@ export interface RelatedClueRef {
   note: string; // 이 단서와의 관계 설명 (예: "당신의 방에 보관된 물건이지만 접근할 수 없습니다")
 }
 
+export type RelationshipTargetType = "player" | "victim" | "npc";
+
 export interface Relationship {
-  playerId: string;
+  targetType: RelationshipTargetType;
+  targetId: string;
   description: string;
+  /** legacy field — 기존 데이터 호환용 */
+  playerId?: string;
 }
 
 export interface PlayerTimelineEntry {
@@ -247,6 +265,41 @@ export interface Scripts {
   ending: ScriptSegment;          // 공통 (빈 경우 분기별로 표시)
   endingSuccess?: ScriptSegment;  // 범인 검거 성공 엔딩
   endingFail?: ScriptSegment;     // 범인 도주 성공 엔딩
+}
+
+export type EndingBranchTriggerType =
+  | "culprit-captured"
+  | "specific-player-arrested"
+  | "wrong-arrest-fallback";
+
+export interface EndingBranch {
+  id: string;
+  label: string;
+  triggerType: EndingBranchTriggerType;
+  targetPlayerId?: string;
+  storyText: string;
+  videoUrl?: string;
+  backgroundMusic?: string;
+}
+
+export interface PersonalEnding {
+  playerId: string;
+  title?: string;
+  text: string;
+}
+
+export interface AuthorNote {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface EndingConfig {
+  branches: EndingBranch[];
+  personalEndingsEnabled: boolean;
+  personalEndings: PersonalEnding[];
+  authorNotesEnabled: boolean;
+  authorNotes: AuthorNote[];
 }
 
 // ─── 메타데이터 ──────────────────────────────────────────────

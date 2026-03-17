@@ -45,7 +45,13 @@ const TYPE_LABEL: Record<string, string> = {
   physical: "물적 증거", testimony: "증언", document: "문서", scene: "현장 단서",
 };
 
-type Tab = "character" | "timeline" | "inventory" | "locations" | "vote";
+type Tab = "character" | "inventory" | "locations" | "vote";
+type CharacterPanel = "profile" | "people" | "timeline";
+const CHARACTER_PANEL_LABELS: Record<CharacterPanel, string> = {
+  profile: "내 정보",
+  people: "인물 정보",
+  timeline: "타임라인",
+};
 
 /**
  * 길이가 긴 개인 정보를 기본 접힘 상태로 보여줘
@@ -97,6 +103,158 @@ function ImageFrame({
         alt={alt}
         className="w-full h-full object-cover"
       />
+    </div>
+  );
+}
+
+/** 관계 대상 라벨을 플레이어/피해자/NPC를 통합해 읽기 쉬운 이름으로 바꾼다. */
+function resolveRelationshipTargetLabel(game: GamePackage, targetType: string | undefined, targetId: string | undefined): string {
+  if (targetType === "victim") {
+    return game.story.victim.name || "피해자";
+  }
+
+  if (targetType === "npc") {
+    return game.story.npcs.find((npc) => npc.id === targetId)?.name ?? "(알 수 없는 NPC)";
+  }
+
+  return game.players.find((player) => player.id === targetId)?.name ?? "(알 수 없음)";
+}
+
+/** 피해자/NPC 카드에 연결된 캐릭터별 관계 설명 목록을 모은다. */
+function collectFigureRelations(game: GamePackage, targetType: "victim" | "npc", targetId: string): Array<{ playerId: string; playerName: string; description: string }> {
+  return game.players.flatMap((player) => (
+    player.relationships
+      .filter((relationship) => relationship.targetType === targetType && relationship.targetId === targetId)
+      .map((relationship) => ({
+        playerId: player.id,
+        playerName: player.name || "(이름 없음)",
+        description: relationship.description,
+      }))
+  ));
+}
+
+function PersonInfoPanel({
+  game,
+}: {
+  game: GamePackage;
+}) {
+  const people = [
+    {
+      id: "victim",
+      type: "victim" as const,
+      roleLabel: "피해자",
+      name: game.story.victim.name,
+      background: game.story.victim.background,
+      imageUrl: game.story.victim.imageUrl,
+      relations: collectFigureRelations(game, "victim", "victim"),
+    },
+    ...game.story.npcs.map((npc) => ({
+      id: npc.id,
+      type: "npc" as const,
+      roleLabel: "NPC",
+      name: npc.name,
+      background: npc.background,
+      imageUrl: npc.imageUrl,
+      relations: collectFigureRelations(game, "npc", npc.id),
+    })),
+  ].filter((person) => person.name || person.background || person.imageUrl || person.relations.length > 0);
+
+  if (people.length === 0) {
+    return (
+      <div className="bg-dark-900 border border-dashed border-dark-800 rounded-xl p-6 text-center">
+        <p className="text-sm text-dark-500">확인할 인물 정보가 없습니다.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {people.map((person) => (
+        <div key={`${person.type}:${person.id}`} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-4">
+          <div className="flex items-start gap-3">
+            {person.imageUrl ? (
+              <div className="w-20">
+                <ImageFrame src={person.imageUrl} alt={person.name || person.roleLabel} compact={false} />
+              </div>
+            ) : null}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-mystery-500">{person.roleLabel}</p>
+              <p className="font-semibold text-dark-100 mt-1">{person.name || "(이름 없음)"}</p>
+              {person.background ? (
+                <p className="text-sm text-dark-300 leading-relaxed mt-2">{person.background}</p>
+              ) : (
+                <p className="text-sm text-dark-600 mt-2">입력된 배경이 없습니다.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-dark-800 pt-3 space-y-2">
+            <p className="text-xs text-dark-500">각 캐릭터의 관계</p>
+            {person.relations.length === 0 ? (
+              <p className="text-sm text-dark-600">연결된 관계 정보가 없습니다.</p>
+            ) : (
+              person.relations.map((relation) => (
+                <div key={`${person.id}-${relation.playerId}`} className="flex gap-3 text-sm">
+                  <span className="shrink-0 font-medium text-dark-300">{relation.playerName}</span>
+                  <span className="text-dark-500">{relation.description}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TimelinePanel({
+  game,
+  character,
+}: {
+  game: GamePackage;
+  character: Player;
+}) {
+  if (!game.story.timeline.enabled || game.story.timeline.slots.length === 0) {
+    return (
+      <div className="bg-dark-900 border border-dashed border-dark-800 rounded-xl p-6 text-center">
+        <p className="text-sm text-dark-500">타임라인이 설정되지 않았습니다.</p>
+      </div>
+    );
+  }
+
+  const filledTimeline = game.story.timeline.slots
+    .map((slot) => ({
+      slot,
+      entry: character.timelineEntries.find((item) => item.slotId === slot.id),
+    }))
+    .filter(({ entry }) => Boolean(entry?.action.trim()));
+
+  if (filledTimeline.length === 0) {
+    return (
+      <div className="bg-dark-900 border border-dashed border-dark-800 rounded-xl p-6 text-center">
+        <p className="text-sm text-dark-500">표시할 행동 타임라인이 없습니다.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
+          <span className="text-[11px] text-dark-600">
+            {filledTimeline.length} / {game.story.timeline.slots.length}
+          </span>
+        </div>
+      </div>
+      {filledTimeline.map(({ slot, entry }) => (
+        <div key={slot.id} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-medium text-mystery-400">{slot.label || "이름 없는 슬롯"}</p>
+          <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
+            {entry?.action}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -239,12 +397,16 @@ function VoteResultScreen({
   myPlayerId: string;
 }) {
   const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
+  const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
   const myVictoryCondition = game.players.find((p) => p.id === myPlayerId)?.victoryCondition;
+  const branch = game.ending.branches.find((item) => item.id === reveal.resolvedBranchId);
+  const resultType = reveal.resultType
+    ?? (reveal.majorityCorrect ? "culprit-captured" : "wrong-arrest");
 
   function myResult(): { label: string; color: string } {
     if (myPlayerId === reveal.culpritPlayerId) {
       // 나는 범인
-      return reveal.majorityCorrect
+      return resultType === "culprit-captured"
         ? { label: "검거 당했습니다", color: "text-red-300" }
         : { label: "도주 성공!", color: "text-green-300" };
     }
@@ -252,34 +414,22 @@ function VoteResultScreen({
       return { label: "개인 목표 달성 여부를 확인하세요", color: "text-purple-300" };
     }
     // 무고한 플레이어
-    return reveal.majorityCorrect
+    return resultType === "culprit-captured"
       ? { label: "수사 성공! 범인을 잡았습니다", color: "text-blue-300" }
-      : { label: "범인이 도주했습니다", color: "text-red-300" };
+      : { label: "오검거가 발생했습니다", color: "text-red-300" };
   }
 
   const result = myResult();
   const totalVotes = reveal.tally.reduce((s, t) => s + t.count, 0);
 
-  const commonNarration = game.scripts.ending?.narration;
-  const branchNarration = reveal.majorityCorrect
-    ? game.scripts.endingSuccess?.narration
-    : game.scripts.endingFail?.narration;
-
   return (
     <div className="space-y-5">
-      {/* 1. 엔딩 나레이션 (공통 + 분기) */}
-      {(commonNarration || branchNarration) && (
+      {/* 1. 분기 엔딩 */}
+      {branch?.storyText && (
         <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-4">
           <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">엔딩</p>
-          {commonNarration && (
-            <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">{commonNarration}</p>
-          )}
-          {branchNarration && (
-            <>
-              {commonNarration && <hr className="border-dark-700" />}
-              <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branchNarration}</p>
-            </>
-          )}
+          {branch.label && <p className="text-sm font-medium text-mystery-300">{branch.label}</p>}
+          <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branch.storyText}</p>
         </div>
       )}
 
@@ -293,6 +443,16 @@ function VoteResultScreen({
           <p className="text-xs text-dark-500 mt-1">{culprit.background}</p>
         )}
       </div>
+
+      {arrested && (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+          <p className="text-xs text-dark-500 mb-2">검거된 인물</p>
+          <p className="text-lg font-semibold text-dark-100">{arrested.name}</p>
+          {arrested.background && (
+            <p className="text-xs text-dark-500 mt-1">{arrested.background}</p>
+          )}
+        </div>
+      )}
 
       {/* 3. 득표 현황 */}
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
@@ -344,13 +504,13 @@ function VoteResultScreen({
       {/* 5. 결과 배너 (맨 아래) */}
       <div
         className={`rounded-2xl border p-6 text-center ${
-          reveal.majorityCorrect
+          resultType === "culprit-captured"
             ? "border-blue-700 bg-blue-950/20"
             : "border-red-700 bg-red-950/20"
         }`}
       >
         <p className="text-xl font-bold text-dark-50">
-          {reveal.majorityCorrect ? "진범 검거 성공" : "진범 도주 성공"}
+          {resultType === "culprit-captured" ? "진범 검거 성공" : "오검거"}
         </p>
         <p className={`text-sm mt-2 font-medium ${result.color}`}>{result.label}</p>
       </div>
@@ -424,6 +584,15 @@ function VoteScreen({
 
   return (
     <div className="space-y-4">
+      {game.scripts.vote.narration && (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+          <p className="text-xs text-yellow-500 mb-2">투표 안내</p>
+          <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
+            {game.scripts.vote.narration}
+          </p>
+        </div>
+      )}
+
       <div className="text-center py-4">
         <p className="text-dark-200 font-semibold">범인이라 생각하는 사람은?</p>
         <p className="text-dark-500 text-xs mt-1">
@@ -478,6 +647,7 @@ export default function PlayerView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>("character");
+  const [characterPanel, setCharacterPanel] = useState<CharacterPanel>("profile");
   const [acquiring, setAcquiring] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
 
@@ -648,7 +818,6 @@ export default function PlayerView() {
 
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: "character", label: "캐릭터 카드" },
-    { id: "timeline", label: "타임라인", hidden: !game.story.timeline.enabled || game.story.timeline.slots.length === 0 },
     { id: "inventory", label: `인벤토리 (${inventory.length})` },
     { id: "locations", label: "장소 탐색" },
     { id: "vote", label: "투표", hidden: phase !== "vote" },
@@ -686,7 +855,7 @@ export default function PlayerView() {
               </div>
               {game.scripts.opening.narration && (
                 <div className="border-t border-mystery-900 pt-4">
-                  <p className="text-xs text-mystery-500 mb-2">나레이션</p>
+                  <p className="text-xs text-mystery-500 mb-2">스토리 텍스트</p>
                   <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
                     {game.scripts.opening.narration}
                   </p>
@@ -696,18 +865,6 @@ export default function PlayerView() {
                 <div className="border-t border-mystery-900 pt-4">
                   <p className="text-xs text-mystery-500 mb-2">사건 개요</p>
                   <p className="text-sm text-dark-200 leading-relaxed">{game.story.incident}</p>
-                </div>
-              )}
-              {game.story.victim?.name && (
-                <div className="bg-dark-900/60 rounded-xl p-3 space-y-1">
-                  <p className="text-xs text-red-500">피해자</p>
-                  <p className="text-sm font-semibold text-dark-100">{game.story.victim.name}</p>
-                  {game.story.victim.background && (
-                    <p className="text-xs text-dark-500">{game.story.victim.background}</p>
-                  )}
-                  {game.story.victim.deathCircumstances && (
-                    <p className="text-xs text-dark-400 mt-1">{game.story.victim.deathCircumstances}</p>
-                  )}
                 </div>
               )}
             </div>
@@ -761,62 +918,100 @@ export default function PlayerView() {
                 <p className="text-sm mt-2 opacity-80">{character.personalGoal}</p>
               )}
             </div>
-            <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-              <p className="text-xs text-dark-500 mb-2">배경 (전원 공개)</p>
-              <p className="text-sm leading-relaxed text-dark-200">{character.background || "—"}</p>
+            <div className="flex gap-1 bg-dark-900 p-1 rounded-xl border border-dark-800">
+              {(["profile", "people", "timeline"] as CharacterPanel[]).map((panel) => {
+                const disabled = panel === "timeline" && (!game.story.timeline.enabled || game.story.timeline.slots.length === 0);
+                if (disabled) return null;
+
+                return (
+                  <button
+                    key={panel}
+                    type="button"
+                    onClick={() => setCharacterPanel(panel)}
+                    className={[
+                      "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
+                      characterPanel === panel
+                        ? "bg-dark-700 text-dark-50"
+                        : "text-dark-500 hover:text-dark-300",
+                    ].join(" ")}
+                  >
+                    {CHARACTER_PANEL_LABELS[panel]}
+                  </button>
+                );
+              })}
             </div>
-            {character.relatedClues.length > 0 && (
-              <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-                <p className="text-xs text-dark-500">나와 관련된 단서 (위치 정보)</p>
-                {character.relatedClues.map((rc, i) => {
-                  const clue = game.clues.find((c) => c.id === rc.clueId);
-                  return (
-                    <div key={i} className="border-l-2 border-dark-700 pl-3">
-                      <p className="text-sm text-dark-300 font-medium">{clue?.title ?? "(알 수 없는 단서)"}</p>
-                      {rc.note && <p className="text-xs text-dark-500 mt-0.5">{rc.note}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {character.relationships.length > 0 && (
-              <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-                <p className="text-xs text-dark-500">관계</p>
-                {character.relationships.map((rel, i) => {
-                  const otherId = rel.targetId || rel.playerId;
-                  const other = game.players.find((p) => p.id === otherId);
-                  return (
-                    <div key={i} className="flex gap-3 text-sm">
-                      <span className="text-dark-400 font-medium shrink-0">{other?.name ?? "(알 수 없음)"}</span>
-                      <span className="text-dark-500">{rel.description}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {character.scoreConditions.length > 0 && (
-              <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-                <p className="text-xs text-dark-500">승점 조건</p>
-                {character.scoreConditions.map((sc, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-dark-300">{sc.description}</span>
-                    <span className="text-mystery-400 font-bold shrink-0">+{sc.points}점</span>
+
+            {characterPanel === "profile" && (
+              <div className="space-y-4">
+                <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+                  <p className="text-xs text-dark-500 mb-2">배경 (전원 공개)</p>
+                  <p className="text-sm leading-relaxed text-dark-200">{character.background || "—"}</p>
+                </div>
+                {character.relatedClues.length > 0 && (
+                  <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+                    <p className="text-xs text-dark-500">나와 관련된 단서 (위치 정보)</p>
+                    {character.relatedClues.map((rc, i) => {
+                      const clue = game.clues.find((c) => c.id === rc.clueId);
+                      return (
+                        <div key={i} className="border-l-2 border-dark-700 pl-3">
+                          <p className="text-sm text-dark-300 font-medium">{clue?.title ?? "(알 수 없는 단서)"}</p>
+                          {rc.note && <p className="text-xs text-dark-500 mt-0.5">{rc.note}</p>}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
+                {character.relationships.length > 0 && (
+                  <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+                    <p className="text-xs text-dark-500">관계</p>
+                    {character.relationships.map((rel, i) => (
+                      <div key={i} className="flex gap-3 text-sm">
+                        <span className="text-dark-400 font-medium shrink-0">
+                          {resolveRelationshipTargetLabel(
+                            game,
+                            rel.targetType,
+                            rel.targetId || rel.playerId,
+                          )}
+                        </span>
+                        <span className="text-dark-500">{rel.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {character.scoreConditions.length > 0 && (
+                  <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+                    <p className="text-xs text-dark-500">승점 조건</p>
+                    {character.scoreConditions.map((sc, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-dark-300">{sc.description}</span>
+                        <span className="text-mystery-400 font-bold shrink-0">+{sc.points}점</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {character.story ? (
+                  <PrivateTextToggle
+                    title="상세 스토리 (본인만 열람)"
+                    content={character.story}
+                  />
+                ) : null}
+                {character.secret ? (
+                  <PrivateTextToggle
+                    title="비밀 / 반전 정보 (본인만 열람)"
+                    content={character.secret}
+                  />
+                ) : null}
               </div>
             )}
-            {character.story ? (
-              <PrivateTextToggle
-                title="상세 스토리 (본인만 열람)"
-                content={character.story}
+
+            {characterPanel === "people" && <PersonInfoPanel game={game} />}
+
+            {characterPanel === "timeline" && (
+              <TimelinePanel
+                game={game}
+                character={character}
               />
-            ) : null}
-            {character.secret ? (
-              <PrivateTextToggle
-                title="비밀 / 반전 정보 (본인만 열람)"
-                content={character.secret}
-              />
-            ) : null}
+            )}
           </div>
         )}
 
@@ -864,46 +1059,6 @@ export default function PlayerView() {
                 );
               })
             )}
-          </div>
-        )}
-
-        {/* ── 타임라인 ── */}
-        {tab === "timeline" && game.story.timeline.enabled && game.story.timeline.slots.length > 0 && (
-          <div className="space-y-3">
-            <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
-                <span className="text-[11px] text-dark-600">
-                  {character.timelineEntries.filter((entry) => entry.action.trim().length > 0).length}
-                  / {game.story.timeline.slots.length}
-                </span>
-              </div>
-            </div>
-            {(() => {
-              const filledTimeline = game.story.timeline.slots
-                .map((slot) => ({
-                  slot,
-                  entry: character.timelineEntries.find((item) => item.slotId === slot.id),
-                }))
-                .filter(({ entry }) => Boolean(entry?.action.trim()));
-
-              if (filledTimeline.length === 0) {
-                return (
-                  <div className="bg-dark-900 border border-dashed border-dark-800 rounded-xl p-6 text-center">
-                    <p className="text-sm text-dark-500">표시할 행동 타임라인이 없습니다.</p>
-                  </div>
-                );
-              }
-
-              return filledTimeline.map(({ slot, entry }) => (
-                <div key={slot.id} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-                  <p className="text-xs font-medium text-mystery-400">{slot.label || "이름 없는 슬롯"}</p>
-                  <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
-                    {entry?.action}
-                  </p>
-                </div>
-              ));
-            })()}
           </div>
         )}
 

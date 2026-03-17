@@ -114,31 +114,104 @@ export default function StoryEditor({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-bold text-dark-50">사건 개요 / 오프닝</h2>
+        <h2 className="text-xl font-bold text-dark-50">오프닝 / 배경 설정</h2>
         <p className="mt-1 text-sm text-dark-500">
-          사건 설명, 피해자/NPC 공개 정보, 오프닝 스토리 텍스트와 도입 미디어를 함께 설정합니다.
+          오프닝 도입, 범인 지정, 대표 지도, 피해자/NPC 공개 정보와 타임라인을 함께 설정합니다.
         </p>
       </div>
 
       <div className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-dark-100">사건 개요</h3>
+          <h3 className="text-sm font-semibold text-dark-100">오프닝</h3>
           <p className="mt-1 text-xs text-dark-500">
-            플레이어가 게임 초반에 받아야 하는 공개 정보와 공통 이미지를 정리합니다.
+            도입부 스토리 텍스트와 오프닝용 미디어를 가장 먼저 정리합니다.
           </p>
         </div>
 
-        <Field label="사건 설명 (플레이어 공개)" required>
+        <Field label="오프닝 스토리 텍스트" required>
           <textarea
-            rows={4}
-            value={story.incident}
-            onChange={(e) => updateStory("incident", e.target.value)}
-            placeholder="게임 시작 시 모든 플레이어에게 공개되는 사건 개요"
+            rows={6}
+            value={opening.narration}
+            onChange={(e) => onChangeOpening({ ...opening, narration: e.target.value })}
+            placeholder="사건이 시작되는 분위기와 플레이어가 처음 받아야 할 인상을 적어주세요."
             className={ta}
           />
         </Field>
 
-        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 보드에 띄울 공통 이미지 또는 지도입니다.">
+        <Field label="오프닝 진행 가이드">
+          <textarea
+            rows={4}
+            value={opening.gmNote ?? ""}
+            onChange={(e) => onChangeOpening({ ...opening, gmNote: e.target.value || undefined })}
+            placeholder="영상 재생, 오프닝 텍스트 낭독, 첫 안내 순서 등을 간단히 정리하세요."
+            className={ta}
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="오프닝 영상 URL">
+            <input
+              type="url"
+              value={opening.videoUrl ?? ""}
+              onChange={(e) => onChangeOpening({ ...opening, videoUrl: e.target.value || undefined })}
+              placeholder="https://..."
+              className={inp}
+            />
+          </Field>
+          <Field label="오프닝 배경 음악 URL">
+            <input
+              type="url"
+              value={opening.backgroundMusic ?? ""}
+              onChange={(e) => onChangeOpening({ ...opening, backgroundMusic: e.target.value || undefined })}
+              placeholder="https://..."
+              className={inp}
+            />
+          </Field>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-dark-100">범인 지정</h3>
+          <p className="mt-1 text-xs text-dark-500">
+            엔딩 분기와 투표 결과 판정에 사용할 범인을 지정합니다.
+          </p>
+        </div>
+
+        <Field
+          label="범인"
+          hint={players.length === 0 ? "Step 3(플레이어)에서 먼저 캐릭터를 추가하세요." : undefined}
+        >
+          <select
+            value={story.culpritPlayerId}
+            onChange={(e) => updateStory("culpritPlayerId", e.target.value)}
+            disabled={players.length === 0}
+            className={sel}
+          >
+            <option value="">— 범인을 선택하세요 —</option>
+            {players.map((player) => (
+              <option key={player.id} value={player.id}>
+                {player.name || "(이름 없음)"}
+              </option>
+            ))}
+          </select>
+          {story.culpritPlayerId && (
+            <p className="mt-1 text-xs text-mystery-400">
+              선택됨: {players.find((player) => player.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
+            </p>
+          )}
+        </Field>
+      </div>
+
+      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-dark-100">대표 지도 / 참고 이미지</h3>
+          <p className="mt-1 text-xs text-dark-500">
+            기본 공통 이미지입니다. 라운드별 이미지가 없으면 이 이미지를 계속 사용합니다.
+          </p>
+        </div>
+
+        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 보드에 띄울 기본 지도 또는 참고 이미지입니다.">
           <input
             type="url"
             value={story.mapImageUrl ?? ""}
@@ -262,56 +335,6 @@ export default function StoryEditor({
       </div>
 
       <div className="rounded-xl border border-dark-700 p-5 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-dark-100">오프닝</h3>
-          <p className="mt-1 text-xs text-dark-500">
-            도입부 스토리 텍스트와 오프닝용 미디어를 이 단계에서 함께 설정합니다.
-          </p>
-        </div>
-
-        <Field label="오프닝 스토리 텍스트" required>
-          <textarea
-            rows={6}
-            value={opening.narration}
-            onChange={(e) => onChangeOpening({ ...opening, narration: e.target.value })}
-            placeholder="사건이 시작되는 분위기와 플레이어가 처음 받아야 할 인상을 적어주세요."
-            className={ta}
-          />
-        </Field>
-
-        <Field label="오프닝 진행 가이드">
-          <textarea
-            rows={4}
-            value={opening.gmNote ?? ""}
-            onChange={(e) => onChangeOpening({ ...opening, gmNote: e.target.value || undefined })}
-            placeholder="영상 재생, 사건 설명 낭독, 첫 안내 순서 등을 간단히 정리하세요."
-            className={ta}
-          />
-        </Field>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="오프닝 영상 URL">
-            <input
-              type="url"
-              value={opening.videoUrl ?? ""}
-              onChange={(e) => onChangeOpening({ ...opening, videoUrl: e.target.value || undefined })}
-              placeholder="https://..."
-              className={inp}
-            />
-          </Field>
-          <Field label="오프닝 배경 음악 URL">
-            <input
-              type="url"
-              value={opening.backgroundMusic ?? ""}
-              onChange={(e) => onChangeOpening({ ...opening, backgroundMusic: e.target.value || undefined })}
-              placeholder="https://..."
-              className={inp}
-            />
-          </Field>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-sm font-semibold text-dark-100">행동 타임라인</h3>
@@ -402,30 +425,6 @@ export default function StoryEditor({
           </div>
         )}
       </div>
-
-      <Field
-        label="범인 (GM only)"
-        hint={players.length === 0 ? "Step 3(플레이어)에서 먼저 캐릭터를 추가하세요." : undefined}
-      >
-        <select
-          value={story.culpritPlayerId}
-          onChange={(e) => updateStory("culpritPlayerId", e.target.value)}
-          disabled={players.length === 0}
-          className={sel}
-        >
-          <option value="">— 범인을 선택하세요 —</option>
-          {players.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name || "(이름 없음)"}
-            </option>
-          ))}
-        </select>
-        {story.culpritPlayerId && (
-          <p className="mt-1 text-xs text-mystery-400">
-            선택됨: {players.find((player) => player.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
-          </p>
-        )}
-      </Field>
 
       <div className="flex justify-end pt-2">
         <Button onClick={onSave} loading={saving} variant="secondary">

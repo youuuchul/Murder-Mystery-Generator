@@ -44,10 +44,6 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 2, "error", "피해자 이름이 비어 있습니다.");
   }
 
-  if (isBlank(game.story.incident)) {
-    addIssue(issues, 2, "error", "플레이어 공개 사건 설명을 작성하세요.");
-  }
-
   if (game.story.timeline.enabled && game.story.timeline.slots.length === 0) {
     addIssue(issues, 2, "error", "타임라인을 사용하려면 시간대 슬롯을 1개 이상 추가하세요.");
   }

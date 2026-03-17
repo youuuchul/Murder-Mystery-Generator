@@ -906,7 +906,7 @@ export default function PlayerView() {
       </div>
 
       <div className="p-4 max-w-lg mx-auto space-y-4 pb-8">
-        {/* 오프닝 페이즈 — 사건 개요 배너 */}
+        {/* 오프닝 페이즈 — 도입 배너 */}
         {phase === "opening" && (
           <div className="space-y-3">
             <div className="bg-mystery-950/40 border border-mystery-800 rounded-2xl p-5 space-y-4">
@@ -920,12 +920,6 @@ export default function PlayerView() {
                   <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
                     {game.scripts.opening.narration}
                   </p>
-                </div>
-              )}
-              {game.story.incident && (
-                <div className="border-t border-mystery-900 pt-4">
-                  <p className="text-xs text-mystery-500 mb-2">사건 개요</p>
-                  <p className="text-sm text-dark-200 leading-relaxed">{game.story.incident}</p>
                 </div>
               )}
             </div>

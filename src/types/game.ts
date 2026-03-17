@@ -23,6 +23,7 @@ export interface GameSettings {
   playerCount: number; // 4~8
   difficulty: "easy" | "normal" | "hard";
   tags: string[];
+  coverImageUrl?: string;
   /** legacy field — 기존 데이터 호환용 */
   theme?: string;
   /** legacy field — 기존 데이터 호환용 */
@@ -309,7 +310,7 @@ export interface GameMetadata {
   title: string;
   createdAt: string;
   updatedAt: string;
-  settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration">;
+  settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration" | "coverImageUrl">;
   playerCount: number;
   clueCount: number;
   locationCount: number;

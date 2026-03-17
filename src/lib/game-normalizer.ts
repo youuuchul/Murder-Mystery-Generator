@@ -407,6 +407,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     difficulty: game.settings?.difficulty ?? "normal",
     estimatedDuration: game.settings?.estimatedDuration ?? 120,
     tags: normalizeTags(game.settings ?? {}),
+    coverImageUrl: asOptionalString(game.settings?.coverImageUrl),
   };
 
   const fallbackPhases = defaultPhases(settings.playerCount);
@@ -522,6 +523,7 @@ export function buildMetadataFromGame(game: GamePackage): GameMetadata {
       difficulty: game.settings.difficulty,
       tags: game.settings.tags,
       estimatedDuration: game.settings.estimatedDuration,
+      coverImageUrl: game.settings.coverImageUrl,
     },
     playerCount: game.players?.length ?? 0,
     clueCount: game.clues.length,

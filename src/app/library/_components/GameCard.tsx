@@ -44,10 +44,23 @@ export default function GameCard({ game }: GameCardProps) {
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
       {/* 썸네일 영역 */}
       <div className="h-32 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-mystery-600 to-transparent" />
-        <span className="text-xs tracking-[0.24em] uppercase text-mystery-300/70 select-none" aria-hidden="true">
-          FILE
-        </span>
+        {game.settings.coverImageUrl ? (
+          <>
+            <img
+              src={game.settings.coverImageUrl}
+              alt={game.title}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-dark-950/80 via-dark-950/10 to-transparent" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-mystery-600 to-transparent" />
+            <span className="text-xs tracking-[0.24em] uppercase text-mystery-300/70 select-none" aria-hidden="true">
+              FILE
+            </span>
+          </>
+        )}
       </div>
 
       {/* 콘텐츠 */}

@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import type {
   Player,
   Clue,
+  Story,
   VictoryCondition,
   ScoreCondition,
   RelatedClueRef,
@@ -15,10 +16,16 @@ import type {
 interface PlayerEditorProps {
   players: Player[];
   clues: Clue[];
+  story: Story;
   timeline: StoryTimeline;
   onChange: (players: Player[]) => void;
   onSave: () => void;
   saving: boolean;
+}
+
+interface RelationTargetOption {
+  value: string;
+  label: string;
 }
 
 const VICTORY_OPTIONS: { value: VictoryCondition; label: string; desc: string; color: string }[] = [
@@ -170,14 +177,14 @@ function TimelineMatrixEditor({
 
 function PlayerForm({
   player,
-  allPlayers,
   clues,
+  relationTargets,
   onChange,
   onDelete,
 }: {
   player: Player;
-  allPlayers: Player[];
   clues: Clue[];
+  relationTargets: RelationTargetOption[];
   onChange: (p: Player) => void;
   onDelete: () => void;
 }) {
@@ -201,7 +208,7 @@ function PlayerForm({
   }
 
   const conditionInfo = VICTORY_OPTIONS.find((v) => v.value === player.victoryCondition);
-  const others = allPlayers.filter((p) => p.id !== player.id);
+  const filteredRelationTargets = relationTargets.filter((target) => target.value !== `player:${player.id}`);
 
   const tabs = [
     { id: "basic" as const, label: "기본 정보" },
@@ -437,17 +444,26 @@ function PlayerForm({
               {player.relationships.map((rel, idx) => (
                 <div key={idx} className="flex gap-2">
                   <select
-                    value={rel.targetId || rel.playerId || ""}
-                    onChange={(e) => updateRel(idx, {
-                      targetType: "player",
-                      targetId: e.target.value,
-                      playerId: e.target.value,
-                    })}
-                    className="w-36 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
+                    value={
+                      rel.targetType && rel.targetId
+                        ? `${rel.targetType}:${rel.targetId}`
+                        : rel.playerId
+                          ? `player:${rel.playerId}`
+                          : ""
+                    }
+                    onChange={(e) => {
+                      const [targetType, targetId] = e.target.value.split(":");
+                      updateRel(idx, {
+                        targetType: (targetType as Relationship["targetType"]) || "player",
+                        targetId: targetId ?? "",
+                        playerId: targetType === "player" ? targetId ?? "" : undefined,
+                      });
+                    }}
+                    className="w-44 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
                   >
-                    <option value="">캐릭터 선택</option>
-                    {others.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name || "(이름 없음)"}</option>
+                    <option value="">대상 선택</option>
+                    {filteredRelationTargets.map((target) => (
+                      <option key={target.value} value={target.value}>{target.label}</option>
                     ))}
                   </select>
                   <input
@@ -484,9 +500,23 @@ function PlayerForm({
   );
 }
 
-export default function PlayerEditor({ players, clues, timeline, onChange, onSave, saving }: PlayerEditorProps) {
+export default function PlayerEditor({ players, clues, story, timeline, onChange, onSave, saving }: PlayerEditorProps) {
   const [view, setView] = useState<"profiles" | "timeline">("profiles");
   const syncedPlayers = players.map((player) => alignTimelineEntries(player, timeline));
+  const relationTargets: RelationTargetOption[] = [
+    ...syncedPlayers.map((player) => ({
+      value: `player:${player.id}`,
+      label: `[플레이어] ${player.name || "(이름 없음)"}`,
+    })),
+    {
+      value: "victim:victim",
+      label: `[피해자] ${story.victim.name || "(이름 없음)"}`,
+    },
+    ...story.npcs.map((npc) => ({
+      value: `npc:${npc.id}`,
+      label: `[NPC] ${npc.name || "(이름 없음)"}`,
+    })),
+  ];
 
   return (
     <div className="space-y-6">
@@ -553,8 +583,8 @@ export default function PlayerEditor({ players, clues, timeline, onChange, onSav
             <PlayerForm
               key={player.id}
               player={player}
-              allPlayers={syncedPlayers}
               clues={clues}
+              relationTargets={relationTargets}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}
               onDelete={() => onChange(players.filter((_, i) => i !== idx))}
             />

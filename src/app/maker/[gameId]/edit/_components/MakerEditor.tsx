@@ -102,6 +102,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             <PlayerEditor
               players={game.players ?? []}
               clues={game.clues}
+              story={game.story}
               timeline={game.story.timeline}
               onChange={(players) => updateGame({ players })}
               onSave={() => save({ ...game })}

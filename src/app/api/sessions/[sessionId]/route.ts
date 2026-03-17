@@ -106,7 +106,7 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const currentStage = normalizeEndingStage(sharedState.endingStage);
-    const nextStage = getNextEndingStage(game, currentStage);
+    const nextStage = getNextEndingStage(game, currentStage, sharedState.voteReveal);
 
     if (!nextStage) {
       return NextResponse.json({ error: "더 진행할 엔딩 단계가 없습니다." }, { status: 400 });

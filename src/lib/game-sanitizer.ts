@@ -53,11 +53,12 @@ function sanitizeEnding(game: GamePackage, viewerPlayerId?: string): GamePackage
   return {
     branches: game.ending.branches.map((branch) => ({
       ...branch,
+      personalEndings: viewerPlayerId
+        ? (branch.personalEndings ?? []).filter((ending) => ending.playerId === viewerPlayerId)
+        : [],
     })),
-    personalEndingsEnabled: game.ending.personalEndingsEnabled,
-    personalEndings: viewerPlayerId
-      ? game.ending.personalEndings.filter((ending) => ending.playerId === viewerPlayerId)
-      : [],
+    personalEndingsEnabled: false,
+    personalEndings: [],
     authorNotesEnabled: false,
     authorNotes: [],
   };

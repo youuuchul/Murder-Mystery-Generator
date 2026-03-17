@@ -7,6 +7,7 @@ import {
   getNextEndingStage,
   normalizeEndingStage,
   resolveActiveEndingBranch,
+  resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
 import type { GamePackage, GameRules } from "@/types/game";
 import type { EndingStage, GameSession, SharedState, CharacterSlot } from "@/types/session";
@@ -328,9 +329,15 @@ function endingAdvanceLabel(stage: EndingStage): string {
   return "엔딩 공개 완료";
 }
 
-/** GM이 모든 개인 엔딩을 캐릭터별 토글로 확인하는 패널이다. */
-function PersonalEndingOverview({ game }: { game: GamePackage }) {
-  const endings = game.ending.personalEndings.filter((ending) => ending.text.trim());
+/** GM이 현재 분기의 개인 엔딩을 캐릭터별 토글로 확인하는 패널이다. */
+function PersonalEndingOverview({
+  game,
+  branch,
+}: {
+  game: GamePackage;
+  branch?: GamePackage["ending"]["branches"][number];
+}) {
+  const endings = resolveBranchPersonalEndings(branch);
 
   if (endings.length === 0) {
     return null;
@@ -988,7 +995,12 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const voteCount = session?.sharedState.voteCount ?? 0;
   const phaseContent = session ? getPhaseBoardContent(game, session.sharedState) : null;
   const currentEndingStage = normalizeEndingStage(session?.sharedState.endingStage);
-  const nextEndingStage = session ? getNextEndingStage(game, currentEndingStage) : null;
+  const activeEndingBranch = session
+    ? resolveActiveEndingBranch(game, session.sharedState.voteReveal)
+    : undefined;
+  const nextEndingStage = session
+    ? getNextEndingStage(game, currentEndingStage, session.sharedState.voteReveal)
+    : null;
   const currentSubPhaseLabel =
     session && phase.startsWith("round-")
       ? SUB_PHASE_LABELS[normalizeSubPhase(session.sharedState.currentSubPhase)]
@@ -1203,7 +1215,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
           <div className="lg:col-span-2 space-y-4">
             {phaseContent && <GMBoard game={game} content={phaseContent} />}
             {phase === "ending" && (currentEndingStage === "personal" || currentEndingStage === "author-notes" || currentEndingStage === "complete") && (
-              <PersonalEndingOverview game={game} />
+              <PersonalEndingOverview game={game} branch={activeEndingBranch} />
             )}
             {phase === "ending" && (currentEndingStage === "author-notes" || currentEndingStage === "complete") && (
               <AuthorNotesOverview game={game} />

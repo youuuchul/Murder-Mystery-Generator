@@ -1,4 +1,4 @@
-import type { EndingBranch, GamePackage } from "@/types/game";
+import type { EndingBranch, GamePackage, PersonalEnding } from "@/types/game";
 import type { EndingStage, VoteReveal } from "@/types/session";
 
 export const ENDING_STAGE_LABELS: Record<EndingStage, string> = {
@@ -22,9 +22,10 @@ export function normalizeEndingStage(stage?: EndingStage): EndingStage {
 }
 
 /** 개인 엔딩 단계가 실제로 필요한지 판단한다. */
-export function hasPersonalEndingStage(game: GamePackage): boolean {
-  return game.ending.personalEndingsEnabled
-    && game.ending.personalEndings.some((ending) => hasText(ending.text));
+export function hasPersonalEndingStage(game: GamePackage, reveal?: VoteReveal): boolean {
+  const branch = resolveActiveEndingBranch(game, reveal);
+  return Boolean(branch?.personalEndingsEnabled)
+    && resolveBranchPersonalEndings(branch).some((ending) => hasText(ending.text));
 }
 
 /** 작가 노트 단계가 실제로 필요한지 판단한다. */
@@ -34,10 +35,10 @@ export function hasAuthorNotesStage(game: GamePackage): boolean {
 }
 
 /** 현재 게임 설정에서 가능한 엔딩 단계 순서를 계산한다. */
-export function getEndingStageOrder(game: GamePackage): EndingStage[] {
+export function getEndingStageOrder(game: GamePackage, reveal?: VoteReveal): EndingStage[] {
   const stages: EndingStage[] = ["branch"];
 
-  if (hasPersonalEndingStage(game)) {
+  if (hasPersonalEndingStage(game, reveal)) {
     stages.push("personal");
   }
 
@@ -50,8 +51,12 @@ export function getEndingStageOrder(game: GamePackage): EndingStage[] {
 }
 
 /** 현재 단계 다음에 공개할 엔딩 단계를 반환한다. */
-export function getNextEndingStage(game: GamePackage, currentStage?: EndingStage): EndingStage | null {
-  const stages = getEndingStageOrder(game);
+export function getNextEndingStage(
+  game: GamePackage,
+  currentStage?: EndingStage,
+  reveal?: VoteReveal
+): EndingStage | null {
+  const stages = getEndingStageOrder(game, reveal);
   const current = normalizeEndingStage(currentStage);
   const index = stages.indexOf(current);
 
@@ -60,6 +65,11 @@ export function getNextEndingStage(game: GamePackage, currentStage?: EndingStage
   }
 
   return stages[index + 1];
+}
+
+/** 현재 활성 분기에서 실제로 표시할 개인 엔딩 목록만 골라낸다. */
+export function resolveBranchPersonalEndings(branch?: EndingBranch): PersonalEnding[] {
+  return branch?.personalEndings?.filter((ending) => hasText(ending.text)) ?? [];
 }
 
 /** 투표 결과와 엔딩 설정을 바탕으로 현재 표시할 분기 엔딩을 찾는다. */

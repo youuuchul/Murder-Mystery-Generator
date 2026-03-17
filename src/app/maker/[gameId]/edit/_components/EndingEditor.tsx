@@ -28,6 +28,8 @@ function createEndingBranch(): EndingBranch {
     triggerType: "wrong-arrest-fallback",
     targetPlayerId: undefined,
     storyText: "",
+    personalEndingsEnabled: false,
+    personalEndings: [],
     videoUrl: undefined,
     backgroundMusic: undefined,
   };
@@ -42,10 +44,13 @@ function createAuthorNote(): AuthorNote {
   };
 }
 
-/** 플레이어별 개인 엔딩 배열을 현재 플레이어 목록에 맞춰 정렬한다. */
-function normalizePersonalEndings(players: Player[], endings: PersonalEnding[]): PersonalEnding[] {
+/** 분기 개인 엔딩 배열을 현재 플레이어 목록 기준으로 정렬한다. */
+function normalizeBranchPersonalEndings(
+  players: Player[],
+  endings: PersonalEnding[] | undefined
+): PersonalEnding[] {
   return players.map((player) => {
-    const existing = endings.find((ending) => ending.playerId === player.id);
+    const existing = endings?.find((ending) => ending.playerId === player.id);
     return existing ?? {
       playerId: player.id,
       title: "",
@@ -61,8 +66,6 @@ export default function EndingEditor({
   onSave,
   saving,
 }: EndingEditorProps) {
-  const personalEndings = normalizePersonalEndings(players, ending.personalEndings);
-
   function updateBranch(index: number, partial: Partial<EndingBranch>) {
     onChange({
       ...ending,
@@ -72,13 +75,27 @@ export default function EndingEditor({
     });
   }
 
-  function updatePersonalEnding(playerId: string, partial: Partial<PersonalEnding>) {
+  function updateBranchPersonalEnding(
+    branchIndex: number,
+    playerId: string,
+    partial: Partial<PersonalEnding>
+  ) {
+    const branch = ending.branches[branchIndex];
+    const personalEndings = normalizeBranchPersonalEndings(players, branch?.personalEndings);
+
     onChange({
       ...ending,
-      personalEndings: personalEndings.map((personalEnding) => (
-        personalEnding.playerId === playerId
-          ? { ...personalEnding, ...partial }
-          : personalEnding
+      branches: ending.branches.map((item, index) => (
+        index === branchIndex
+          ? {
+              ...item,
+              personalEndings: personalEndings.map((personalEnding) => (
+                personalEnding.playerId === playerId
+                  ? { ...personalEnding, ...partial }
+                  : personalEnding
+              )),
+            }
+          : item
       )),
     });
   }
@@ -97,7 +114,7 @@ export default function EndingEditor({
       <div>
         <h2 className="text-xl font-bold text-dark-50">엔딩</h2>
         <p className="mt-1 text-sm text-dark-500">
-          검거된 캐릭터 기준 분기 엔딩과 개인 엔딩, 작가 추가 설명을 설정합니다.
+          검거된 캐릭터 기준 분기 엔딩과 분기별 개인 엔딩, 작가 추가 설명을 설정합니다.
         </p>
       </div>
 
@@ -125,7 +142,12 @@ export default function EndingEditor({
         ) : (
           <div className="space-y-4">
             {ending.branches.map((branch, index) => (
-              <div key={branch.id} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-4 space-y-4">
+              <div key={branch.id} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-4 space-y-5">
+                {(() => {
+                  const branchPersonalEndings = normalizeBranchPersonalEndings(players, branch.personalEndings);
+
+                  return (
+                    <>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-dark-100">
                     {branch.label || `분기 ${index + 1}`}
@@ -223,71 +245,79 @@ export default function EndingEditor({
                     />
                   </div>
                 </div>
+
+                <div className="rounded-xl border border-dark-800 bg-dark-950/50 p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-dark-100">개인 엔딩</h4>
+                      <p className="mt-1 text-xs text-dark-500">
+                        켜면 이 분기 엔딩 뒤에 플레이어가 각자 자기 화면에서 개인 엔딩을 확인합니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateBranch(index, {
+                        personalEndingsEnabled: !branch.personalEndingsEnabled,
+                        personalEndings: !branch.personalEndingsEnabled
+                          ? branchPersonalEndings
+                          : branch.personalEndings,
+                      })}
+                      className={[
+                        "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                        branch.personalEndingsEnabled
+                          ? "border-mystery-600 bg-mystery-900/30 text-mystery-200"
+                          : "border-dark-700 text-dark-500 hover:text-dark-300",
+                      ].join(" ")}
+                    >
+                      {branch.personalEndingsEnabled ? "사용 중" : "사용 안 함"}
+                    </button>
+                  </div>
+
+                  {branch.personalEndingsEnabled && (
+                    <div className="space-y-4">
+                      {branchPersonalEndings.map((personalEnding) => {
+                        const player = players.find((item) => item.id === personalEnding.playerId);
+
+                        return (
+                          <div key={`${branch.id}-${personalEnding.playerId}`} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-4 space-y-3">
+                            <p className="text-sm font-medium text-dark-100">
+                              {player?.name || "(이름 없는 캐릭터)"}
+                            </p>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-dark-400">제목</label>
+                              <input
+                                type="text"
+                                value={personalEnding.title ?? ""}
+                                onChange={(e) => updateBranchPersonalEnding(index, personalEnding.playerId, {
+                                  title: e.target.value || undefined,
+                                })}
+                                placeholder="선택 사항"
+                                className={inp}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-dark-400">개인 엔딩 텍스트</label>
+                              <textarea
+                                rows={4}
+                                value={personalEnding.text}
+                                onChange={(e) => updateBranchPersonalEnding(index, personalEnding.playerId, {
+                                  text: e.target.value,
+                                })}
+                                placeholder="이 캐릭터만 확인할 개인 엔딩"
+                                className={ta}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-dark-100">개인 엔딩</h3>
-            <p className="mt-1 text-xs text-dark-500">
-              켜면 분기 엔딩 후 플레이어가 각자 자기 화면에서 개인 엔딩을 확인합니다.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onChange({
-              ...ending,
-              personalEndingsEnabled: !ending.personalEndingsEnabled,
-              personalEndings: !ending.personalEndingsEnabled ? personalEndings : ending.personalEndings,
-            })}
-            className={[
-              "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-              ending.personalEndingsEnabled
-                ? "border-mystery-600 bg-mystery-900/30 text-mystery-200"
-                : "border-dark-700 text-dark-500 hover:text-dark-300",
-            ].join(" ")}
-          >
-            {ending.personalEndingsEnabled ? "사용 중" : "사용 안 함"}
-          </button>
-        </div>
-
-        {ending.personalEndingsEnabled && (
-          <div className="space-y-4">
-            {personalEndings.map((personalEnding) => {
-              const player = players.find((item) => item.id === personalEnding.playerId);
-
-              return (
-                <div key={personalEnding.playerId} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-4 space-y-3">
-                  <p className="text-sm font-medium text-dark-100">
-                    {player?.name || "(이름 없는 캐릭터)"}
-                  </p>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-dark-400">제목</label>
-                    <input
-                      type="text"
-                      value={personalEnding.title ?? ""}
-                      onChange={(e) => updatePersonalEnding(personalEnding.playerId, { title: e.target.value || undefined })}
-                      placeholder="선택 사항"
-                      className={inp}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-dark-400">개인 엔딩 텍스트</label>
-                    <textarea
-                      rows={4}
-                      value={personalEnding.text}
-                      onChange={(e) => updatePersonalEnding(personalEnding.playerId, { text: e.target.value })}
-                      placeholder="이 캐릭터만 확인할 개인 엔딩"
-                      className={ta}
-                    />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
       </div>

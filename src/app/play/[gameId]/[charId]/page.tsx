@@ -271,12 +271,7 @@ function TimelinePanel({
   return (
     <div className="space-y-3">
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
-          <span className="text-[11px] text-dark-600">
-            {filledTimeline.length} / {game.story.timeline.slots.length}
-          </span>
-        </div>
+        <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
       </div>
       {filledTimeline.map(({ slot, entry }) => (
         <div key={slot.id} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">

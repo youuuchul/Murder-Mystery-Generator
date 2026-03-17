@@ -126,12 +126,24 @@ function resolveRelationshipTargetLabel(game: GamePackage, targetType: string | 
   return game.players.find((player) => player.id === targetId)?.name ?? "(알 수 없음)";
 }
 
-/** 피해자/NPC 카드에 연결된 캐릭터별 관계 설명 목록을 모은다. */
-function collectFigureRelations(game: GamePackage, targetType: "victim" | "npc", targetId: string): Array<{ playerId: string; playerName: string; description: string }> {
+/**
+ * 특정 인물을 대상으로 연결된 공개 관계 설명 목록을 모은다.
+ * 플레이어, 피해자, NPC 카드가 모두 같은 규칙으로 관계를 노출하도록 맞춘다.
+ */
+function collectFigureRelations(
+  game: GamePackage,
+  targetType: "player" | "victim" | "npc",
+  targetId: string
+): Array<{ key: string; playerId: string; playerName: string; description: string }> {
   return game.players.flatMap((player) => (
     player.relationships
-      .filter((relationship) => relationship.targetType === targetType && relationship.targetId === targetId)
-      .map((relationship) => ({
+      .filter((relationship) => (
+        relationship.targetType === targetType
+        && (relationship.targetId || relationship.playerId) === targetId
+        && Boolean(relationship.description.trim())
+      ))
+      .map((relationship, index) => ({
+        key: `${player.id}-${targetType}-${targetId}-${index}`,
         playerId: player.id,
         playerName: player.name || "(이름 없음)",
         description: relationship.description,
@@ -141,10 +153,23 @@ function collectFigureRelations(game: GamePackage, targetType: "victim" | "npc",
 
 function PersonInfoPanel({
   game,
+  currentPlayerId,
 }: {
   game: GamePackage;
+  currentPlayerId: string;
 }) {
   const people = [
+    ...game.players
+      .filter((player) => player.id !== currentPlayerId)
+      .map((player) => ({
+        id: player.id,
+        type: "player" as const,
+        roleLabel: "캐릭터",
+        name: player.name,
+        background: player.background,
+        imageUrl: undefined,
+        relations: collectFigureRelations(game, "player", player.id),
+      })),
     {
       id: "victim",
       type: "victim" as const,
@@ -200,7 +225,7 @@ function PersonInfoPanel({
               <p className="text-sm text-dark-600">연결된 관계 정보가 없습니다.</p>
             ) : (
               person.relations.map((relation) => (
-                <div key={`${person.id}-${relation.playerId}`} className="flex gap-3 text-sm">
+                <div key={relation.key} className="flex gap-3 text-sm">
                   <span className="shrink-0 font-medium text-dark-300">{relation.playerName}</span>
                   <span className="text-dark-500">{relation.description}</span>
                 </div>
@@ -445,33 +470,12 @@ function VoteResultScreen({
 }) {
   const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
   const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
-  const myVictoryCondition = game.players.find((p) => p.id === myPlayerId)?.victoryCondition;
   const branch = resolveActiveEndingBranch(game, reveal);
   const branchPersonalEndings = resolveBranchPersonalEndings(branch);
   const personalEnding = branchPersonalEndings.find((ending) => ending.playerId === myPlayerId)
     ?? branchPersonalEndings[0];
-  const resultType = reveal.resultType
-    ?? (reveal.majorityCorrect ? "culprit-captured" : "wrong-arrest");
   const showPersonalEnding = endingStage !== "branch" && Boolean(personalEnding?.text.trim());
   const hasPersonalEndingForPlayer = Boolean(branch?.personalEndingsEnabled) && branchPersonalEndings.length > 0;
-
-  function myResult(): { label: string; color: string } {
-    if (myPlayerId === reveal.culpritPlayerId) {
-      // 나는 범인
-      return resultType === "culprit-captured"
-        ? { label: "검거 당했습니다", color: "text-red-300" }
-        : { label: "도주 성공!", color: "text-green-300" };
-    }
-    if (myVictoryCondition === "personal-goal") {
-      return { label: "개인 목표 달성 여부를 확인하세요", color: "text-purple-300" };
-    }
-    // 무고한 플레이어
-    return resultType === "culprit-captured"
-      ? { label: "수사 성공! 범인을 잡았습니다", color: "text-blue-300" }
-      : { label: "오검거가 발생했습니다", color: "text-red-300" };
-  }
-
-  const result = myResult();
   const totalVotes = reveal.tally.reduce((s, t) => s + t.count, 0);
 
   return (
@@ -491,18 +495,12 @@ function VoteResultScreen({
         <p className="text-xl font-bold text-mystery-300">
           {culprit?.name ?? "알 수 없음"}
         </p>
-        {culprit?.background && (
-          <p className="text-xs text-dark-500 mt-1">{culprit.background}</p>
-        )}
       </div>
 
       {arrested && (
         <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
           <p className="text-xs text-dark-500 mb-2">검거된 인물</p>
           <p className="text-lg font-semibold text-dark-100">{arrested.name}</p>
-          {arrested.background && (
-            <p className="text-xs text-dark-500 mt-1">{arrested.background}</p>
-          )}
         </div>
       )}
 
@@ -563,22 +561,11 @@ function VoteResultScreen({
         </div>
       )}
 
-      {/* 5. 결과 배너 (맨 아래) */}
-      <div
-        className={`rounded-2xl border p-6 text-center ${
-          resultType === "culprit-captured"
-            ? "border-blue-700 bg-blue-950/20"
-            : "border-red-700 bg-red-950/20"
-        }`}
-      >
-        <p className="text-xl font-bold text-dark-50">
-          {resultType === "culprit-captured" ? "진범 검거 성공" : "오검거"}
-        </p>
-        <p className={`text-sm mt-2 font-medium ${result.color}`}>{result.label}</p>
-        {endingStage === "branch" && hasPersonalEndingForPlayer && (
-          <p className="text-xs text-dark-600 mt-3">GM이 다음 단계를 공개하면 개인 엔딩이 열립니다.</p>
-        )}
-      </div>
+      {endingStage === "branch" && hasPersonalEndingForPlayer && (
+        <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 text-center">
+          <p className="text-xs text-dark-500">GM이 다음 단계를 공개하면 개인 엔딩이 열립니다.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -679,9 +666,6 @@ function VoteScreen({
             ].join(" ")}
           >
             <p className="font-semibold text-dark-100">{p.name}</p>
-            {p.background && (
-              <p className="text-xs text-dark-500 mt-0.5 line-clamp-1">{p.background}</p>
-            )}
           </button>
         ))}
       </div>
@@ -933,7 +917,6 @@ export default function PlayerView() {
             <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
               <p className="text-xs text-dark-500 mb-1">내 캐릭터</p>
               <p className="font-bold text-dark-50">{character.name}</p>
-              <p className="text-sm text-dark-300 leading-relaxed">{character.background || "—"}</p>
             </div>
           </div>
         )}
@@ -1005,10 +988,6 @@ export default function PlayerView() {
 
             {characterPanel === "profile" && (
               <div className="space-y-4">
-                <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-                  <p className="text-xs text-dark-500 mb-2">배경 (전원 공개)</p>
-                  <p className="text-sm leading-relaxed text-dark-200">{character.background || "—"}</p>
-                </div>
                 {character.relatedClues.length > 0 && (
                   <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
                     <p className="text-xs text-dark-500">나와 관련된 단서 (위치 정보)</p>
@@ -1066,7 +1045,7 @@ export default function PlayerView() {
               </div>
             )}
 
-            {characterPanel === "people" && <PersonInfoPanel game={game} />}
+            {characterPanel === "people" && <PersonInfoPanel game={game} currentPlayerId={charId} />}
 
             {characterPanel === "timeline" && (
               <TimelinePanel

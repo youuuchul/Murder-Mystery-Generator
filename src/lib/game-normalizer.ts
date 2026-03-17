@@ -447,6 +447,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
       round: round.round,
       narration: asTrimmedString(round.narration),
       unlockedLocationIds: [],
+      imageUrl: asOptionalString(round.imageUrl),
       videoUrl: asOptionalString(round.videoUrl),
       backgroundMusic: asOptionalString(round.backgroundMusic),
       gmNote: asOptionalString(round.gmNote),

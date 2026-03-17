@@ -255,6 +255,7 @@ export interface RoundScript {
   round: number;
   narration: string;
   unlockedLocationIds: string[];
+  imageUrl?: string;
   videoUrl?: string;
   backgroundMusic?: string;
   gmNote?: string; // 해당 라운드의 GM 메인 화면 메모

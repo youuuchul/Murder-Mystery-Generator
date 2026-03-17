@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
+import { ENDING_STAGE_LABELS, normalizeEndingStage, resolveActiveEndingBranch } from "@/lib/ending-flow";
 import type { GamePackage, Player, ClueCondition } from "@/types/game";
-import type { SharedState, InventoryCard, VoteReveal } from "@/types/session";
+import type { EndingStage, SharedState, InventoryCard, VoteReveal } from "@/types/session";
 
 const PHASE_LABEL: Record<string, string> = {
   lobby: "대기 중",
@@ -391,17 +392,22 @@ function VoteResultScreen({
   reveal,
   game,
   myPlayerId,
+  endingStage,
 }: {
   reveal: VoteReveal;
   game: GamePackage;
   myPlayerId: string;
+  endingStage: EndingStage;
 }) {
   const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
   const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
   const myVictoryCondition = game.players.find((p) => p.id === myPlayerId)?.victoryCondition;
-  const branch = game.ending.branches.find((item) => item.id === reveal.resolvedBranchId);
+  const branch = resolveActiveEndingBranch(game, reveal);
+  const personalEnding = game.ending.personalEndings.find((ending) => ending.playerId === myPlayerId)
+    ?? game.ending.personalEndings[0];
   const resultType = reveal.resultType
     ?? (reveal.majorityCorrect ? "culprit-captured" : "wrong-arrest");
+  const showPersonalEnding = endingStage !== "branch" && Boolean(personalEnding?.text.trim());
 
   function myResult(): { label: string; color: string } {
     if (myPlayerId === reveal.culpritPlayerId) {
@@ -501,6 +507,16 @@ function VoteResultScreen({
         </div>
       )}
 
+      {showPersonalEnding && personalEnding && (
+        <div className="bg-dark-900 border border-mystery-800 rounded-xl p-5 space-y-3">
+          <p className="text-xs text-mystery-500">개인 엔딩</p>
+          {personalEnding.title && (
+            <p className="text-sm font-semibold text-mystery-300">{personalEnding.title}</p>
+          )}
+          <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{personalEnding.text}</p>
+        </div>
+      )}
+
       {/* 5. 결과 배너 (맨 아래) */}
       <div
         className={`rounded-2xl border p-6 text-center ${
@@ -513,6 +529,9 @@ function VoteResultScreen({
           {resultType === "culprit-captured" ? "진범 검거 성공" : "오검거"}
         </p>
         <p className={`text-sm mt-2 font-medium ${result.color}`}>{result.label}</p>
+        {endingStage === "branch" && game.ending.personalEndingsEnabled && (
+          <p className="text-xs text-dark-600 mt-3">GM이 다음 단계를 공개하면 개인 엔딩이 열립니다.</p>
+        )}
       </div>
     </div>
   );
@@ -777,6 +796,7 @@ export default function PlayerView() {
   }
 
   const phase = sharedState.phase;
+  const endingStage = normalizeEndingStage(sharedState.endingStage);
   const isRound = phase.startsWith("round-");
   const currentRound = sharedState.currentRound;
 
@@ -802,7 +822,7 @@ export default function PlayerView() {
             <p className="text-sm font-semibold text-dark-100">{character.name}</p>
           </div>
           <span className="text-xs px-3 py-1 rounded-full border border-yellow-700 bg-yellow-950/20 text-yellow-300">
-            결과 공개
+            {ENDING_STAGE_LABELS[endingStage]}
           </span>
         </div>
         <div className="p-4 max-w-lg mx-auto pb-8">
@@ -810,6 +830,7 @@ export default function PlayerView() {
             reveal={sharedState.voteReveal}
             game={game}
             myPlayerId={charId}
+            endingStage={endingStage}
           />
         </div>
       </div>

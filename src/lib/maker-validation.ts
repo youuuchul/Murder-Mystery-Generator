@@ -164,9 +164,21 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 6, "warning", "오검거 기본 분기가 아직 없습니다.");
   }
 
-  if (game.ending.personalEndingsEnabled && game.ending.personalEndings.length === 0) {
-    addIssue(issues, 6, "warning", "개인 엔딩 기능이 켜져 있지만 입력된 개인 엔딩이 없습니다.");
-  }
+  game.ending.branches.forEach((branch, index) => {
+    if (!branch.personalEndingsEnabled) {
+      return;
+    }
+
+    const hasBranchPersonalEnding = (branch.personalEndings ?? []).some((ending) => !isBlank(ending.text));
+    if (!hasBranchPersonalEnding) {
+      addIssue(
+        issues,
+        6,
+        "warning",
+        `${branch.label || `분기 ${index + 1}`}에 개인 엔딩이 켜져 있지만 입력된 텍스트가 없습니다.`
+      );
+    }
+  });
 
   if (game.ending.authorNotesEnabled && game.ending.authorNotes.length === 0) {
     addIssue(issues, 6, "warning", "작가 추가 설명 기능이 켜져 있지만 입력된 항목이 없습니다.");

@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
-import { ENDING_STAGE_LABELS, normalizeEndingStage, resolveActiveEndingBranch } from "@/lib/ending-flow";
+import {
+  ENDING_STAGE_LABELS,
+  normalizeEndingStage,
+  resolveActiveEndingBranch,
+  resolveBranchPersonalEndings,
+} from "@/lib/ending-flow";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
 import type { EndingStage, SharedState, InventoryCard, VoteReveal } from "@/types/session";
 
@@ -442,11 +447,13 @@ function VoteResultScreen({
   const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
   const myVictoryCondition = game.players.find((p) => p.id === myPlayerId)?.victoryCondition;
   const branch = resolveActiveEndingBranch(game, reveal);
-  const personalEnding = game.ending.personalEndings.find((ending) => ending.playerId === myPlayerId)
-    ?? game.ending.personalEndings[0];
+  const branchPersonalEndings = resolveBranchPersonalEndings(branch);
+  const personalEnding = branchPersonalEndings.find((ending) => ending.playerId === myPlayerId)
+    ?? branchPersonalEndings[0];
   const resultType = reveal.resultType
     ?? (reveal.majorityCorrect ? "culprit-captured" : "wrong-arrest");
   const showPersonalEnding = endingStage !== "branch" && Boolean(personalEnding?.text.trim());
+  const hasPersonalEndingForPlayer = Boolean(branch?.personalEndingsEnabled) && branchPersonalEndings.length > 0;
 
   function myResult(): { label: string; color: string } {
     if (myPlayerId === reveal.culpritPlayerId) {
@@ -568,7 +575,7 @@ function VoteResultScreen({
           {resultType === "culprit-captured" ? "진범 검거 성공" : "오검거"}
         </p>
         <p className={`text-sm mt-2 font-medium ${result.color}`}>{result.label}</p>
-        {endingStage === "branch" && game.ending.personalEndingsEnabled && (
+        {endingStage === "branch" && hasPersonalEndingForPlayer && (
           <p className="text-xs text-dark-600 mt-3">GM이 다음 단계를 공개하면 개인 엔딩이 열립니다.</p>
         )}
       </div>

@@ -282,6 +282,8 @@ export interface EndingBranch {
   triggerType: EndingBranchTriggerType;
   targetPlayerId?: string;
   storyText: string;
+  personalEndingsEnabled?: boolean;
+  personalEndings?: PersonalEnding[];
   videoUrl?: string;
   backgroundMusic?: string;
 }
@@ -300,7 +302,9 @@ export interface AuthorNote {
 
 export interface EndingConfig {
   branches: EndingBranch[];
+  /** legacy field — 기존 공통 개인 엔딩 데이터 호환용 */
   personalEndingsEnabled: boolean;
+  /** legacy field — 기존 공통 개인 엔딩 데이터 호환용 */
   personalEndings: PersonalEnding[];
   authorNotesEnabled: boolean;
   authorNotes: AuthorNote[];

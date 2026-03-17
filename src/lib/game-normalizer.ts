@@ -184,8 +184,21 @@ function normalizeClueCondition(condition: ClueCondition | undefined): ClueCondi
 }
 
 /** 엔딩 분기 1개를 현재 엔딩 에디터에서 바로 쓸 수 있는 형태로 정리한다. */
-function normalizeEndingBranch(branch: EndingBranch | undefined): EndingBranch {
+function normalizeEndingBranch(
+  branch: EndingBranch | undefined,
+  fallbackPersonalEndingsEnabled: boolean,
+  fallbackPersonalEndings: PersonalEnding[]
+): EndingBranch {
   const triggerType = normalizeEndingTriggerType(branch?.triggerType);
+  const normalizedPersonalEndings = Array.isArray(branch?.personalEndings)
+    ? branch.personalEndings.map(normalizePersonalEnding)
+    : fallbackPersonalEndings.map((ending) => ({ ...ending }));
+  const derivedPersonalEndingsEnabled = branch?.personalEndingsEnabled
+    ?? (Array.isArray(branch?.personalEndings)
+      ? branch.personalEndings.some((ending) => (
+          Boolean(asTrimmedString(ending?.title)) || Boolean(asTrimmedString(ending?.text))
+        ))
+      : fallbackPersonalEndingsEnabled);
 
   return {
     id: asTrimmedString(branch?.id) || crypto.randomUUID(),
@@ -195,6 +208,8 @@ function normalizeEndingBranch(branch: EndingBranch | undefined): EndingBranch {
       ? asOptionalString(branch?.targetPlayerId)
       : undefined,
     storyText: asTrimmedString(branch?.storyText),
+    personalEndingsEnabled: derivedPersonalEndingsEnabled,
+    personalEndings: normalizedPersonalEndings,
     videoUrl: asOptionalString(branch?.videoUrl),
     backgroundMusic: asOptionalString(branch?.backgroundMusic),
   };
@@ -351,17 +366,27 @@ function normalizeEndingConfig(
   incoming: GamePackage["ending"] | undefined,
   scripts: GamePackage["scripts"] | undefined
 ): EndingConfig {
+  const legacyPersonalEndings = Array.isArray(incoming?.personalEndings)
+    ? incoming.personalEndings.map(normalizePersonalEnding)
+    : [];
+  const fallbackPersonalEndingsEnabled = (incoming?.personalEndingsEnabled ?? false)
+    && legacyPersonalEndings.some((ending) => Boolean(ending.title?.trim()) || Boolean(ending.text.trim()));
   const explicitBranches = Array.isArray(incoming?.branches)
-    ? incoming.branches.map(normalizeEndingBranch)
+    ? incoming.branches.map((branch) => (
+        normalizeEndingBranch(branch, fallbackPersonalEndingsEnabled, legacyPersonalEndings)
+      ))
     : [];
   const legacyBranches = buildLegacyEndingBranches(scripts);
+  const branches = explicitBranches.length > 0
+    ? explicitBranches
+    : legacyBranches.map((branch) => (
+        normalizeEndingBranch(branch, fallbackPersonalEndingsEnabled, legacyPersonalEndings)
+      ));
 
   return {
-    branches: explicitBranches.length > 0 ? explicitBranches : legacyBranches,
+    branches,
     personalEndingsEnabled: incoming?.personalEndingsEnabled ?? false,
-    personalEndings: Array.isArray(incoming?.personalEndings)
-      ? incoming.personalEndings.map(normalizePersonalEnding)
-      : [],
+    personalEndings: legacyPersonalEndings,
     authorNotesEnabled: incoming?.authorNotesEnabled ?? false,
     authorNotes: Array.isArray(incoming?.authorNotes)
       ? incoming.authorNotes.map(normalizeAuthorNote)

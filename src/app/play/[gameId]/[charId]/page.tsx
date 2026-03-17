@@ -127,40 +127,33 @@ function resolveRelationshipTargetLabel(game: GamePackage, targetType: string | 
 }
 
 /**
- * 특정 인물을 대상으로 연결된 공개 관계 설명 목록을 모은다.
- * 플레이어, 피해자, NPC 카드가 모두 같은 규칙으로 관계를 노출하도록 맞춘다.
+ * 현재 플레이어가 특정 인물에 대해 입력한 관계/인상만 추려낸다.
+ * 다른 캐릭터의 관계는 플레이어 화면에 노출하지 않는다.
  */
-function collectFigureRelations(
-  game: GamePackage,
+function collectViewerImpressions(
+  viewer: Player,
   targetType: "player" | "victim" | "npc",
   targetId: string
-): Array<{ key: string; playerId: string; playerName: string; description: string }> {
-  return game.players.flatMap((player) => (
-    player.relationships
-      .filter((relationship) => (
-        relationship.targetType === targetType
-        && (relationship.targetId || relationship.playerId) === targetId
-        && Boolean(relationship.description.trim())
-      ))
-      .map((relationship, index) => ({
-        key: `${player.id}-${targetType}-${targetId}-${index}`,
-        playerId: player.id,
-        playerName: player.name || "(이름 없음)",
-        description: relationship.description,
-      }))
-  ));
+): string[] {
+  return viewer.relationships
+    .filter((relationship) => (
+      relationship.targetType === targetType
+      && (relationship.targetId || relationship.playerId) === targetId
+      && Boolean(relationship.description.trim())
+    ))
+    .map((relationship) => relationship.description);
 }
 
 function PersonInfoPanel({
   game,
-  currentPlayerId,
+  currentPlayer,
 }: {
   game: GamePackage;
-  currentPlayerId: string;
+  currentPlayer: Player;
 }) {
   const people = [
     ...game.players
-      .filter((player) => player.id !== currentPlayerId)
+      .filter((player) => player.id !== currentPlayer.id)
       .map((player) => ({
         id: player.id,
         type: "player" as const,
@@ -168,7 +161,7 @@ function PersonInfoPanel({
         name: player.name,
         background: player.background,
         imageUrl: undefined,
-        relations: collectFigureRelations(game, "player", player.id),
+        impressions: collectViewerImpressions(currentPlayer, "player", player.id),
       })),
     {
       id: "victim",
@@ -177,7 +170,7 @@ function PersonInfoPanel({
       name: game.story.victim.name,
       background: game.story.victim.background,
       imageUrl: game.story.victim.imageUrl,
-      relations: collectFigureRelations(game, "victim", "victim"),
+      impressions: collectViewerImpressions(currentPlayer, "victim", "victim"),
     },
     ...game.story.npcs.map((npc) => ({
       id: npc.id,
@@ -186,9 +179,9 @@ function PersonInfoPanel({
       name: npc.name,
       background: npc.background,
       imageUrl: npc.imageUrl,
-      relations: collectFigureRelations(game, "npc", npc.id),
+      impressions: collectViewerImpressions(currentPlayer, "npc", npc.id),
     })),
-  ].filter((person) => person.name || person.background || person.imageUrl || person.relations.length > 0);
+  ].filter((person) => person.name || person.background || person.imageUrl || person.impressions.length > 0);
 
   if (people.length === 0) {
     return (
@@ -220,15 +213,14 @@ function PersonInfoPanel({
           </div>
 
           <div className="border-t border-dark-800 pt-3 space-y-2">
-            <p className="text-xs text-dark-500">각 캐릭터의 관계</p>
-            {person.relations.length === 0 ? (
-              <p className="text-sm text-dark-600">연결된 관계 정보가 없습니다.</p>
+            <p className="text-xs text-dark-500">내가 보는 인상</p>
+            {person.impressions.length === 0 ? (
+              <p className="text-sm text-dark-600">입력된 관계 / 인상이 없습니다.</p>
             ) : (
-              person.relations.map((relation) => (
-                <div key={relation.key} className="flex gap-3 text-sm">
-                  <span className="shrink-0 font-medium text-dark-300">{relation.playerName}</span>
-                  <span className="text-dark-500">{relation.description}</span>
-                </div>
+              person.impressions.map((impression, index) => (
+                <p key={`${person.type}:${person.id}:${index}`} className="text-sm text-dark-300 leading-relaxed">
+                  {impression}
+                </p>
               ))
             )}
           </div>
@@ -1040,7 +1032,7 @@ export default function PlayerView() {
               </div>
             )}
 
-            {characterPanel === "people" && <PersonInfoPanel game={game} currentPlayerId={charId} />}
+            {characterPanel === "people" && <PersonInfoPanel game={game} currentPlayer={character} />}
 
             {characterPanel === "timeline" && (
               <TimelinePanel

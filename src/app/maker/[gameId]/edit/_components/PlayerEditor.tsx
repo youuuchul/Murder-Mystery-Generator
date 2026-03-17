@@ -207,6 +207,14 @@ function PlayerForm({
     update("relationships", player.relationships.map((r, i) => i === idx ? { ...r, ...partial } : r));
   }
 
+  /** 관계 1개를 현재 캐릭터 카드에 추가한다. */
+  function addRelationship() {
+    update("relationships", [
+      ...player.relationships,
+      { targetType: "player", targetId: "", playerId: "", description: "" },
+    ]);
+  }
+
   const conditionInfo = VICTORY_OPTIONS.find((v) => v.value === player.victoryCondition);
   const filteredRelationTargets = relationTargets.filter((target) => target.value !== `player:${player.id}`);
 
@@ -484,10 +492,7 @@ function PlayerForm({
               ))}
               <button
                 type="button"
-                onClick={() => update("relationships", [
-                  ...player.relationships,
-                  { targetType: "player", targetId: "", playerId: "", description: "" },
-                ])}
+                onClick={addRelationship}
                 className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
               >
                 + 관계 추가

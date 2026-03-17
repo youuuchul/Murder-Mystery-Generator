@@ -200,6 +200,13 @@ function normalizeEndingBranch(branch: EndingBranch | undefined): EndingBranch {
   };
 }
 
+/** legacy 문서형 단서를 현재 3종 단서 체계로 안전하게 매핑한다. */
+function normalizeClueType(value: unknown): Clue["type"] {
+  return value === "testimony" || value === "scene"
+    ? value
+    : "physical";
+}
+
 /** 플레이어 개인 엔딩 1개를 정리한다. */
 function normalizePersonalEnding(ending: PersonalEnding | undefined): PersonalEnding {
   return {
@@ -282,16 +289,14 @@ function normalizeClue(clue: Clue | undefined): Clue {
     id: asTrimmedString(clue?.id) || crypto.randomUUID(),
     title: asTrimmedString(clue?.title),
     description: asTrimmedString(clue?.description),
-    type: clue?.type === "testimony"
-      || clue?.type === "document"
-      || clue?.type === "scene"
-      ? clue.type
-      : "physical",
+    type: normalizeClueType(clue?.type),
     imageUrl: asOptionalString(clue?.imageUrl),
     locationId: asTrimmedString(clue?.locationId),
     pointsTo: asOptionalString(clue?.pointsTo),
     isSecret: clue?.isSecret === true,
-    condition: normalizeClueCondition(clue?.condition),
+    condition: normalizeClueType(clue?.type) === "scene"
+      ? undefined
+      : normalizeClueCondition(clue?.condition),
   };
 }
 
@@ -304,11 +309,7 @@ function normalizeClueCard(card: ClueCard | undefined): ClueCard {
     clueId: asTrimmedString(card?.clueId),
     title: asTrimmedString(card?.title),
     description: asTrimmedString(card?.description),
-    type: card?.type === "testimony"
-      || card?.type === "document"
-      || card?.type === "scene"
-      ? card.type
-      : "physical",
+    type: normalizeClueType(card?.type),
     imageUrl: asOptionalString(card?.imageUrl),
   };
 }

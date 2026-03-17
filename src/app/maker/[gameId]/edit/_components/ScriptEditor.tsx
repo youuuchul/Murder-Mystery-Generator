@@ -13,7 +13,7 @@ interface ScriptEditorProps {
   saving: boolean;
 }
 
-type Tab = "lobby" | "opening" | "rounds" | "vote" | "ending";
+type Tab = "lobby" | "rounds" | "vote";
 type EditorStatus = "empty" | "partial" | "complete";
 
 interface SegmentGuidance {
@@ -177,12 +177,18 @@ function SegmentEditor({
   segment,
   guidance,
   onChange,
+  textLabel,
+  textBadgeLabel = "나레이션",
+  hideTextField = false,
 }: {
   label: string;
   phaseLabel: string;
   segment: ScriptSegment;
   guidance: SegmentGuidance;
   onChange: (segment: ScriptSegment) => void;
+  textLabel?: string;
+  textBadgeLabel?: string;
+  hideTextField?: boolean;
 }) {
   const status = getSegmentStatus(segment);
   const hasNarration = hasContent(segment.narration);
@@ -203,7 +209,7 @@ function SegmentEditor({
 
         <div className="flex flex-wrap gap-2 text-[11px]">
           <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-            나레이션 {hasNarration ? "작성됨" : "미작성"}
+            {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
           </span>
           <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             진행 가이드 {hasGuide ? "작성됨" : "미작성"}
@@ -217,26 +223,28 @@ function SegmentEditor({
         </div>
       </div>
 
-      <div>
-        <FieldHeader label={`${label} 나레이션`} filled={hasNarration} />
-        <textarea
-          rows={8}
-          value={segment.narration}
-          onChange={(e) => onChange({ ...segment, narration: e.target.value })}
-          placeholder={guidance.narrationPrompt}
-          className={textareaClass}
-        />
-        <p className="mt-1 text-xs text-dark-500">{segment.narration.length}자</p>
-        {!hasNarration && (
-          <div className="mt-3">
-            <ExamplePanel
-              title="예시 나레이션"
-              description="아직 비어 있다면 아래 흐름을 참고해서 문장을 시작하면 됩니다."
-              example={guidance.narrationExample}
-            />
-          </div>
-        )}
-      </div>
+      {!hideTextField && (
+        <div>
+          <FieldHeader label={textLabel ?? `${label} 나레이션`} filled={hasNarration} />
+          <textarea
+            rows={8}
+            value={segment.narration}
+            onChange={(e) => onChange({ ...segment, narration: e.target.value })}
+            placeholder={guidance.narrationPrompt}
+            className={textareaClass}
+          />
+          <p className="mt-1 text-xs text-dark-500">{segment.narration.length}자</p>
+          {!hasNarration && (
+            <div className="mt-3">
+              <ExamplePanel
+                title={`예시 ${textBadgeLabel}`}
+                description="아직 비어 있다면 아래 흐름을 참고해서 문장을 시작하면 됩니다."
+                example={guidance.narrationExample}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <FieldHeader label={`${phaseLabel} 진행 가이드`} filled={hasGuide} />
@@ -325,7 +333,7 @@ function RoundScriptForm({
               <p className="text-sm font-semibold text-dark-100">Round {round.round} 작성 메모</p>
               <div className="flex flex-wrap gap-2 text-[11px]">
                 <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-                  나레이션 {hasNarration ? "작성됨" : "미작성"}
+                  라운드 이벤트 {hasNarration ? "작성됨" : "미작성"}
                 </span>
                 <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   진행 가이드 {hasGuide ? "작성됨" : "미작성"}
@@ -338,18 +346,18 @@ function RoundScriptForm({
           </div>
 
           <div>
-            <FieldHeader label="라운드 나레이션" filled={hasNarration} />
+            <FieldHeader label="라운드 이벤트" filled={hasNarration} />
             <textarea
               rows={4}
               value={round.narration}
               onChange={(e) => onChange({ ...round, narration: e.target.value })}
-              placeholder={`Round ${round.round} 시작 시 플레이어에게 바로 읽어 줄 내용을 적어주세요.`}
+              placeholder={`Round ${round.round}에서 플레이어에게 바로 보여줄 이벤트 텍스트를 적어주세요.`}
               className={textareaClass}
             />
             {!hasNarration && (
               <div className="mt-3">
                 <ExamplePanel
-                  title={`Round ${round.round} 나레이션 예시`}
+                  title={`Round ${round.round} 라운드 이벤트 예시`}
                   description="새로 열린 장소와 이번 라운드의 행동 목표를 먼저 알려주면 흐름이 깔끔합니다."
                   example={`조사 시간이 다시 시작됩니다.\n이번 라운드에 새로 열린 공간을 확인하고 제한 시간 안에 단서를 확보해 주세요.`}
                 />
@@ -441,21 +449,6 @@ function getRoundsTabStatus(rounds: RoundScript[]): EditorStatus {
   return "partial";
 }
 
-/**
- * 엔딩 탭은 공통/성공/실패 세그먼트를 묶어서 상태를 계산한다.
- */
-function getEndingTabStatus(scripts: Scripts): EditorStatus {
-  const states = [
-    getSegmentStatus(scripts.ending),
-    getSegmentStatus(scripts.endingSuccess ?? { narration: "", gmNote: "" }),
-    getSegmentStatus(scripts.endingFail ?? { narration: "", gmNote: "" }),
-  ];
-
-  if (states.every((state) => state === "empty")) return "empty";
-  if (states.every((state) => state === "complete")) return "complete";
-  return "partial";
-}
-
 export default function ScriptEditor({
   scripts,
   rounds,
@@ -491,10 +484,8 @@ export default function ScriptEditor({
   const roundStatuses = normalizedRounds.map((round) => getRoundStatus(round));
   const tabs: { id: Tab; label: string; status: EditorStatus }[] = [
     { id: "lobby", label: "대기실", status: getSegmentStatus(scripts.lobby) },
-    { id: "opening", label: "오프닝", status: getSegmentStatus(scripts.opening) },
     { id: "rounds", label: `라운드 (${roundCount}개)`, status: getRoundsTabStatus(normalizedRounds) },
     { id: "vote", label: "투표", status: getSegmentStatus(scripts.vote) },
-    { id: "ending", label: "엔딩", status: getEndingTabStatus(scripts) },
   ];
 
   return (
@@ -502,7 +493,7 @@ export default function ScriptEditor({
       <div>
         <h2 className="text-xl font-bold text-dark-50">스크립트</h2>
         <p className="text-sm text-dark-500 mt-1">
-          각 페이즈의 나레이션, GM 진행 가이드, 영상, 배경음악을 작성합니다. 미작성 구간은 탭과 배지에서 바로 확인할 수 있습니다.
+          라운드별 가이드, 미디어, 이벤트 텍스트와 투표 안내를 작성합니다. 오프닝은 Step 2, 엔딩은 Step 6에서 설정합니다.
         </p>
       </div>
 
@@ -532,16 +523,9 @@ export default function ScriptEditor({
           segment={scripts.lobby}
           guidance={SEGMENT_GUIDANCE.lobby}
           onChange={(lobby) => onChange({ ...scripts, lobby })}
-        />
-      )}
-
-      {activeTab === "opening" && (
-        <SegmentEditor
-          label="오프닝"
-          phaseLabel="오프닝"
-          segment={scripts.opening}
-          guidance={SEGMENT_GUIDANCE.opening}
-          onChange={(opening) => onChange({ ...scripts, opening })}
+          hideTextField
+          textLabel="대기실 텍스트"
+          textBadgeLabel="대기실 텍스트"
         />
       )}
 
@@ -575,53 +559,9 @@ export default function ScriptEditor({
           segment={scripts.vote}
           guidance={SEGMENT_GUIDANCE.vote}
           onChange={(vote) => onChange({ ...scripts, vote })}
+          textLabel="투표 안내 텍스트"
+          textBadgeLabel="안내 텍스트"
         />
-      )}
-
-      {activeTab === "ending" && (
-        <div className="space-y-8">
-          <SegmentEditor
-            label="공통 엔딩"
-            phaseLabel="엔딩 공통"
-            segment={scripts.ending}
-            guidance={SEGMENT_GUIDANCE.ending}
-            onChange={(ending) => onChange({ ...scripts, ending })}
-          />
-
-          <div className="border border-blue-800/50 rounded-xl p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-blue-300">범인 검거 성공 엔딩</p>
-                <p className="text-xs text-dark-500 mt-0.5">다수가 범인을 지목해 검거에 성공했을 때 사용됩니다.</p>
-              </div>
-              <StatusBadge status={getSegmentStatus(scripts.endingSuccess ?? { narration: "", gmNote: "" })} />
-            </div>
-            <SegmentEditor
-              label="검거 성공"
-              phaseLabel="검거 성공"
-              segment={scripts.endingSuccess ?? { narration: "", videoUrl: undefined, backgroundMusic: undefined }}
-              guidance={SEGMENT_GUIDANCE.endingSuccess}
-              onChange={(endingSuccess) => onChange({ ...scripts, endingSuccess })}
-            />
-          </div>
-
-          <div className="border border-red-800/50 rounded-xl p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-red-300">범인 도주 성공 엔딩</p>
-                <p className="text-xs text-dark-500 mt-0.5">범인이 특정되지 않거나 다수가 틀렸을 때 사용됩니다.</p>
-              </div>
-              <StatusBadge status={getSegmentStatus(scripts.endingFail ?? { narration: "", gmNote: "" })} />
-            </div>
-            <SegmentEditor
-              label="도주 성공"
-              phaseLabel="도주 성공"
-              segment={scripts.endingFail ?? { narration: "", videoUrl: undefined, backgroundMusic: undefined }}
-              guidance={SEGMENT_GUIDANCE.endingFail}
-              onChange={(endingFail) => onChange({ ...scripts, endingFail })}
-            />
-          </div>
-        </div>
       )}
 
       <div className="flex justify-end pt-2">

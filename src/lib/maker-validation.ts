@@ -48,10 +48,6 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 2, "error", "플레이어 공개 사건 설명을 작성하세요.");
   }
 
-  if (isBlank(game.story.location)) {
-    addIssue(issues, 2, "error", "배경 장소를 입력하세요.");
-  }
-
   if (game.story.timeline.enabled && game.story.timeline.slots.length === 0) {
     addIssue(issues, 2, "error", "타임라인을 사용하려면 시간대 슬롯을 1개 이상 추가하세요.");
   }
@@ -59,6 +55,11 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
   const blankTimelineSlots = game.story.timeline.slots.filter((slot) => isBlank(slot.label)).length;
   if (blankTimelineSlots > 0) {
     addIssue(issues, 2, "warning", `이름이 비어 있는 타임라인 슬롯이 ${blankTimelineSlots}개 있습니다.`);
+  }
+
+  const namelessNpcs = game.story.npcs.filter((npc) => isBlank(npc.name)).length;
+  if (namelessNpcs > 0) {
+    addIssue(issues, 2, "warning", `이름이 비어 있는 NPC가 ${namelessNpcs}명 있습니다.`);
   }
 
   if (playerCount === 0) {
@@ -141,24 +142,38 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
   }
 
   if (isBlank(game.scripts.opening.narration)) {
-    addIssue(issues, 5, "error", "오프닝 나레이션이 비어 있습니다.");
+    addIssue(issues, 2, "error", "오프닝 스토리 텍스트가 비어 있습니다.");
   }
 
   if (isBlank(game.scripts.vote.narration)) {
-    addIssue(issues, 5, "error", "투표 안내 나레이션이 비어 있습니다.");
-  }
-
-  if (isBlank(game.scripts.ending.narration)) {
-    addIssue(issues, 5, "warning", "공통 엔딩 나레이션이 비어 있습니다.");
-  }
-
-  if (isBlank(game.scripts.lobby.narration)) {
-    addIssue(issues, 5, "warning", "대기실 나레이션이 비어 있습니다.");
+    addIssue(issues, 5, "error", "투표 안내 텍스트가 비어 있습니다.");
   }
 
   const missingRoundNarrations = normalizedRounds.filter((round) => isBlank(round.narration)).length;
   if (missingRoundNarrations > 0) {
-    addIssue(issues, 5, "warning", `라운드 나레이션이 비어 있는 구간이 ${missingRoundNarrations}개 있습니다.`);
+    addIssue(issues, 5, "warning", `라운드 이벤트 텍스트가 비어 있는 구간이 ${missingRoundNarrations}개 있습니다.`);
+  }
+
+  if (game.ending.branches.length === 0) {
+    addIssue(issues, 6, "error", "엔딩 분기를 1개 이상 추가하세요.");
+  }
+
+  const hasCulpritCapturedBranch = game.ending.branches.some((branch) => branch.triggerType === "culprit-captured");
+  if (!hasCulpritCapturedBranch) {
+    addIssue(issues, 6, "warning", "범인 검거 분기가 아직 없습니다.");
+  }
+
+  const hasWrongArrestFallback = game.ending.branches.some((branch) => branch.triggerType === "wrong-arrest-fallback");
+  if (!hasWrongArrestFallback) {
+    addIssue(issues, 6, "warning", "오검거 기본 분기가 아직 없습니다.");
+  }
+
+  if (game.ending.personalEndingsEnabled && game.ending.personalEndings.length === 0) {
+    addIssue(issues, 6, "warning", "개인 엔딩 기능이 켜져 있지만 입력된 개인 엔딩이 없습니다.");
+  }
+
+  if (game.ending.authorNotesEnabled && game.ending.authorNotes.length === 0) {
+    addIssue(issues, 6, "warning", "작가 추가 설명 기능이 켜져 있지만 입력된 항목이 없습니다.");
   }
 
   return {

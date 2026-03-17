@@ -41,8 +41,25 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
     alibi: "",
     timelineEntries: [],
     relatedClues: [],
-    relationships: [],
     cardImage: undefined,
+  };
+}
+
+/**
+ * 엔딩 설정에서 플레이어에게 공개해도 되는 필드만 남긴다.
+ * 개인 엔딩은 현재 플레이어 본인 것만 전달하고 작가 노트는 제외한다.
+ */
+function sanitizeEnding(game: GamePackage, viewerPlayerId?: string): GamePackage["ending"] {
+  return {
+    branches: game.ending.branches.map((branch) => ({
+      ...branch,
+    })),
+    personalEndingsEnabled: game.ending.personalEndingsEnabled,
+    personalEndings: viewerPlayerId
+      ? game.ending.personalEndings.filter((ending) => ending.playerId === viewerPlayerId)
+      : [],
+    authorNotesEnabled: false,
+    authorNotes: [],
   };
 }
 
@@ -76,6 +93,7 @@ function sanitizeGame(game: GamePackage, viewerPlayerId?: string): GamePackage {
         ? sanitizeSegment(game.scripts.endingFail)
         : undefined,
     },
+    ending: sanitizeEnding(game, viewerPlayerId),
   };
 }
 

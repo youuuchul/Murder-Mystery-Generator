@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
       rules: incomingRules ?? buildDefaultRules(settings.playerCount),
       story: {
         synopsis: "",
-        victim: { name: "", background: "", deathCircumstances: "" },
+        victim: { name: "", background: "", imageUrl: undefined },
+        npcs: [],
         incident: "",
-        location: "",
         gmOverview: "",
         mapImageUrl: undefined,
         timeline: {
@@ -100,6 +100,13 @@ export async function POST(request: NextRequest) {
         rounds: [],
         vote: { narration: "" },
         ending: { narration: "" },
+      },
+      ending: {
+        branches: [],
+        personalEndingsEnabled: false,
+        personalEndings: [],
+        authorNotesEnabled: false,
+        authorNotes: [],
       },
     };
 

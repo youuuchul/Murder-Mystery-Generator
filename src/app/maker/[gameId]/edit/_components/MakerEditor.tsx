@@ -10,7 +10,7 @@ import ScriptEditor from "./ScriptEditor";
 import EndingEditor from "./EndingEditor";
 import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
-import type { GamePackage } from "@/types/game";
+import type { GamePackage, Player, Story } from "@/types/game";
 import { validateMakerGame } from "@/lib/maker-validation";
 
 interface MakerEditorProps {
@@ -18,6 +18,42 @@ interface MakerEditorProps {
 }
 
 const STEP_COUNT = 6;
+
+/**
+ * 스텝 2/3 편집 중 삭제된 플레이어/NPC를 가리키는 관계를 자동 정리한다.
+ * 사건 개요와 플레이어 탭을 오가도 참조가 깨진 관계가 저장본에 남지 않게 한다.
+ */
+function pruneDanglingRelationships(players: Player[], story: Story): Player[] {
+  const validPlayerIds = new Set(players.map((player) => player.id));
+  const validNpcIds = new Set(story.npcs.map((npc) => npc.id));
+
+  return players.map((player) => ({
+    ...player,
+    relationships: player.relationships.filter((relationship) => {
+      const targetType = relationship.targetType ?? "player";
+      const targetId = relationship.targetId || relationship.playerId || "";
+
+      if (targetType === "victim") {
+        return targetId === "victim";
+      }
+
+      if (targetType === "npc") {
+        return validNpcIds.has(targetId);
+      }
+
+      return targetId !== player.id && validPlayerIds.has(targetId);
+    }).map((relationship) => {
+      const targetType = relationship.targetType ?? "player";
+      const targetId = relationship.targetId || relationship.playerId || "";
+      return {
+        ...relationship,
+        targetType,
+        targetId,
+        playerId: targetType === "player" ? targetId : undefined,
+      };
+    }),
+  }));
+}
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [game, setGame] = useState<GamePackage>(initialGame);
@@ -27,7 +63,15 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const validation = validateMakerGame(game);
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
-    setGame((prev) => ({ ...prev, ...partial }));
+    setGame((prev) => {
+      const next = { ...prev, ...partial };
+
+      if (partial.story || partial.players) {
+        next.players = pruneDanglingRelationships(next.players ?? [], next.story);
+      }
+
+      return next;
+    });
   }, []);
 
   async function save(updatedGame: GamePackage = game) {

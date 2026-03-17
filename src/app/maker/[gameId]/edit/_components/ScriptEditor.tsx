@@ -408,6 +408,17 @@ function RoundScriptForm({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
+              <FieldHeader label="라운드 대표 이미지 URL" filled={hasContent(round.imageUrl)} optional />
+              <input
+                type="url"
+                value={round.imageUrl ?? ""}
+                onChange={(e) => onChange({ ...round, imageUrl: e.target.value || undefined })}
+                placeholder="https://..."
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-dark-600">비워 두면 Step 2 대표 지도 / 참고 이미지를 그대로 사용합니다.</p>
+            </div>
+            <div>
               <FieldHeader label="배경 음악 URL" filled={hasContent(round.backgroundMusic)} optional />
               <input
                 type="url"
@@ -417,7 +428,7 @@ function RoundScriptForm({
                 className={inputClass}
               />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <FieldHeader label="영상 URL" filled={hasContent(round.videoUrl)} optional />
               <input
                 type="url"
@@ -469,6 +480,7 @@ export default function ScriptEditor({
           round,
           narration: "",
           unlockedLocationIds: [],
+          imageUrl: undefined,
           videoUrl: undefined,
           backgroundMusic: undefined,
           gmNote: undefined,

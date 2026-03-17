@@ -49,6 +49,7 @@ interface PhaseBoardContent {
   badge: string;
   narrationBlocks: { label: string; text: string }[];
   guideText?: string;
+  imageUrl?: string;
   videoUrl?: string;
   backgroundMusic?: string;
   showSharedImage?: boolean;
@@ -110,9 +111,10 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
         ? [{ label: "스토리 텍스트", text: game.scripts.opening.narration }]
         : [],
       guideText: game.scripts.opening.gmNote,
+      imageUrl: game.story.mapImageUrl,
       videoUrl: game.scripts.opening.videoUrl,
       backgroundMusic: game.scripts.opening.backgroundMusic,
-      showSharedImage: false,
+      showSharedImage: true,
     };
   }
 
@@ -125,6 +127,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
         ? [{ label: `Round ${roundNum} 이벤트`, text: roundScript.narration }]
         : [],
       guideText: roundScript?.gmNote,
+      imageUrl: roundScript?.imageUrl,
       videoUrl: roundScript?.videoUrl,
       backgroundMusic: roundScript?.backgroundMusic,
       showSharedImage: true,
@@ -216,7 +219,9 @@ function MediaPanel({ source, title }: { source: VideoSource | null; title: stri
 
 function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardContent }) {
   const videoSource = resolveVideoSource(content.videoUrl);
-  const showSharedImage = Boolean(content.showSharedImage ?? true) && Boolean(game.story.mapImageUrl);
+  const resolvedImageUrl = content.imageUrl
+    ?? (content.showSharedImage ? game.story.mapImageUrl : undefined);
+  const showSharedImage = Boolean(resolvedImageUrl);
   const hasBackgroundMusic = Boolean(content.backgroundMusic?.trim());
   const hasNarrationBlocks = content.narrationBlocks.length > 0;
   const hasMediaPanels = Boolean(videoSource) || showSharedImage || hasBackgroundMusic;
@@ -263,7 +268,7 @@ function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardCont
                 <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
                   <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
                   <img
-                    src={game.story.mapImageUrl}
+                    src={resolvedImageUrl}
                     alt={`${game.title} 공통 이미지`}
                     className="w-full rounded-xl border border-dark-700 object-cover"
                   />

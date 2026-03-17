@@ -26,13 +26,8 @@ function resolveEndingBranchId(
     ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
 }
 
-function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSession>>) {
-  if (!session) return;
-
-  const game = getGame(session.gameId);
-  const culpritPlayerId = game?.story.culpritPlayerId ?? "";
-
-  // 득표 집계
+/** 현재 세션의 비공개 표 데이터를 정렬된 득표 집계로 변환한다. */
+function buildVoteTally(session: NonNullable<ReturnType<typeof getSession>>): VoteTally[] {
   session.votes = session.votes ?? {};
   const tallyMap = new Map<string, { count: number; voterNames: string[] }>();
   for (const [token, targetPlayerId] of Object.entries(session.votes)) {
@@ -43,16 +38,61 @@ function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSe
     if (voter) entry.voterNames.push(voter.playerName);
   }
 
-  const tally: VoteTally[] = [...tallyMap.entries()].map(([playerId, data]) => ({
+  return [...tallyMap.entries()].map(([playerId, data]) => ({
     playerId,
     count: data.count,
     voterNames: data.voterNames,
   })).sort((a, b) => b.count - a.count);
+}
+
+/** 최다 득표 동률 후보를 playerId 목록으로 추린다. */
+function resolveTiedCandidates(tally: VoteTally[]): string[] {
+  const topCount = tally[0]?.count ?? 0;
+  if (topCount <= 0) {
+    return [];
+  }
+
+  return tally
+    .filter((entry) => entry.count === topCount)
+    .map((entry) => entry.playerId);
+}
+
+/**
+ * 득표 결과를 엔딩 공개 상태로 바꾸거나, 동률이면 GM 선택 대기 상태로 전환한다.
+ * 강제 검거 대상이 전달되면 동률 후보 중 해당 캐릭터를 최종 검거 대상으로 확정한다.
+ */
+function revealVotes(
+  sessionId: string,
+  session: Awaited<ReturnType<typeof getSession>>,
+  forcedArrestedPlayerId?: string
+) {
+  if (!session) {
+    return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
+  }
+
+  const game = getGame(session.gameId);
+  const culpritPlayerId = game?.story.culpritPlayerId ?? "";
+  const tally = buildVoteTally(session);
+  const tiedCandidates = resolveTiedCandidates(tally);
+
+  if (!forcedArrestedPlayerId && tiedCandidates.length > 1) {
+    session.pendingArrestOptions = tiedCandidates;
+    session.sharedState.eventLog.push({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      message: "최다 득표 동률입니다. GM이 최종 검거 대상을 선택해야 합니다.",
+      type: "system",
+    });
+
+    updateSession(session);
+    broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+    return { requiresTieBreak: true, pendingArrestOptions: tiedCandidates };
+  }
 
   const totalVotes = Object.keys(session.votes).length;
-  const culpritVotes = tallyMap.get(culpritPlayerId)?.count ?? 0;
+  const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
   const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
-  const arrestedPlayerId = tally[0]?.playerId ?? "";
+  const arrestedPlayerId = forcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
   const resultType = arrestedPlayerId === culpritPlayerId
     ? "culprit-captured"
     : "wrong-arrest";
@@ -68,6 +108,7 @@ function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSe
     resolvedBranchId,
     majorityCorrect,
   };
+  session.pendingArrestOptions = undefined;
   session.sharedState.voteReveal = reveal;
   session.sharedState.phase = "ending";
   session.sharedState.endingStage = "branch";
@@ -84,6 +125,7 @@ function revealVotes(sessionId: string, session: Awaited<ReturnType<typeof getSe
 
   updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+  return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
 }
 
 /** POST /api/sessions/[sessionId]/vote — 투표 제출 */
@@ -103,6 +145,10 @@ export async function POST(req: Request, { params }: Params) {
 
   if (session.sharedState.phase !== "vote") {
     return NextResponse.json({ error: "투표 페이즈가 아닙니다" }, { status: 400 });
+  }
+
+  if ((session.pendingArrestOptions?.length ?? 0) > 0) {
+    return NextResponse.json({ error: "GM이 최종 검거 대상을 선택하는 중입니다." }, { status: 400 });
   }
 
   const voter = session.playerStates.find((p) => p.token === token);
@@ -134,16 +180,24 @@ export async function POST(req: Request, { params }: Params) {
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   // 전원 투표 완료 시 자동 공개
+  let revealState: ReturnType<typeof revealVotes> | null = null;
   if (allVoted) {
-    revealVotes(sessionId, session);
+    revealState = revealVotes(sessionId, session);
   }
 
-  return NextResponse.json({ ok: true, allVoted });
+  return NextResponse.json({
+    ok: true,
+    allVoted,
+    requiresTieBreak: revealState?.requiresTieBreak ?? false,
+  });
 }
 
 /** PATCH /api/sessions/[sessionId]/vote — GM 강제 공개 */
 export async function PATCH(req: Request, { params }: Params) {
   const { sessionId } = params;
+  const { arrestedPlayerId } = await req.json().catch(() => ({})) as {
+    arrestedPlayerId?: string;
+  };
   const session = getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
@@ -151,6 +205,25 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: "투표 페이즈가 아닙니다" }, { status: 400 });
   }
 
-  revealVotes(sessionId, session);
-  return NextResponse.json({ ok: true });
+  if ((session.pendingArrestOptions?.length ?? 0) > 0) {
+    if (!arrestedPlayerId) {
+      return NextResponse.json({ error: "동률 후보 중 최종 검거 대상을 선택하세요." }, { status: 400 });
+    }
+
+    if (!session.pendingArrestOptions?.includes(arrestedPlayerId)) {
+      return NextResponse.json({ error: "선택한 캐릭터는 동률 후보가 아닙니다." }, { status: 400 });
+    }
+  }
+
+  const revealState = revealVotes(sessionId, session, arrestedPlayerId);
+  return NextResponse.json({
+    ok: true,
+    session: {
+      id: session.id,
+      sharedState: session.sharedState,
+      pendingArrestOptions: session.pendingArrestOptions ?? [],
+    },
+    requiresTieBreak: revealState.requiresTieBreak,
+    pendingArrestOptions: revealState.pendingArrestOptions,
+  });
 }

@@ -840,6 +840,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const [revealingVote, setRevealingVote] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [endingSession, setEndingSession] = useState(false);
+  const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
 
   const secretClues = game.clues.filter((c) => c.isSecret).map((c) => ({
     id: c.id,
@@ -854,9 +855,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
         const res = await fetch(`/api/sessions/${session.id}`);
         if (!res.ok) return;
         const data = await res.json();
-        setSession((prev) =>
-          prev ? { ...prev, sharedState: data.session.sharedState } : prev
-        );
+        setSession((prev) => (prev ? { ...prev, ...data.session } : prev));
       } catch {}
     }, 3000);
     return () => clearInterval(id);
@@ -957,8 +956,34 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   async function forceRevealVotes() {
     if (!session) return;
     setRevealingVote(true);
-    await fetch(`/api/sessions/${session.id}/vote`, { method: "PATCH" });
-    setRevealingVote(false);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/vote`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrestedPlayerId: selectedArrestPlayerId || undefined }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "결과 공개 실패");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.session) {
+        setSession((prev) => (
+          prev
+            ? {
+                ...prev,
+                sharedState: data.session.sharedState ?? prev.sharedState,
+                pendingArrestOptions: data.session.pendingArrestOptions ?? [],
+              }
+            : prev
+        ));
+      }
+    } finally {
+      setRevealingVote(false);
+    }
   }
 
   async function advanceEndingStage() {
@@ -1026,6 +1051,18 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     "vote",
     "ending",
   ];
+  const pendingArrestOptions = session?.pendingArrestOptions ?? [];
+
+  useEffect(() => {
+    if (pendingArrestOptions.length === 0) {
+      setSelectedArrestPlayerId("");
+      return;
+    }
+
+    setSelectedArrestPlayerId((prev) => (
+      pendingArrestOptions.includes(prev) ? prev : pendingArrestOptions[0]
+    ));
+  }, [pendingArrestOptions]);
 
   return (
     <div className="space-y-6">
@@ -1101,14 +1138,46 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                       style={{ width: `${totalPlayers > 0 ? (voteCount / totalPlayers) * 100 : 0}%` }}
                     />
                   </div>
-                  <button
-                    onClick={forceRevealVotes}
-                    disabled={revealingVote}
-                    className="w-full py-2.5 bg-yellow-800 hover:bg-yellow-700 text-yellow-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                  >
-                    {revealingVote ? "공개 중…" : `강제 결과 공개 (${voteCount}/${totalPlayers}표)`}
-                  </button>
-                  <p className="text-xs text-dark-600 text-center">전원 투표 시 자동 공개됩니다.</p>
+                  {pendingArrestOptions.length > 0 ? (
+                    <div className="space-y-3 rounded-xl border border-yellow-900/50 bg-yellow-950/10 p-3">
+                      <div>
+                        <p className="text-sm font-medium text-yellow-300">최다 득표 동률</p>
+                        <p className="text-xs text-dark-500 mt-1">최종 검거 대상을 선택해야 엔딩으로 넘어갑니다.</p>
+                      </div>
+                      <select
+                        value={selectedArrestPlayerId}
+                        onChange={(e) => setSelectedArrestPlayerId(e.target.value)}
+                        className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-200 text-sm focus:outline-none focus:ring-1 focus:ring-mystery-500"
+                      >
+                        {pendingArrestOptions.map((playerId) => {
+                          const player = game.players.find((item) => item.id === playerId);
+                          return (
+                            <option key={playerId} value={playerId}>
+                              {player?.name || "(이름 없음)"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <button
+                        onClick={forceRevealVotes}
+                        disabled={revealingVote || !selectedArrestPlayerId}
+                        className="w-full py-2.5 bg-yellow-800 hover:bg-yellow-700 text-yellow-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {revealingVote ? "확정 중…" : "최종 검거 대상 확정"}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={forceRevealVotes}
+                        disabled={revealingVote}
+                        className="w-full py-2.5 bg-yellow-800 hover:bg-yellow-700 text-yellow-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {revealingVote ? "공개 중…" : `강제 결과 공개 (${voteCount}/${totalPlayers}표)`}
+                      </button>
+                      <p className="text-xs text-dark-600 text-center">전원 투표 시 자동 공개됩니다.</p>
+                    </>
+                  )}
                 </div>
               ) : phase !== "ending" ? (
                 <button

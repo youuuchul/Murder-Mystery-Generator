@@ -32,10 +32,12 @@ export default function MakerAssistantDock({
         currentStep={currentStep}
         validationIssueCount={validationIssueCount}
         draft={assistant.draft}
+        responseMode={assistant.responseMode}
         error={assistant.error}
         messages={assistant.messages}
         onClose={() => assistant.setOpen(false)}
         onDraftChange={assistant.setDraft}
+        onResponseModeChange={assistant.setResponseMode}
         onQuickAction={assistant.runQuickAction}
         onSend={assistant.sendChat}
         onReset={assistant.resetConversation}

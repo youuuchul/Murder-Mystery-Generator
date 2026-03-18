@@ -7,6 +7,7 @@ import {
   isMakerAssistantEnabled,
 } from "@/lib/ai/openai";
 import { buildMakerAssistantContext } from "@/lib/ai/maker-assistant-context";
+import { resolveMakerAssistantResponseMode } from "@/lib/ai/maker-assistant-response-mode";
 import {
   buildMakerAssistantSystemPrompt,
   buildMakerAssistantUserPrompt,
@@ -38,14 +39,20 @@ export async function POST(request: NextRequest) {
 
     const client = getOpenAIClient();
     const context = buildMakerAssistantContext(payload.game, payload.task, payload.currentStep);
+    const responseMode = resolveMakerAssistantResponseMode({
+      task: payload.task,
+      message: payload.message,
+      requestedMode: payload.responseMode,
+    });
 
     const response = await client.responses.create({
       model: getMakerAssistantModel(),
       store: false,
       previous_response_id: payload.previousResponseId ?? undefined,
-      instructions: buildMakerAssistantSystemPrompt(payload.task),
+      instructions: buildMakerAssistantSystemPrompt(payload.task, responseMode),
       input: buildMakerAssistantUserPrompt({
         task: payload.task,
+        responseMode,
         context,
         message: payload.message,
       }),
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
     });
 
     const rawText = extractResponseText(response);
-    const result = await resolveMakerAssistantResult(client, rawText);
+    const result = await resolveMakerAssistantResult(client, rawText, responseMode);
 
     const body: MakerAssistantResponse = {
       task: payload.task,
@@ -96,10 +103,11 @@ export async function POST(request: NextRequest) {
  */
 async function resolveMakerAssistantResult(
   client: ReturnType<typeof getOpenAIClient>,
-  rawText: string
+  rawText: string,
+  responseMode: "guide" | "draft"
 ): Promise<MakerAssistantResult> {
   try {
-    return parseMakerAssistantResult(rawText);
+    return parseMakerAssistantResult(rawText, responseMode);
   } catch (parseError) {
     console.warn("[maker-assistant] repairing malformed JSON output", parseError);
   }
@@ -110,19 +118,7 @@ async function resolveMakerAssistantResult(
     const repaired = await client.responses.create({
       model: getMakerAssistantModel(),
       store: false,
-      instructions: [
-        "주어진 초안 텍스트를 아래 line 포맷으로만 다시 정리하라.",
-        "JSON, 마크다운, 코드펜스, 설명 문장은 금지한다.",
-        "SUMMARY:",
-        "요약 문장",
-        "FINDINGS:",
-        "FINDING|warning|3|null|null|null|제목|상세 설명",
-        "ACTIONS:",
-        "ACTION|3|작업 라벨|이유",
-        "QUESTIONS:",
-        "QUESTION|추가 질문",
-        "필드 값이 없으면 null을 사용하고, title/detail/label/reason/question 안에는 | 문자를 쓰지 말라.",
-      ].join("\n"),
+      instructions: buildRepairInstructions(responseMode),
       input: repairSource,
       reasoning: {
         effort: "low",
@@ -133,7 +129,7 @@ async function resolveMakerAssistantResult(
     const repairedText = extractResponseText(repaired);
 
     try {
-      return parseMakerAssistantResult(repairedText);
+      return parseMakerAssistantResult(repairedText, responseMode);
     } catch (repairError) {
       console.warn(`[maker-assistant] repair attempt ${attempt} failed`, repairError);
       repairSource = repairedText;
@@ -141,6 +137,36 @@ async function resolveMakerAssistantResult(
   }
 
   throw new Error("모델 응답을 유효한 JSON 결과로 복구하지 못했습니다.");
+}
+
+/** 파싱 실패 시 기대 모드에 맞는 line 포맷으로만 다시 정리하도록 모델에 지시한다. */
+function buildRepairInstructions(responseMode: "guide" | "draft"): string {
+  if (responseMode === "draft") {
+    return [
+      "주어진 초안 텍스트를 아래 draft line 포맷으로만 다시 정리하라.",
+      "JSON, 마크다운, 코드펜스, 분석 문장, 머리말은 금지한다.",
+      "TITLE:",
+      "짧은 제목 또는 비워둘 수 있음",
+      "BODY:",
+      "실제 삽입용 본문",
+      "NOTES:",
+      "NOTE|짧은 메모",
+    ].join("\n");
+  }
+
+  return [
+    "주어진 초안 텍스트를 아래 guide line 포맷으로만 다시 정리하라.",
+    "JSON, 마크다운, 코드펜스, 설명 문장은 금지한다.",
+    "SUMMARY:",
+    "요약 문장",
+    "FINDINGS:",
+    "FINDING|warning|3|null|null|null|제목|상세 설명",
+    "ACTIONS:",
+    "ACTION|3|작업 라벨|이유",
+    "QUESTIONS:",
+    "QUESTION|추가 질문",
+    "필드 값이 없으면 null을 사용하고, title/detail/label/reason/question 안에는 | 문자를 쓰지 말라.",
+  ].join("\n");
 }
 
 /** raw response의 message/output_text 블록을 합쳐 텍스트 본문만 꺼낸다. */

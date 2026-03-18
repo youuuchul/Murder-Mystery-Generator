@@ -45,6 +45,7 @@ const ta = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 tex
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const sel = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const DEFAULT_TIMELINE_SLOT_LABELS = ["19:00", "19:30", "20:00", "20:30"];
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 /** 타임라인 슬롯 1개를 생성한다. */
 function createTimelineSlot(label = ""): TimelineSlot {
@@ -79,7 +80,7 @@ export default function StoryEditor({
   onSave,
   saving,
 }: StoryEditorProps) {
-  const [uploadingMapImage, setUploadingMapImage] = useState(false);
+  const [uploadingAssetTarget, setUploadingAssetTarget] = useState<string | null>(null);
 
   function updateStory<K extends keyof Story>(key: K, value: Story[K]) {
     onChangeStory({ ...story, [key]: value });
@@ -118,6 +119,39 @@ export default function StoryEditor({
   }
 
   /**
+   * Step 2 공개 이미지들을 같은 story scope로 업로드해 내부 에셋 URL을 반환한다.
+   */
+  async function uploadStoryImage(file: File, label: string): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "story");
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? `${label} 업로드 실패`);
+        return null;
+      }
+
+      return data.url as string;
+    } catch (error) {
+      console.error(`${label} 업로드 실패:`, error);
+      alert(`${label} 업로드 중 오류가 발생했습니다.`);
+      return null;
+    }
+  }
+
+  /** 현재 어떤 대상 이미지가 업로드 중인지 비교해 버튼 상태를 제어한다. */
+  function isUploadingAsset(target: string): boolean {
+    return uploadingAssetTarget === target;
+  }
+
+  /**
    * 대표 지도 이미지를 업로드하고 story.mapImageUrl에 내부 에셋 URL을 연결한다.
    * 라운드 override가 없을 때 플레이어/GM 공통 기본 이미지로 사용된다.
    */
@@ -129,31 +163,47 @@ export default function StoryEditor({
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("scope", "story");
-
-    setUploadingMapImage(true);
-
-    try {
-      const res = await fetch(`/api/games/${gameId}/assets`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error ?? "대표 지도 업로드 실패");
-        return;
-      }
-
-      updateStory("mapImageUrl", data.url);
-    } catch (error) {
-      console.error("대표 지도 업로드 실패:", error);
-      alert("대표 지도 업로드 중 오류가 발생했습니다.");
-    } finally {
-      setUploadingMapImage(false);
+    setUploadingAssetTarget("map");
+    const uploadedUrl = await uploadStoryImage(file, "대표 지도");
+    if (uploadedUrl) {
+      updateStory("mapImageUrl", uploadedUrl);
     }
+    setUploadingAssetTarget(null);
+  }
+
+  /** 피해자 사진을 업로드하고 공개 인물 정보 카드에 사용할 URL을 연결한다. */
+  async function handleVictimImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setUploadingAssetTarget("victim");
+    const uploadedUrl = await uploadStoryImage(file, "피해자 사진");
+    if (uploadedUrl) {
+      updateVictim("imageUrl", uploadedUrl);
+    }
+    setUploadingAssetTarget(null);
+  }
+
+  /** NPC 사진을 업로드하고 해당 NPC의 공개 인물 이미지 URL을 갱신한다. */
+  async function handleNpcImageUpload(index: number, npcId: string, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const target = `npc:${npcId}`;
+    setUploadingAssetTarget(target);
+    const uploadedUrl = await uploadStoryImage(file, "NPC 사진");
+    if (uploadedUrl) {
+      updateNpc(index, { imageUrl: uploadedUrl });
+    }
+    setUploadingAssetTarget(null);
   }
 
   return (
@@ -266,13 +316,13 @@ export default function StoryEditor({
           <label className="shrink-0">
             <input
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept={IMAGE_ACCEPT}
               className="hidden"
               onChange={handleMapImageUpload}
-              disabled={uploadingMapImage}
+              disabled={isUploadingAsset("map")}
             />
             <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-              {uploadingMapImage ? "업로드 중…" : "이미지 업로드"}
+              {isUploadingAsset("map") ? "업로드 중…" : "이미지 업로드"}
             </span>
           </label>
         </div>
@@ -314,6 +364,27 @@ export default function StoryEditor({
           <span className="text-xs text-dark-500">(플레이어 인물 정보에서 공개)</span>
         </div>
 
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-dark-200">피해자 사진 업로드</p>
+            <p className="mt-1 text-xs text-dark-500">
+              플레이어 인물 정보 탭과 캐릭터 선택 화면에서 쓸 이미지를 바로 올립니다.
+            </p>
+          </div>
+          <label className="shrink-0">
+            <input
+              type="file"
+              accept={IMAGE_ACCEPT}
+              className="hidden"
+              onChange={handleVictimImageUpload}
+              disabled={isUploadingAsset("victim")}
+            />
+            <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
+              {isUploadingAsset("victim") ? "업로드 중…" : "이미지 업로드"}
+            </span>
+          </label>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="피해자 이름" required>
             <input
@@ -334,6 +405,26 @@ export default function StoryEditor({
             />
           </Field>
         </div>
+
+        {story.victim.imageUrl ? (
+          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
+            <img
+              src={story.victim.imageUrl}
+              alt={story.victim.name || "피해자 사진 미리보기"}
+              className="h-56 w-full object-cover"
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
+              <p className="truncate text-xs text-dark-500">{story.victim.imageUrl}</p>
+              <button
+                type="button"
+                onClick={() => updateVictim("imageUrl", undefined)}
+                className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
+              >
+                이미지 제거
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <Field label="배경">
           <textarea
@@ -384,6 +475,27 @@ export default function StoryEditor({
                   </button>
                 </div>
 
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-dark-200">NPC 사진 업로드</p>
+                    <p className="mt-1 text-xs text-dark-500">
+                      공개 인물 정보 패널에서 사용할 이미지를 바로 연결합니다.
+                    </p>
+                  </div>
+                  <label className="shrink-0">
+                    <input
+                      type="file"
+                      accept={IMAGE_ACCEPT}
+                      className="hidden"
+                      onChange={(event) => handleNpcImageUpload(index, npc.id, event)}
+                      disabled={isUploadingAsset(`npc:${npc.id}`)}
+                    />
+                    <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
+                      {isUploadingAsset(`npc:${npc.id}`) ? "업로드 중…" : "이미지 업로드"}
+                    </span>
+                  </label>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="이름" required>
                     <input
@@ -404,6 +516,26 @@ export default function StoryEditor({
                     />
                   </Field>
                 </div>
+
+                {npc.imageUrl ? (
+                  <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
+                    <img
+                      src={npc.imageUrl}
+                      alt={npc.name || `NPC ${index + 1} 사진 미리보기`}
+                      className="h-48 w-full object-cover"
+                    />
+                    <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
+                      <p className="truncate text-xs text-dark-500">{npc.imageUrl}</p>
+                      <button
+                        type="button"
+                        onClick={() => updateNpc(index, { imageUrl: undefined })}
+                        className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
+                      >
+                        이미지 제거
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 <Field label="배경">
                   <textarea

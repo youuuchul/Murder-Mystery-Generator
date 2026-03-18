@@ -52,7 +52,11 @@ export async function GET(req: Request, { params }: Params) {
 /** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 */
 export async function PATCH(req: Request, { params }: Params) {
   const { sessionId } = params;
-  const body = await req.json().catch(() => ({})) as { action?: string; subPhase?: string };
+  const body = await req.json().catch(() => ({})) as {
+    action?: string;
+    subPhase?: string;
+    playerId?: string;
+  };
 
   const session = getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -119,6 +123,36 @@ export async function PATCH(req: Request, { params }: Params) {
     newPhase = "ending";
     sharedState.endingStage = "complete";
     message = "GM이 세션을 종료했습니다.";
+  } else if (body.action === "unlock_slot") {
+    if (!body.playerId) {
+      return NextResponse.json({ error: "playerId가 필요합니다." }, { status: 400 });
+    }
+
+    const slot = sharedState.characterSlots.find((item) => item.playerId === body.playerId);
+    if (!slot) {
+      return NextResponse.json({ error: "해당 캐릭터 슬롯을 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    const releasedPlayerName = slot.playerName ?? "플레이어";
+    const releasedToken = slot.token;
+
+    slot.playerName = null;
+    slot.token = null;
+    slot.isLocked = false;
+
+    session.playerStates = session.playerStates.filter((playerState) => playerState.playerId !== body.playerId);
+
+    if (releasedToken) {
+      delete session.votes[releasedToken];
+    }
+    sharedState.voteCount = Object.keys(session.votes).length;
+
+    sharedState.eventLog.push({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      message: `${releasedPlayerName}님의 슬롯 잠금이 해제됐습니다. 다시 참가할 수 있습니다.`,
+      type: "system",
+    });
   }
 
   sharedState.phase = newPhase;

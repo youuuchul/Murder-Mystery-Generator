@@ -724,9 +724,13 @@ function SessionCode({ code }: { code: string }) {
 function SlotCard({
   slot,
   playerName,
+  unlocking,
+  onUnlock,
 }: {
   slot: CharacterSlot;
   playerName: string;
+  unlocking: boolean;
+  onUnlock: (playerId: string) => void;
 }) {
   return (
     <div
@@ -757,6 +761,17 @@ function SlotCard({
           {slot.isLocked ? "참가" : "미참가"}
         </span>
       </div>
+
+      {slot.isLocked && (
+        <button
+          type="button"
+          onClick={() => onUnlock(slot.playerId)}
+          disabled={unlocking}
+          className="w-full rounded-lg border border-orange-900/50 px-3 py-2 text-xs text-orange-300 hover:bg-orange-950/20 transition-colors disabled:opacity-50"
+        >
+          {unlocking ? "해제 중…" : "재참가 허용"}
+        </button>
+      )}
     </div>
   );
 }
@@ -801,6 +816,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const [revealingVote, setRevealingVote] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [endingSession, setEndingSession] = useState(false);
+  const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
 
   // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 세션 상태 동기화
@@ -988,6 +1004,46 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
     setDeleting(false);
     // session_deleted SSE 이벤트로 setSession(null) 처리됨
+  }
+
+  async function unlockSlot(playerId: string) {
+    if (!session) return;
+
+    const slot = session.sharedState.characterSlots.find((item) => item.playerId === playerId);
+    if (!slot?.isLocked) return;
+
+    const targetName = game.players.find((item) => item.id === playerId)?.name ?? "해당 캐릭터";
+    if (!confirm(`${targetName} 슬롯 잠금을 해제하고 다시 참가할 수 있게 하시겠습니까?`)) return;
+
+    setUnlockingPlayerId(playerId);
+
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unlock_slot", playerId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "슬롯 잠금 해제 실패");
+        return;
+      }
+
+      const data = await res.json();
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              sharedState: data.session.sharedState,
+            }
+          : prev
+      );
+    } catch {
+      alert("슬롯 잠금 해제 중 오류가 발생했습니다.");
+    } finally {
+      setUnlockingPlayerId(null);
+    }
   }
 
   const phase = session?.sharedState.phase ?? "lobby";
@@ -1236,6 +1292,8 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
                     key={slot.playerId}
                     slot={slot}
                     playerName={character?.name || "(이름 없음)"}
+                    unlocking={unlockingPlayerId === slot.playerId}
+                    onUnlock={unlockSlot}
                   />
                 );
               })}

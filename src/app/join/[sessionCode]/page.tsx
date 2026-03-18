@@ -5,6 +5,19 @@ import { useRouter, useParams } from "next/navigation";
 import type { GamePackage } from "@/types/game";
 import type { GameSession } from "@/types/session";
 
+interface ResumeSessionResponse {
+  gameId: string;
+  playerState: {
+    playerId: string;
+  };
+}
+
+interface JoinActionResponse {
+  token: string;
+  sessionId: string;
+  gameId: string;
+  playerId: string;
+}
 
 export default function JoinPage() {
   const { sessionCode } = useParams() as { sessionCode: string };
@@ -14,10 +27,14 @@ export default function JoinPage() {
   const [game, setGame] = useState<GamePackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [resumeMessage, setResumeMessage] = useState("");
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [joining, setJoining] = useState(false);
+
+  const selectedSlot = session?.sharedState.characterSlots.find((slot) => slot.playerId === selectedPlayerId) ?? null;
+  const isRejoinFlow = Boolean(selectedSlot?.isLocked);
 
   useEffect(() => {
     async function fetchSession() {
@@ -30,15 +47,42 @@ export default function JoinPage() {
       const data = await res.json();
       setSession(data.session);
       setGame(data.game);
+
+      const savedToken = localStorage.getItem(`mm_${data.session.id}`);
+      if (!savedToken) {
+        setLoading(false);
+        return;
+      }
+
+      setResumeMessage("기존 참가 정보를 확인하는 중…");
+
+      try {
+        const resumeRes = await fetch(`/api/sessions/${data.session.id}?token=${savedToken}`);
+
+        if (!resumeRes.ok) {
+          localStorage.removeItem(`mm_${data.session.id}`);
+          setResumeMessage("");
+          setLoading(false);
+          return;
+        }
+
+        const resumeData = await resumeRes.json() as ResumeSessionResponse;
+        router.replace(`/play/${resumeData.gameId}/${resumeData.playerState.playerId}?s=${data.session.id}`);
+        return;
+      } catch {
+        setResumeMessage("");
+      }
+
       setLoading(false);
     }
     fetchSession();
-  }, [sessionCode]);
+  }, [router, sessionCode]);
 
   async function handleJoin() {
     if (!selectedPlayerId || !playerName.trim() || !session) return;
     setJoining(true);
-    const res = await fetch(`/api/sessions/${session.id}/join`, {
+    const endpoint = isRejoinFlow ? "rejoin" : "join";
+    const res = await fetch(`/api/sessions/${session.id}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playerId: selectedPlayerId, playerName: playerName.trim() }),
@@ -49,7 +93,7 @@ export default function JoinPage() {
       setJoining(false);
       return;
     }
-    const { token, sessionId, gameId, playerId } = await res.json();
+    const { token, sessionId, gameId, playerId } = await res.json() as JoinActionResponse;
     // token 저장
     localStorage.setItem(`mm_${sessionId}`, token);
     router.push(`/play/${gameId}/${playerId}?s=${sessionId}`);
@@ -58,7 +102,7 @@ export default function JoinPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center">
-        <p className="text-dark-400 animate-pulse">로딩 중…</p>
+        <p className="text-dark-400 animate-pulse">{resumeMessage || "로딩 중…"}</p>
       </div>
     );
   }
@@ -104,14 +148,15 @@ export default function JoinPage() {
                 <button
                   key={slot.playerId}
                   type="button"
-                  disabled={taken}
-                  onClick={() => !taken && setSelectedPlayerId(slot.playerId)}
+                  onClick={() => setSelectedPlayerId(slot.playerId)}
                   className={[
                     "w-full text-left p-4 rounded-xl border transition-all",
-                    taken
-                      ? "border-dark-800 bg-dark-900/30 opacity-50 cursor-not-allowed"
-                      : selected
-                      ? "border-mystery-600 bg-mystery-950/30 ring-1 ring-mystery-600"
+                    selected
+                      ? taken
+                        ? "border-amber-700 bg-amber-950/20 ring-1 ring-amber-700"
+                        : "border-mystery-600 bg-mystery-950/30 ring-1 ring-mystery-600"
+                      : taken
+                      ? "border-dark-700 bg-dark-900/60 hover:border-amber-800"
                       : "border-dark-700 bg-dark-900 hover:border-dark-500",
                   ].join(" ")}
                 >
@@ -125,7 +170,7 @@ export default function JoinPage() {
                       )}
                     </div>
                     {taken ? (
-                      <span className="text-xs text-dark-600 shrink-0">참가 중</span>
+                      <span className="text-xs text-amber-400 shrink-0">복귀 가능</span>
                     ) : selected ? (
                       <span className="text-xs text-mystery-400 shrink-0">선택됨</span>
                     ) : null}
@@ -140,13 +185,18 @@ export default function JoinPage() {
         {selectedPlayerId && (
           <div className="bg-dark-900 border border-mystery-800 rounded-xl p-4 space-y-3">
             <p className="text-sm font-medium text-dark-300">
-              {game.players.find((p) => p.id === selectedPlayerId)?.name} 로 참가
+              {game.players.find((p) => p.id === selectedPlayerId)?.name} {isRejoinFlow ? "복귀" : "로 참가"}
+            </p>
+            <p className="text-xs text-dark-500">
+              {isRejoinFlow
+                ? "처음 참가할 때 입력한 실제 이름을 그대로 입력해야 복귀할 수 있습니다."
+                : "플레이어를 식별할 실제 이름을 입력하세요. 나중에 재접속할 때도 이 이름으로 확인합니다."}
             </p>
             <input
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="실제 이름을 입력하세요"
+              placeholder={isRejoinFlow ? "처음 참가 때 입력한 이름" : "실제 이름을 입력하세요"}
               maxLength={20}
               className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition text-sm"
               onKeyDown={(e) => e.key === "Enter" && handleJoin()}
@@ -156,7 +206,7 @@ export default function JoinPage() {
               disabled={!playerName.trim() || joining}
               className="w-full py-3 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {joining ? "참가 중…" : "참가하기"}
+              {joining ? (isRejoinFlow ? "복귀 중…" : "참가 중…") : (isRejoinFlow ? "복귀하기" : "참가하기")}
             </button>
           </div>
         )}

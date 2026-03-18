@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
-type AssetScope = "covers" | "locations";
+type AssetScope = "covers" | "locations" | "story";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const MIME_EXTENSION_MAP: Record<string, string> = {
@@ -28,7 +28,11 @@ function ensureAssetDir(gameId: string, scope: AssetScope): string {
 
 /** 폼데이터의 에셋 분류를 읽어 안전한 저장 경로 이름으로 정규화한다. */
 function normalizeAssetScope(value: FormDataEntryValue | null): AssetScope {
-  return value === "covers" ? "covers" : "locations";
+  if (value === "covers" || value === "locations" || value === "story") {
+    return value;
+  }
+
+  return "locations";
 }
 
 /**

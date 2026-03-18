@@ -128,6 +128,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           )}
           {currentStep === 2 && (
             <StoryEditor
+              gameId={game.id}
               story={game.story}
               opening={game.scripts.opening}
               players={game.players ?? []}

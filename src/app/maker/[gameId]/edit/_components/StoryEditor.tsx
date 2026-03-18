@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
-import Button from "@/components/ui/Button";
+import { useState } from "react";
+import ImageAssetField from "./ImageAssetField";
 import type {
   GamePackage,
   Player,
@@ -20,8 +20,6 @@ interface StoryEditorProps {
   players: Player[];
   onChangeStory: (story: Story) => void;
   onChangeOpening: (opening: ScriptSegment) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 function Field({ label, hint, required, children }: {
@@ -45,7 +43,6 @@ const ta = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 tex
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const sel = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const DEFAULT_TIMELINE_SLOT_LABELS = ["19:00", "19:30", "20:00", "20:30"];
-const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 /** 타임라인 슬롯 1개를 생성한다. */
 function createTimelineSlot(label = ""): TimelineSlot {
@@ -77,8 +74,6 @@ export default function StoryEditor({
   players,
   onChangeStory,
   onChangeOpening,
-  onSave,
-  saving,
 }: StoryEditorProps) {
   const [uploadingAssetTarget, setUploadingAssetTarget] = useState<string | null>(null);
 
@@ -155,14 +150,7 @@ export default function StoryEditor({
    * 대표 지도 이미지를 업로드하고 story.mapImageUrl에 내부 에셋 URL을 연결한다.
    * 라운드 override가 없을 때 플레이어/GM 공통 기본 이미지로 사용된다.
    */
-  async function handleMapImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  async function handleMapImageUpload(file: File) {
     setUploadingAssetTarget("map");
     const uploadedUrl = await uploadStoryImage(file, "대표 지도");
     if (uploadedUrl) {
@@ -172,14 +160,7 @@ export default function StoryEditor({
   }
 
   /** 피해자 사진을 업로드하고 공개 인물 정보 카드에 사용할 URL을 연결한다. */
-  async function handleVictimImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  async function handleVictimImageUpload(file: File) {
     setUploadingAssetTarget("victim");
     const uploadedUrl = await uploadStoryImage(file, "피해자 사진");
     if (uploadedUrl) {
@@ -189,14 +170,7 @@ export default function StoryEditor({
   }
 
   /** NPC 사진을 업로드하고 해당 NPC의 공개 인물 이미지 URL을 갱신한다. */
-  async function handleNpcImageUpload(index: number, npcId: string, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  async function handleNpcImageUpload(index: number, npcId: string, file: File) {
     const target = `npc:${npcId}`;
     setUploadingAssetTarget(target);
     const uploadedUrl = await uploadStoryImage(file, "NPC 사진");
@@ -306,56 +280,20 @@ export default function StoryEditor({
           </p>
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-dark-200">대표 지도 업로드</p>
-            <p className="mt-1 text-xs text-dark-500">
-              URL 입력 없이 바로 업로드해 기본 공통 이미지로 사용할 수 있습니다.
-            </p>
-          </div>
-          <label className="shrink-0">
-            <input
-              type="file"
-              accept={IMAGE_ACCEPT}
-              className="hidden"
-              onChange={handleMapImageUpload}
-              disabled={isUploadingAsset("map")}
-            />
-            <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-              {isUploadingAsset("map") ? "업로드 중…" : "이미지 업로드"}
-            </span>
-          </label>
-        </div>
-
-        <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 보드에 띄울 기본 지도 또는 참고 이미지입니다.">
-          <input
-            type="url"
-            value={story.mapImageUrl ?? ""}
-            onChange={(e) => updateStory("mapImageUrl", e.target.value || undefined)}
-            placeholder="https://..."
-            className={inp}
-          />
-        </Field>
-
-        {story.mapImageUrl ? (
-          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-            <img
-              src={story.mapImageUrl}
-              alt="대표 지도 미리보기"
-              className="h-56 w-full object-cover"
-            />
-            <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
-              <p className="truncate text-xs text-dark-500">{story.mapImageUrl}</p>
-              <button
-                type="button"
-                onClick={() => updateStory("mapImageUrl", undefined)}
-                className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
-              >
-                이미지 제거
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <ImageAssetField
+          title="대표 지도 업로드"
+          description="라운드별 override가 없으면 이 이미지를 계속 사용합니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+          value={story.mapImageUrl}
+          alt="대표 지도 미리보기"
+          profile="map"
+          onChange={(nextValue) => updateStory("mapImageUrl", nextValue)}
+          onUpload={handleMapImageUpload}
+          uploading={isUploadingAsset("map")}
+          uploadLabel="이미지 업로드"
+          emptyStateLabel="아직 연결된 대표 지도 이미지가 없습니다."
+          urlLabel="대표 지도 / 참고 이미지 URL"
+          urlHint="GM 메인 보드에 띄울 기본 지도 또는 참고 이미지입니다."
+        />
       </div>
 
       <div className="rounded-xl border border-dark-700 p-5 space-y-4">
@@ -364,67 +302,29 @@ export default function StoryEditor({
           <span className="text-xs text-dark-500">(플레이어 인물 정보에서 공개)</span>
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-dark-200">피해자 사진 업로드</p>
-            <p className="mt-1 text-xs text-dark-500">
-              플레이어 인물 정보 탭과 캐릭터 선택 화면에서 쓸 이미지를 바로 올립니다.
-            </p>
-          </div>
-          <label className="shrink-0">
-            <input
-              type="file"
-              accept={IMAGE_ACCEPT}
-              className="hidden"
-              onChange={handleVictimImageUpload}
-              disabled={isUploadingAsset("victim")}
-            />
-            <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-              {isUploadingAsset("victim") ? "업로드 중…" : "이미지 업로드"}
-            </span>
-          </label>
-        </div>
+        <Field label="피해자 이름" required>
+          <input
+            type="text"
+            value={story.victim.name}
+            onChange={(e) => updateVictim("name", e.target.value)}
+            placeholder="예: 헨리 브라운 경"
+            className={inp}
+          />
+        </Field>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="피해자 이름" required>
-            <input
-              type="text"
-              value={story.victim.name}
-              onChange={(e) => updateVictim("name", e.target.value)}
-              placeholder="예: 헨리 브라운 경"
-              className={inp}
-            />
-          </Field>
-          <Field label="피해자 사진 URL">
-            <input
-              type="url"
-              value={story.victim.imageUrl ?? ""}
-              onChange={(e) => updateVictim("imageUrl", e.target.value || undefined)}
-              placeholder="https://..."
-              className={inp}
-            />
-          </Field>
-        </div>
-
-        {story.victim.imageUrl ? (
-          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-            <img
-              src={story.victim.imageUrl}
-              alt={story.victim.name || "피해자 사진 미리보기"}
-              className="h-56 w-full object-cover"
-            />
-            <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
-              <p className="truncate text-xs text-dark-500">{story.victim.imageUrl}</p>
-              <button
-                type="button"
-                onClick={() => updateVictim("imageUrl", undefined)}
-                className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
-              >
-                이미지 제거
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <ImageAssetField
+          title="피해자 사진"
+          description="플레이어 인물 정보 탭과 캐릭터 선택 화면에서 쓸 이미지를 연결합니다."
+          value={story.victim.imageUrl}
+          alt={story.victim.name || "피해자 사진 미리보기"}
+          profile="portrait"
+          onChange={(nextValue) => updateVictim("imageUrl", nextValue)}
+          onUpload={handleVictimImageUpload}
+          uploading={isUploadingAsset("victim")}
+          uploadLabel="이미지 업로드"
+          emptyStateLabel="아직 연결된 피해자 사진이 없습니다."
+          urlLabel="피해자 사진 URL"
+        />
 
         <Field label="배경">
           <textarea
@@ -475,67 +375,29 @@ export default function StoryEditor({
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-dark-200">NPC 사진 업로드</p>
-                    <p className="mt-1 text-xs text-dark-500">
-                      공개 인물 정보 패널에서 사용할 이미지를 바로 연결합니다.
-                    </p>
-                  </div>
-                  <label className="shrink-0">
-                    <input
-                      type="file"
-                      accept={IMAGE_ACCEPT}
-                      className="hidden"
-                      onChange={(event) => handleNpcImageUpload(index, npc.id, event)}
-                      disabled={isUploadingAsset(`npc:${npc.id}`)}
-                    />
-                    <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-                      {isUploadingAsset(`npc:${npc.id}`) ? "업로드 중…" : "이미지 업로드"}
-                    </span>
-                  </label>
-                </div>
+                <Field label="이름" required>
+                  <input
+                    type="text"
+                    value={npc.name}
+                    onChange={(e) => updateNpc(index, { name: e.target.value })}
+                    placeholder="예: 집사 마거릿"
+                    className={inp}
+                  />
+                </Field>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="이름" required>
-                    <input
-                      type="text"
-                      value={npc.name}
-                      onChange={(e) => updateNpc(index, { name: e.target.value })}
-                      placeholder="예: 집사 마거릿"
-                      className={inp}
-                    />
-                  </Field>
-                  <Field label="사진 URL">
-                    <input
-                      type="url"
-                      value={npc.imageUrl ?? ""}
-                      onChange={(e) => updateNpc(index, { imageUrl: e.target.value || undefined })}
-                      placeholder="https://..."
-                      className={inp}
-                    />
-                  </Field>
-                </div>
-
-                {npc.imageUrl ? (
-                  <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-                    <img
-                      src={npc.imageUrl}
-                      alt={npc.name || `NPC ${index + 1} 사진 미리보기`}
-                      className="h-48 w-full object-cover"
-                    />
-                    <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
-                      <p className="truncate text-xs text-dark-500">{npc.imageUrl}</p>
-                      <button
-                        type="button"
-                        onClick={() => updateNpc(index, { imageUrl: undefined })}
-                        className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
-                      >
-                        이미지 제거
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+                <ImageAssetField
+                  title="NPC 사진"
+                  description="공개 인물 정보 패널에서 사용할 이미지를 연결합니다."
+                  value={npc.imageUrl}
+                  alt={npc.name || `NPC ${index + 1} 사진 미리보기`}
+                  profile="portrait"
+                  onChange={(nextValue) => updateNpc(index, { imageUrl: nextValue })}
+                  onUpload={(file) => handleNpcImageUpload(index, npc.id, file)}
+                  uploading={isUploadingAsset(`npc:${npc.id}`)}
+                  uploadLabel="이미지 업로드"
+                  emptyStateLabel="아직 연결된 NPC 사진이 없습니다."
+                  urlLabel="NPC 사진 URL"
+                />
 
                 <Field label="배경">
                   <textarea
@@ -642,12 +504,6 @@ export default function StoryEditor({
             </p>
           </div>
         )}
-      </div>
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">
-          저장
-        </Button>
       </div>
     </div>
   );

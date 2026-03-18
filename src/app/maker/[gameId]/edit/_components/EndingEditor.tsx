@@ -1,6 +1,5 @@
 "use client";
 
-import Button from "@/components/ui/Button";
 import type {
   AuthorNote,
   EndingBranch,
@@ -13,8 +12,6 @@ interface EndingEditorProps {
   ending: EndingConfig;
   players: Player[];
   onChange: (ending: EndingConfig) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
@@ -63,8 +60,6 @@ export default function EndingEditor({
   ending,
   players,
   onChange,
-  onSave,
-  saving,
 }: EndingEditorProps) {
   function updateBranch(index: number, partial: Partial<EndingBranch>) {
     onChange({
@@ -406,12 +401,6 @@ export default function EndingEditor({
             )}
           </div>
         )}
-      </div>
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">
-          저장
-        </Button>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import Button from "@/components/ui/Button";
+import ImageAssetField from "./ImageAssetField";
 import type { Location, Clue, GameRules, Player, ClueCondition, ClueConditionType } from "@/types/game";
 
 interface LocationEditorProps {
@@ -13,8 +14,6 @@ interface LocationEditorProps {
   onChangeLocations: (locations: Location[]) => void;
   onChangeClues: (clues: Clue[]) => void;
   onChangeRules: (rules: GameRules) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 const CLUE_TYPES: { value: Clue["type"]; label: string }[] = [
@@ -242,14 +241,7 @@ function LocationBlock({
    * 장소 대표 이미지를 업로드하고, 응답으로 받은 내부 자산 URL을 장소 데이터에 연결한다.
    * 파일 자체는 `data/games/{gameId}/assets/locations` 아래에 저장된다.
    */
-  async function handleLocationImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  async function handleLocationImageUpload(file: File) {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -393,50 +385,19 @@ function LocationBlock({
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <label className="block text-xs font-medium text-dark-400 mb-1">장소 대표 이미지</label>
-                <p className="text-xs text-dark-600">
-                  플레이어 장소 카드에 함께 노출될 이미지입니다. 업로드 후 저장해야 최종 반영됩니다.
-                </p>
-              </div>
-              <label className="shrink-0">
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  onChange={handleLocationImageUpload}
-                  disabled={uploadingImage}
-                />
-                <span className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-dark-600 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-                  {uploadingImage ? "업로드 중…" : "이미지 업로드"}
-                </span>
-              </label>
-            </div>
-
-            {location.imageUrl ? (
-              <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-                <img
-                  src={location.imageUrl}
-                  alt={location.name || "장소 이미지 미리보기"}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-dark-700 bg-dark-900/60">
-                  <p className="text-xs text-dark-500 truncate">{location.imageUrl}</p>
-                  <button
-                    type="button"
-                    onClick={() => update("imageUrl", undefined)}
-                    className="text-xs text-dark-500 hover:text-red-400 transition-colors shrink-0"
-                  >
-                    이미지 제거
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6 border border-dashed border-dark-700 rounded-xl">
-                <p className="text-xs text-dark-600">아직 업로드된 장소 이미지가 없습니다.</p>
-              </div>
-            )}
+            <ImageAssetField
+              title="장소 대표 이미지"
+              description="플레이어 장소 카드에 함께 노출됩니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+              value={location.imageUrl}
+              alt={location.name || "장소 이미지 미리보기"}
+              profile="location"
+              onChange={(nextValue) => update("imageUrl", nextValue)}
+              onUpload={handleLocationImageUpload}
+              uploading={uploadingImage}
+              uploadLabel="이미지 업로드"
+              emptyStateLabel="아직 연결된 장소 이미지가 없습니다."
+              urlLabel="장소 대표 이미지 URL"
+            />
           </div>
 
           {/* 장소 입장 조건 */}
@@ -476,6 +437,7 @@ function LocationBlock({
                 {clues.map((clue) => (
                   <ClueForm
                     key={clue.id}
+                    gameId={gameId}
                     clue={clue}
                     allClues={allClues}
                     allCharacters={allCharacters}
@@ -494,12 +456,14 @@ function LocationBlock({
 
 /** 단서 카드 1개 폼 */
 function ClueForm({
+  gameId,
   clue,
   allClues,
   allCharacters,
   onChange,
   onDelete,
 }: {
+  gameId: string;
   clue: Clue;
   allClues: Clue[];
   allCharacters: Player[];
@@ -507,11 +471,43 @@ function ClueForm({
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const typeInfo = CLUE_TYPES.find((t) => t.value === clue.type);
   const isSceneClue = clue.type === "scene";
 
   function update<K extends keyof Clue>(key: K, value: Clue[K]) {
     onChange({ ...clue, [key]: value });
+  }
+
+  /**
+   * 단서 이미지를 업로드하고 인벤토리/상세 카드에서 사용할 내부 에셋 URL을 기록한다.
+   * 파일은 `data/games/{gameId}/assets/clues` 아래에 저장된다.
+   */
+  async function handleClueImageUpload(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "clues");
+
+    setUploadingImage(true);
+    try {
+      const res = await fetch(`/api/games/${gameId}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? "단서 이미지 업로드 실패");
+        return;
+      }
+
+      update("imageUrl", data.url);
+    } catch (error) {
+      console.error("단서 이미지 업로드 실패:", error);
+      alert("단서 이미지 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   return (
@@ -604,32 +600,20 @@ function ClueForm({
             </div>
           )}
 
-          <div>
-            <label className="block text-xs text-dark-500 mb-1">
-              단서 이미지 URL
-              <span className="text-dark-600 ml-1">인벤토리와 상세 카드에 함께 표시됩니다.</span>
-            </label>
-            <input
-              type="url"
-              value={clue.imageUrl ?? ""}
-              onChange={(e) => update("imageUrl", e.target.value || undefined)}
-              placeholder="https://..."
-              className={inputClass}
-            />
-            {clue.imageUrl ? (
-              <div className="mt-2 overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-                <img
-                  src={clue.imageUrl}
-                  alt={clue.title || "단서 이미지 미리보기"}
-                  className="w-full h-40 object-cover"
-                />
-              </div>
-            ) : (
-              <p className="text-xs text-dark-600 mt-2">
-                이미지가 없으면 플레이어 화면에서는 텍스트 카드만 표시됩니다.
-              </p>
-            )}
-          </div>
+          <ImageAssetField
+            title="단서 이미지"
+            description="인벤토리 카드와 상세 모달에 함께 표시됩니다. 문서형 단서는 잘리지 않도록 여백 포함 이미지를 권장합니다."
+            value={clue.imageUrl}
+            alt={clue.title || "단서 이미지 미리보기"}
+            profile="clue"
+            onChange={(nextValue) => update("imageUrl", nextValue)}
+            onUpload={handleClueImageUpload}
+            uploading={uploadingImage}
+            uploadLabel="단서 이미지 업로드"
+            emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
+            urlLabel="단서 이미지 URL"
+            urlHint="이미 호스팅된 카드 이미지가 있으면 외부 URL도 사용할 수 있습니다."
+          />
 
           {/* 단서 획득 조건 */}
           {!isSceneClue && (
@@ -663,8 +647,6 @@ export default function LocationEditor({
   onChangeLocations,
   onChangeClues,
   onChangeRules,
-  onSave,
-  saving,
 }: LocationEditorProps) {
   function addLocation() {
     onChangeLocations([...locations, createLocation()]);
@@ -820,10 +802,6 @@ export default function LocationEditor({
           })}
         </div>
       )}
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">저장</Button>
-      </div>
     </div>
   );
 }

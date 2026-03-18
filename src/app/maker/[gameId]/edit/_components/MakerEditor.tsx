@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
 import SettingsEditor from "./SettingsEditor";
 import StoryEditor from "./StoryEditor";
@@ -56,10 +56,13 @@ function pruneDanglingRelationships(players: Player[], story: Story): Player[] {
 }
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
+  const editVersionRef = useRef(0);
   const [game, setGame] = useState<GamePackage>(initialGame);
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const validation = validateMakerGame(game);
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
@@ -72,27 +75,96 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
 
       return next;
     });
+    editVersionRef.current += 1;
+    setHasUnsavedChanges(true);
+    setSaveError(null);
   }, []);
 
-  async function save(updatedGame: GamePackage = game) {
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  async function save(updatedGame: GamePackage = game): Promise<boolean> {
+    if (saving) {
+      return false;
+    }
+
+    const requestedEditVersion = editVersionRef.current;
     setSaving(true);
+    setSaveError(null);
     try {
       const res = await fetch(`/api/games/${updatedGame.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedGame),
       });
-      if (res.ok) {
-        const { game: saved } = await res.json();
-        setGame(saved);
-        setSavedAt(new Date().toLocaleTimeString("ko-KR"));
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "저장에 실패했습니다." }));
+        setSaveError(data.error ?? "저장에 실패했습니다.");
+        return false;
       }
+
+      const { game: saved } = await res.json();
+      if (editVersionRef.current === requestedEditVersion) {
+        setGame(saved);
+        setHasUnsavedChanges(false);
+      }
+      setSavedAt(new Date().toLocaleTimeString("ko-KR"));
+      return true;
     } catch (err) {
       console.error("저장 실패:", err);
+      setSaveError("저장 중 오류가 발생했습니다.");
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  async function moveToStep(step: number) {
+    if (step === currentStep || saving) {
+      return;
+    }
+
+    if (hasUnsavedChanges) {
+      const saved = await save();
+      if (!saved) {
+        return;
+      }
+    }
+
+    setCurrentStep(step);
+  }
+
+  const saveHeadline = saving
+    ? "저장 중..."
+    : saveError
+      ? "저장 실패"
+      : hasUnsavedChanges
+        ? "저장되지 않은 변경 있음"
+        : savedAt
+          ? `${savedAt} 저장 완료`
+          : "편집 준비 완료";
+
+  const saveHint = saving
+    ? "현재 스텝 변경사항을 서버에 기록하고 있습니다."
+    : saveError
+      ? saveError
+      : hasUnsavedChanges
+        ? "스텝 이동 시 현재 내용부터 먼저 저장합니다."
+        : "현재 화면의 변경사항이 모두 저장된 상태입니다.";
+
+  const saveButtonLabel = hasUnsavedChanges ? "지금 저장" : "저장 완료";
 
   return (
     <>
@@ -100,20 +172,17 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         <div className="bg-dark-900 border border-dark-800 rounded-2xl p-5">
           <StepWizard
             currentStep={currentStep}
-            onStepClick={(step) => setCurrentStep(step)}
+            onStepClick={(step) => { void moveToStep(step); }}
             allClickable
             stepIssues={validation.stepIssues}
           />
         </div>
 
-        {(savedAt || validation.issues.length > 0) && (
+        {validation.issues.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            {savedAt ? <p className="text-xs text-dark-500">{savedAt} 저장됨</p> : <span />}
-            {validation.issues.length > 0 && (
-              <p className="text-xs text-dark-500">
-                검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
-              </p>
-            )}
+            <p className="text-xs text-dark-500">
+              검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
+            </p>
           </div>
         )}
 
@@ -122,8 +191,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             <SettingsEditor
               game={game}
               onChange={updateGame}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
           {currentStep === 2 && (
@@ -139,19 +206,16 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                   opening,
                 },
               })}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
           {currentStep === 3 && (
             <PlayerEditor
+              gameId={game.id}
               players={game.players ?? []}
               clues={game.clues}
               story={game.story}
               timeline={game.story.timeline}
               onChange={(players) => updateGame({ players })}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
           {currentStep === 4 && (
@@ -164,8 +228,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               onChangeLocations={(locations) => updateGame({ locations })}
               onChangeClues={(clues) => updateGame({ clues })}
               onChangeRules={(rules) => updateGame({ rules })}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
           {currentStep === 5 && (
@@ -174,8 +236,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}
               onChange={(scripts) => updateGame({ scripts })}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
           {currentStep === 6 && (
@@ -183,23 +243,58 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               ending={game.ending}
               players={game.players ?? []}
               onChange={(ending) => updateGame({ ending })}
-              onSave={() => save({ ...game })}
-              saving={saving}
             />
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))} disabled={currentStep <= 1}>
-            ← 이전
-          </Button>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => save()} loading={saving}>저장</Button>
-            {currentStep < STEP_COUNT ? (
-              <Button onClick={() => setCurrentStep((s) => s + 1)}>다음 →</Button>
-            ) : (
-              <Button onClick={() => save()} loading={saving}>완료 & 저장</Button>
-            )}
+        <div className="sticky bottom-4 z-10">
+          <div className="flex flex-col gap-4 rounded-2xl border border-dark-700 bg-dark-950/95 px-5 py-4 shadow-2xl shadow-black/30 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className={`text-sm font-medium ${
+                saveError
+                  ? "text-red-300"
+                  : hasUnsavedChanges
+                    ? "text-yellow-300"
+                    : "text-emerald-300"
+              }`}>
+                {saveHeadline}
+              </p>
+              <p className="mt-1 text-xs text-dark-500">{saveHint}</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => { void moveToStep(Math.max(1, currentStep - 1)); }}
+                disabled={currentStep <= 1 || saving}
+              >
+                ← 이전
+              </Button>
+              {currentStep < STEP_COUNT ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => { void save(); }}
+                    loading={saving}
+                    disabled={saving || !hasUnsavedChanges}
+                  >
+                    {saveButtonLabel}
+                  </Button>
+                  <Button onClick={() => { void moveToStep(currentStep + 1); }} disabled={saving}>
+                    다음 →
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() => { void save(); }}
+                  loading={saving}
+                  disabled={saving || !hasUnsavedChanges}
+                >
+                  {hasUnsavedChanges ? "최종 저장" : "최종 저장 완료"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -433,6 +433,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     difficulty: game.settings?.difficulty ?? "normal",
     estimatedDuration: game.settings?.estimatedDuration ?? 120,
     tags: normalizeTags(game.settings ?? {}),
+    summary: asOptionalString(game.settings?.summary),
     coverImageUrl: asOptionalString(game.settings?.coverImageUrl),
   };
 
@@ -550,6 +551,7 @@ export function buildMetadataFromGame(game: GamePackage): GameMetadata {
       difficulty: game.settings.difficulty,
       tags: game.settings.tags,
       estimatedDuration: game.settings.estimatedDuration,
+      summary: game.settings.summary,
       coverImageUrl: game.settings.coverImageUrl,
     },
     playerCount: game.players?.length ?? 0,

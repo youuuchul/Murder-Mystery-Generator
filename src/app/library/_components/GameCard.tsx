@@ -69,6 +69,12 @@ export default function GameCard({ game }: GameCardProps) {
           {game.title}
         </h3>
 
+        {game.settings.summary ? (
+          <p className="text-sm leading-relaxed text-dark-400 line-clamp-3 min-h-[3.9rem]">
+            {game.settings.summary}
+          </p>
+        ) : null}
+
         {/* 배지 */}
         <div className="flex flex-wrap gap-1.5">
           <span
@@ -87,8 +93,6 @@ export default function GameCard({ game }: GameCardProps) {
         <div className="flex items-center gap-3 text-xs text-dark-400">
           <span title="인원 수">인원 {game.settings.playerCount}인</span>
           <span title="소요 시간">시간 {game.settings.estimatedDuration}분</span>
-          <span title="플레이어">플레이어 {game.playerCount}명</span>
-          <span title="단서 수">단서 {game.clueCount}개</span>
         </div>
 
         {/* 액션 버튼 */}

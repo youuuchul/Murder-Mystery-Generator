@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Button from "@/components/ui/Button";
 import type { Location, RoundScript, ScriptSegment, Scripts } from "@/types/game";
 
 interface ScriptEditorProps {
@@ -9,8 +8,6 @@ interface ScriptEditorProps {
   rounds: number;
   locations: Location[];
   onChange: (scripts: Scripts) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 type Tab = "lobby" | "rounds" | "vote";
@@ -465,8 +462,6 @@ export default function ScriptEditor({
   rounds,
   locations,
   onChange,
-  onSave,
-  saving,
 }: ScriptEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("lobby");
 
@@ -575,12 +570,6 @@ export default function ScriptEditor({
           textBadgeLabel="안내 텍스트"
         />
       )}
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">
-          저장
-        </Button>
-      </div>
     </div>
   );
 }

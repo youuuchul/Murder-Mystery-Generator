@@ -24,7 +24,7 @@ function sanitizeRound(round: RoundScript): RoundScript {
 
 /**
  * 특정 플레이어에게 보이지 않아야 하는 캐릭터 민감정보를 제거한다.
- * 현재 플레이어 본인 데이터는 원본 그대로 유지한다.
+ * 현재 플레이어 본인 데이터는 원본 그대로 유지하고, 공개 프로필 이미지는 노출을 허용한다.
  */
 function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
   if (viewerPlayerId && player.id === viewerPlayerId) {
@@ -41,7 +41,6 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
     alibi: "",
     timelineEntries: [],
     relatedClues: [],
-    cardImage: undefined,
   };
 }
 

@@ -33,6 +33,7 @@ const CreateGameSchema = z.object({
     difficulty: z.enum(["easy", "normal", "hard"]),
     tags: z.array(z.string().min(1)).min(1),
     estimatedDuration: z.number().int().min(30).max(300),
+    summary: z.string().max(220).optional(),
     coverImageUrl: z.string().url().optional(),
   }),
 });

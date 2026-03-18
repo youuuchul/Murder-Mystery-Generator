@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
-type AssetScope = "covers" | "locations" | "story";
+type AssetScope = "covers" | "locations" | "story" | "players" | "clues";
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
 const MIME_EXTENSION_MAP: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -16,7 +16,7 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
 
 /**
  * 특정 게임의 에셋 업로드 디렉토리를 만든 뒤 절대 경로를 반환한다.
- * 표지 이미지와 장소 이미지를 같은 API에서 다루되 저장 경로만 분리한다.
+ * 표지, 플레이어, 사건 개요, 장소, 단서 이미지를 같은 API에서 다루되 저장 경로만 분리한다.
  */
 function ensureAssetDir(gameId: string, scope: AssetScope): string {
   const dir = path.join(process.cwd(), "data", "games", gameId, "assets", scope);
@@ -28,7 +28,7 @@ function ensureAssetDir(gameId: string, scope: AssetScope): string {
 
 /** 폼데이터의 에셋 분류를 읽어 안전한 저장 경로 이름으로 정규화한다. */
 function normalizeAssetScope(value: FormDataEntryValue | null): AssetScope {
-  if (value === "covers" || value === "locations" || value === "story") {
+  if (value === "covers" || value === "locations" || value === "story" || value === "players" || value === "clues") {
     return value;
   }
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      return NextResponse.json({ error: "이미지는 5MB 이하만 업로드할 수 있습니다." }, { status: 400 });
+      return NextResponse.json({ error: "이미지는 15MB 이하만 업로드할 수 있습니다." }, { status: 400 });
     }
 
     const extension = extensionFromMimeType(file.type);

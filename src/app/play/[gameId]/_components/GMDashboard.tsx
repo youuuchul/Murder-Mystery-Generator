@@ -268,11 +268,13 @@ function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardCont
               {showSharedImage && (
                 <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-4 space-y-3">
                   <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
-                  <img
-                    src={resolvedImageUrl}
-                    alt={`${game.title} 공통 이미지`}
-                    className="w-full rounded-xl border border-dark-700 object-cover"
-                  />
+                  <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/80 aspect-[16/9]">
+                    <img
+                      src={resolvedImageUrl}
+                      alt={`${game.title} 공통 이미지`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
                 </div>
               )}
 

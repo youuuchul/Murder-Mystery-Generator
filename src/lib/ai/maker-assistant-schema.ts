@@ -24,6 +24,12 @@ export const makerAssistantRequestSchema = z.object({
   message: z.string().trim().max(4000).optional(),
   previousResponseId: z.string().trim().nullable().optional(),
   responseMode: responseModePreferenceSchema.optional(),
+  conversationHistory: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    task: taskSchema,
+    content: z.string().trim().min(1).max(4000),
+    responseMode: z.enum(["guide", "draft"]).optional(),
+  })).max(8).optional(),
 });
 
 const makerAssistantFindingSchema = z.object({

@@ -67,6 +67,13 @@ export type MakerAssistantResult =
   | MakerAssistantGuideResult
   | MakerAssistantDraftResult;
 
+export interface MakerAssistantConversationTurn {
+  role: "user" | "assistant";
+  task: MakerAssistantTask;
+  content: string;
+  responseMode?: MakerAssistantResponseMode;
+}
+
 export interface MakerAssistantRequest {
   task: MakerAssistantTask;
   game: GamePackage;
@@ -74,6 +81,7 @@ export interface MakerAssistantRequest {
   message?: string;
   previousResponseId?: string | null;
   responseMode?: MakerAssistantResponseModePreference;
+  conversationHistory?: MakerAssistantConversationTurn[];
 }
 
 export interface MakerAssistantResponse {

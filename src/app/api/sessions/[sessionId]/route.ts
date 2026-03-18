@@ -135,14 +135,21 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const releasedPlayerName = slot.playerName ?? "플레이어";
     const releasedToken = slot.token;
+    const playerState = session.playerStates.find((item) => item.playerId === body.playerId);
+    const standbyToken = playerState ? crypto.randomUUID() : null;
 
     slot.playerName = null;
     slot.token = null;
     slot.isLocked = false;
 
-    session.playerStates = session.playerStates.filter((playerState) => playerState.playerId !== body.playerId);
+    if (playerState && standbyToken) {
+      playerState.token = standbyToken;
+    }
 
-    if (releasedToken) {
+    if (releasedToken && standbyToken && releasedToken in session.votes) {
+      session.votes[standbyToken] = session.votes[releasedToken];
+      delete session.votes[releasedToken];
+    } else if (releasedToken && !playerState) {
       delete session.votes[releasedToken];
     }
     sharedState.voteCount = Object.keys(session.votes).length;
@@ -150,7 +157,7 @@ export async function PATCH(req: Request, { params }: Params) {
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      message: `${releasedPlayerName}님의 슬롯 잠금이 해제됐습니다. 다시 참가할 수 있습니다.`,
+      message: `${releasedPlayerName}님의 슬롯 잠금이 해제됐습니다. 진행 상태는 유지한 채 다시 참가할 수 있습니다.`,
       type: "system",
     });
   }

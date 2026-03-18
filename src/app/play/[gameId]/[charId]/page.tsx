@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import {
@@ -60,10 +61,16 @@ const CHARACTER_PANEL_LABELS: Record<CharacterPanel, string> = {
 };
 
 /**
- * 길이가 긴 개인 정보를 기본 접힘 상태로 보여줘
- * 모바일 플레이 화면이 과하게 길어지지 않도록 제어한다.
+ * 모바일 화면에서 긴 개인 정보를 접고 펼칠 수 있는 공통 섹션.
+ * 설명문, 점수 조건, 단서 목록처럼 성격이 다른 콘텐츠도 같은 UI로 다룬다.
  */
-function PrivateTextToggle({ title, content }: { title: string; content: string }) {
+function CollapsibleSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-mystery-900 rounded-xl overflow-hidden">
@@ -76,11 +83,25 @@ function PrivateTextToggle({ title, content }: { title: string; content: string 
         <span className="text-dark-500 text-xs ml-2 shrink-0">{open ? "접기" : "펼치기"}</span>
       </button>
       {open && (
-        <div className="px-4 py-4 bg-mystery-950/20">
-          <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
+        <div className="px-4 py-4 bg-mystery-950/20 space-y-3">
+          {children}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 길이가 긴 개인 정보를 기본 접힘 상태로 보여줘.
+ * 모바일 플레이 화면이 과하게 길어지지 않도록 제어한다.
+ */
+function PrivateTextToggle({ title, content }: { title: string; content: string }) {
+  if (!content.trim()) return null;
+
+  return (
+    <CollapsibleSection title={title}>
+      <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
+    </CollapsibleSection>
   );
 }
 
@@ -122,19 +143,6 @@ function ImageFrame({
       />
     </div>
   );
-}
-
-/** 관계 대상 라벨을 플레이어/피해자/NPC를 통합해 읽기 쉬운 이름으로 바꾼다. */
-function resolveRelationshipTargetLabel(game: GamePackage, targetType: string | undefined, targetId: string | undefined): string {
-  if (targetType === "victim") {
-    return game.story.victim.name || "피해자";
-  }
-
-  if (targetType === "npc") {
-    return game.story.npcs.find((npc) => npc.id === targetId)?.name ?? "(알 수 없는 NPC)";
-  }
-
-  return game.players.find((player) => player.id === targetId)?.name ?? "(알 수 없음)";
 }
 
 /**
@@ -707,6 +715,7 @@ export default function PlayerView() {
   const [acquiring, setAcquiring] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
   const [selectedSceneClue, setSelectedSceneClue] = useState<Clue | null>(null);
+  const previousPhaseRef = useRef<string | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem(`mm_${sessionId}`) ?? "";
@@ -738,9 +747,20 @@ export default function PlayerView() {
     fetchState();
   }, [token, sessionId, gameId]);
 
-  // 투표 페이즈 진입 시 자동으로 투표 탭으로 전환
+  // 페이즈 변화가 눈에 띄도록 본게임 진입 시 장소 탐색, 투표 진입 시 투표 탭으로 이동한다.
   useEffect(() => {
-    if (sharedState?.phase === "vote") setTab("vote");
+    const nextPhase = sharedState?.phase;
+    if (!nextPhase) return;
+
+    const previousPhase = previousPhaseRef.current;
+
+    if (nextPhase === "vote") {
+      setTab("vote");
+    } else if (nextPhase.startsWith("round-") && previousPhase !== nextPhase) {
+      setTab("locations");
+    }
+
+    previousPhaseRef.current = nextPhase;
   }, [sharedState?.phase]);
 
   // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 상태 동기화
@@ -995,48 +1015,22 @@ export default function PlayerView() {
 
             {characterPanel === "profile" && (
               <div className="space-y-4">
-                {character.relatedClues.length > 0 && (
+                {character.cardImage ? (
                   <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-                    <p className="text-xs text-dark-500">나와 관련된 단서 (위치 정보)</p>
-                    {character.relatedClues.map((rc, i) => {
-                      const clue = game.clues.find((c) => c.id === rc.clueId);
-                      return (
-                        <div key={i} className="border-l-2 border-dark-700 pl-3">
-                          <p className="text-sm text-dark-300 font-medium">{clue?.title ?? "(알 수 없는 단서)"}</p>
-                          {rc.note && <p className="text-xs text-dark-500 mt-0.5">{rc.note}</p>}
-                        </div>
-                      );
-                    })}
+                    <p className="text-xs text-dark-500">이미지</p>
+                    <ImageFrame
+                      src={character.cardImage}
+                      alt={character.name || "캐릭터 이미지"}
+                      variant="portrait"
+                    />
                   </div>
-                )}
-                {character.relationships.length > 0 && (
-                  <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-                    <p className="text-xs text-dark-500">관계</p>
-                    {character.relationships.map((rel, i) => (
-                      <div key={i} className="flex gap-3 text-sm">
-                        <span className="text-dark-400 font-medium shrink-0">
-                          {resolveRelationshipTargetLabel(
-                            game,
-                            rel.targetType,
-                            rel.targetId || rel.playerId,
-                          )}
-                        </span>
-                        <span className="text-dark-500">{rel.description}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {character.scoreConditions.length > 0 && (
-                  <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-                    <p className="text-xs text-dark-500">승점 조건</p>
-                    {character.scoreConditions.map((sc, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-dark-300">{sc.description}</span>
-                        <span className="text-mystery-400 font-bold shrink-0">+{sc.points}점</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ) : null}
+                <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+                  <p className="text-xs text-dark-500">배경</p>
+                  <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
+                    {character.background || "입력된 배경이 없습니다."}
+                  </p>
+                </div>
                 {character.story ? (
                   <PrivateTextToggle
                     title="상세 스토리 (본인만 열람)"
@@ -1048,6 +1042,31 @@ export default function PlayerView() {
                     title="비밀 / 반전 정보 (본인만 열람)"
                     content={character.secret}
                   />
+                ) : null}
+                {character.scoreConditions.length > 0 ? (
+                  <CollapsibleSection title="승점 조건">
+                    {character.scoreConditions.map((sc, i) => (
+                      <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-dark-300">{sc.description}</span>
+                        <span className="text-mystery-400 font-bold shrink-0">+{sc.points}점</span>
+                      </div>
+                    ))}
+                  </CollapsibleSection>
+                ) : null}
+                {character.relatedClues.length > 0 ? (
+                  <CollapsibleSection title="나와 관련된 단서 (위치 정보)">
+                    {character.relatedClues.map((rc, i) => {
+                      const clue = game.clues.find((c) => c.id === rc.clueId);
+                      return (
+                        <div key={i} className="border-l-2 border-dark-700 pl-3">
+                          <p className="text-sm text-dark-300 font-medium">{clue?.title ?? "(알 수 없는 단서)"}</p>
+                          {rc.note ? (
+                            <p className="text-xs text-dark-500 mt-0.5 whitespace-pre-line">{rc.note}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </CollapsibleSection>
                 ) : null}
               </div>
             )}

@@ -3,16 +3,21 @@ import { getSession, updateSession } from "@/lib/storage/session-storage";
 import { broadcast } from "@/lib/sse/broadcaster";
 
 type Params = { params: { sessionId: string } };
+interface JoinRequestBody {
+  playerId?: string;
+  playerName?: string;
+}
 
-/** POST /api/sessions/[sessionId]/join — 플레이어 참가 */
+/**
+ * POST /api/sessions/[sessionId]/join
+ * 비어 있는 슬롯에 새로 참가하거나, GM이 재참가 허용으로 풀어둔 슬롯의 진행 상태를 이어받는다.
+ */
 export async function POST(req: Request, { params }: Params) {
   const { sessionId } = params;
-  const { playerId, playerName } = await req.json().catch(() => ({})) as {
-    playerId?: string;
-    playerName?: string;
-  };
+  const { playerId, playerName } = await req.json().catch(() => ({})) as JoinRequestBody;
+  const normalizedPlayerName = playerName?.trim();
 
-  if (!playerId || !playerName?.trim()) {
+  if (!playerId || !normalizedPlayerName) {
     return NextResponse.json(
       { error: "playerId, playerName 필수" },
       { status: 400 }
@@ -28,29 +33,43 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "이미 참가한 슬롯입니다." }, { status: 409 });
   }
 
+  const existingPlayerState = session.playerStates.find((item) => item.playerId === playerId);
+  const previousToken = slot.token ?? existingPlayerState?.token;
   const token = crypto.randomUUID();
 
   // 슬롯 잠금
-  slot.playerName = playerName.trim();
+  slot.playerName = normalizedPlayerName;
   slot.token = token;
   slot.isLocked = true;
 
-  // PlayerState 생성
-  session.playerStates.push({
-    token,
-    playerId,
-    playerName: playerName.trim(),
-    inventory: [],
-    transferLog: [],
-    roundAcquired: {},
-    roundVisitedLocations: {},
-  });
+  if (existingPlayerState) {
+    existingPlayerState.token = token;
+    existingPlayerState.playerName = normalizedPlayerName;
+  } else {
+    session.playerStates.push({
+      token,
+      playerId,
+      playerName: normalizedPlayerName,
+      inventory: [],
+      transferLog: [],
+      roundAcquired: {},
+      roundVisitedLocations: {},
+    });
+  }
+
+  if (previousToken && previousToken in session.votes) {
+    session.votes[token] = session.votes[previousToken];
+    delete session.votes[previousToken];
+  }
+  session.sharedState.voteCount = Object.keys(session.votes).length;
 
   // 이벤트 로그
   session.sharedState.eventLog.push({
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    message: `${playerName.trim()}님이 참가했습니다.`,
+    message: existingPlayerState
+      ? `${normalizedPlayerName}님이 기존 진행 상태를 이어서 참가했습니다.`
+      : `${normalizedPlayerName}님이 참가했습니다.`,
     type: "player_joined",
   });
 
@@ -62,6 +81,6 @@ export async function POST(req: Request, { params }: Params) {
     sessionId,
     gameId: session.gameId,
     playerId,
-    playerName: playerName.trim(),
+    playerName: normalizedPlayerName,
   });
 }

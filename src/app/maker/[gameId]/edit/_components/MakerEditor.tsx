@@ -57,12 +57,14 @@ function pruneDanglingRelationships(players: Player[], story: Story): Player[] {
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const editVersionRef = useRef(0);
+  const actionBarRef = useRef<HTMLDivElement | null>(null);
   const [game, setGame] = useState<GamePackage>(initialGame);
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [assistantLauncherBottomOffset, setAssistantLauncherBottomOffset] = useState(120);
   const validation = validateMakerGame(game);
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
@@ -93,6 +95,41 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    const actionBar = actionBarRef.current;
+    if (!actionBar) {
+      return;
+    }
+
+    /**
+     * 모바일에서 AI 런처가 하단 액션바와 겹치지 않도록
+     * 현재 액션바 높이를 기준으로 런처의 bottom offset을 계산한다.
+     */
+    function updateLauncherOffset() {
+      const currentActionBar = actionBarRef.current;
+      if (!currentActionBar) {
+        return;
+      }
+
+      const height = Math.ceil(currentActionBar.getBoundingClientRect().height);
+      setAssistantLauncherBottomOffset(height + 24);
+    }
+
+    updateLauncherOffset();
+
+    const observer = new ResizeObserver(() => {
+      updateLauncherOffset();
+    });
+
+    observer.observe(actionBar);
+    window.addEventListener("resize", updateLauncherOffset);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateLauncherOffset);
+    };
+  }, []);
 
   async function save(updatedGame: GamePackage = game): Promise<boolean> {
     if (saving) {
@@ -247,7 +284,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           )}
         </div>
 
-        <div className="sticky bottom-4 z-10">
+        <div ref={actionBarRef} className="sticky bottom-4 z-10">
           <div className="flex flex-col gap-4 rounded-2xl border border-dark-700 bg-dark-950/95 px-5 py-4 shadow-2xl shadow-black/30 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className={`text-sm font-medium ${
@@ -303,6 +340,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         game={game}
         currentStep={currentStep}
         validationIssueCount={validation.issues.length}
+        launcherBottomOffset={assistantLauncherBottomOffset}
       />
     </>
   );

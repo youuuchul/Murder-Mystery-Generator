@@ -5,6 +5,7 @@ import type { GamePackage } from "@/types/game";
 import {
   MAKER_ASSISTANT_TASK_LABELS,
   type MakerAssistantChatMessage,
+  type MakerAssistantConversationTurn,
   type MakerAssistantResponseModePreference,
   type MakerAssistantResponse,
   type MakerAssistantTask,
@@ -35,7 +36,6 @@ export default function useMakerAssistant({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<MakerAssistantChatMessage[]>([]);
-  const [previousResponseId, setPreviousResponseId] = useState<string | null>(null);
 
   async function runQuickAction(task: Exclude<MakerAssistantTask, "chat">) {
     await send(task, QUICK_ACTION_PROMPTS[task], QUICK_ACTION_PROMPTS[task], "guide");
@@ -48,14 +48,15 @@ export default function useMakerAssistant({
       return;
     }
 
-    await send("chat", trimmed, trimmed, responseMode);
-    setDraft("");
+    const sent = await send("chat", trimmed, trimmed, responseMode);
+    if (sent) {
+      setDraft("");
+    }
   }
 
   function resetConversation() {
     setMessages([]);
     setError(null);
-    setPreviousResponseId(null);
   }
 
   async function send(
@@ -63,9 +64,9 @@ export default function useMakerAssistant({
     message: string,
     visibleContent: string,
     requestedMode: MakerAssistantResponseModePreference
-  ) {
+  ): Promise<boolean> {
     if (pending) {
-      return;
+      return false;
     }
 
     setOpen(true);
@@ -81,6 +82,8 @@ export default function useMakerAssistant({
       createdAt: new Date().toISOString(),
     };
 
+    const conversationHistory = buildConversationHistory(messages);
+
     setMessages((prev) => [...prev, userMessage]);
 
     try {
@@ -94,8 +97,8 @@ export default function useMakerAssistant({
           game,
           currentStep,
           message,
-          previousResponseId,
           responseMode: requestedMode,
+          conversationHistory,
         }),
       });
 
@@ -111,7 +114,6 @@ export default function useMakerAssistant({
 
       const payload = data as MakerAssistantResponse;
 
-      setPreviousResponseId(payload.previousResponseId);
       setMessages((prev) => [
         ...prev,
         {
@@ -124,12 +126,15 @@ export default function useMakerAssistant({
           result: payload.result,
         },
       ]);
+      return true;
     } catch (requestError) {
+      setMessages((prev) => prev.filter((item) => item.id !== userMessage.id));
       setError(
         requestError instanceof Error
           ? requestError.message
           : "제작 도우미 호출에 실패했습니다."
       );
+      return false;
     } finally {
       setPending(false);
     }
@@ -149,4 +154,17 @@ export default function useMakerAssistant({
     sendChat,
     resetConversation,
   };
+}
+
+/**
+ * Responses API의 server-side conversation state 대신,
+ * 최근 대화 몇 턴을 직접 prompt에 붙일 수 있도록 가벼운 이력만 추린다.
+ */
+function buildConversationHistory(messages: MakerAssistantChatMessage[]): MakerAssistantConversationTurn[] {
+  return messages.slice(-8).map((message) => ({
+    role: message.role,
+    task: message.task,
+    content: message.content,
+    responseMode: message.result?.mode,
+  }));
 }

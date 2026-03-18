@@ -48,13 +48,13 @@ export async function POST(request: NextRequest) {
     const response = await client.responses.create({
       model: getMakerAssistantModel(),
       store: false,
-      previous_response_id: payload.previousResponseId ?? undefined,
       instructions: buildMakerAssistantSystemPrompt(payload.task, responseMode),
       input: buildMakerAssistantUserPrompt({
         task: payload.task,
         responseMode,
         context,
         message: payload.message,
+        conversationHistory: payload.conversationHistory,
       }),
       reasoning: {
         effort: getMakerAssistantReasoningEffort(),
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const body: MakerAssistantResponse = {
       task: payload.task,
-      previousResponseId: response.id,
+      previousResponseId: null,
       result,
     };
 

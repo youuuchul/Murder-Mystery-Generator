@@ -9,12 +9,14 @@ interface MakerAssistantDockProps {
   game: GamePackage;
   currentStep: number;
   validationIssueCount: number;
+  launcherBottomOffset: number;
 }
 
 export default function MakerAssistantDock({
   game,
   currentStep,
   validationIssueCount,
+  launcherBottomOffset,
 }: MakerAssistantDockProps) {
   const assistant = useMakerAssistant({ game, currentStep });
 
@@ -23,6 +25,7 @@ export default function MakerAssistantDock({
       <MakerAssistantLauncher
         open={assistant.open}
         pending={assistant.pending}
+        launcherBottomOffset={launcherBottomOffset}
         onClick={() => assistant.setOpen(true)}
       />
       <MakerAssistantDrawer

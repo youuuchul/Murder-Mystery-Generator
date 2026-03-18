@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, type ChangeEvent } from "react";
 import Button from "@/components/ui/Button";
 import type {
+  GamePackage,
   Player,
   ScriptSegment,
   Story,
@@ -12,6 +14,7 @@ import type {
 } from "@/types/game";
 
 interface StoryEditorProps {
+  gameId: GamePackage["id"];
   story: Story;
   opening: ScriptSegment;
   players: Player[];
@@ -67,6 +70,7 @@ function createNpc(): StoryNpc {
 }
 
 export default function StoryEditor({
+  gameId,
   story,
   opening,
   players,
@@ -75,6 +79,8 @@ export default function StoryEditor({
   onSave,
   saving,
 }: StoryEditorProps) {
+  const [uploadingMapImage, setUploadingMapImage] = useState(false);
+
   function updateStory<K extends keyof Story>(key: K, value: Story[K]) {
     onChangeStory({ ...story, [key]: value });
   }
@@ -109,6 +115,45 @@ export default function StoryEditor({
     updateStory("npcs", story.npcs.map((npc, npcIndex) => (
       npcIndex === index ? { ...npc, ...partial } : npc
     )));
+  }
+
+  /**
+   * 대표 지도 이미지를 업로드하고 story.mapImageUrl에 내부 에셋 URL을 연결한다.
+   * 라운드 override가 없을 때 플레이어/GM 공통 기본 이미지로 사용된다.
+   */
+  async function handleMapImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "story");
+
+    setUploadingMapImage(true);
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? "대표 지도 업로드 실패");
+        return;
+      }
+
+      updateStory("mapImageUrl", data.url);
+    } catch (error) {
+      console.error("대표 지도 업로드 실패:", error);
+      alert("대표 지도 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingMapImage(false);
+    }
   }
 
   return (
@@ -211,6 +256,27 @@ export default function StoryEditor({
           </p>
         </div>
 
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/40 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-dark-200">대표 지도 업로드</p>
+            <p className="mt-1 text-xs text-dark-500">
+              URL 입력 없이 바로 업로드해 기본 공통 이미지로 사용할 수 있습니다.
+            </p>
+          </div>
+          <label className="shrink-0">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleMapImageUpload}
+              disabled={uploadingMapImage}
+            />
+            <span className="inline-flex items-center justify-center rounded-lg border border-dark-600 px-3 py-2 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
+              {uploadingMapImage ? "업로드 중…" : "이미지 업로드"}
+            </span>
+          </label>
+        </div>
+
         <Field label="대표 지도 / 참고 이미지 URL" hint="GM 메인 보드에 띄울 기본 지도 또는 참고 이미지입니다.">
           <input
             type="url"
@@ -220,6 +286,26 @@ export default function StoryEditor({
             className={inp}
           />
         </Field>
+
+        {story.mapImageUrl ? (
+          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
+            <img
+              src={story.mapImageUrl}
+              alt="대표 지도 미리보기"
+              className="h-56 w-full object-cover"
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-dark-700 bg-dark-900/60 px-3 py-2">
+              <p className="truncate text-xs text-dark-500">{story.mapImageUrl}</p>
+              <button
+                type="button"
+                onClick={() => updateStory("mapImageUrl", undefined)}
+                className="shrink-0 text-xs text-dark-500 hover:text-red-400 transition-colors"
+              >
+                이미지 제거
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-dark-700 p-5 space-y-4">

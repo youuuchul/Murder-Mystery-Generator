@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import ImageAssetField from "./ImageAssetField";
 import type {
   Player,
   Clue,
@@ -14,13 +15,12 @@ import type {
 } from "@/types/game";
 
 interface PlayerEditorProps {
+  gameId: string;
   players: Player[];
   clues: Clue[];
   story: Story;
   timeline: StoryTimeline;
   onChange: (players: Player[]) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 interface RelationTargetOption {
@@ -176,12 +176,14 @@ function TimelineMatrixEditor({
 }
 
 function PlayerForm({
+  gameId,
   player,
   clues,
   relationTargets,
   onChange,
   onDelete,
 }: {
+  gameId: string;
   player: Player;
   clues: Clue[];
   relationTargets: RelationTargetOption[];
@@ -190,9 +192,41 @@ function PlayerForm({
 }) {
   const [expanded, setExpanded] = useState(true);
   const [tab, setTab] = useState<"basic" | "score" | "clues" | "rel">("basic");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   function update<K extends keyof Player>(key: K, value: Player[K]) {
     onChange({ ...player, [key]: value });
+  }
+
+  /**
+   * 플레이어 대표 이미지를 업로드하고 참가 선택/투표 화면에 사용할 URL을 캐릭터 데이터에 기록한다.
+   * 파일은 `data/games/{gameId}/assets/players` 아래에 저장된다.
+   */
+  async function handleCardImageUpload(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "players");
+
+    setUploadingImage(true);
+    try {
+      const res = await fetch(`/api/games/${gameId}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? "플레이어 이미지 업로드 실패");
+        return;
+      }
+
+      update("cardImage", data.url);
+    } catch (error) {
+      console.error("플레이어 이미지 업로드 실패:", error);
+      alert("플레이어 이미지 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   function updateScore(idx: number, partial: Partial<ScoreCondition>) {
@@ -318,6 +352,20 @@ function PlayerForm({
 
           {tab === "basic" && (
             <div className="space-y-3">
+              <ImageAssetField
+                title="캐릭터 대표 이미지"
+                description="참가 선택, 인물 정보, 투표 화면에 쓸 인물 사진입니다. 업로드를 우선 쓰고 외부 URL은 필요할 때만 입력합니다."
+                value={player.cardImage}
+                alt={player.name || "플레이어 캐릭터 이미지"}
+                profile="portrait"
+                onChange={(nextValue) => update("cardImage", nextValue)}
+                onUpload={handleCardImageUpload}
+                uploading={uploadingImage}
+                uploadLabel="인물 이미지 업로드"
+                emptyStateLabel="선택/투표 화면에 쓸 캐릭터 대표 이미지가 아직 없습니다."
+                urlLabel="캐릭터 이미지 URL"
+                urlHint="이미 공개 URL이 있으면 직접 붙여넣어도 됩니다."
+              />
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">배경 (전원 공개)</label>
                 <textarea
@@ -505,7 +553,7 @@ function PlayerForm({
   );
 }
 
-export default function PlayerEditor({ players, clues, story, timeline, onChange, onSave, saving }: PlayerEditorProps) {
+export default function PlayerEditor({ gameId, players, clues, story, timeline, onChange }: PlayerEditorProps) {
   const [view, setView] = useState<"profiles" | "timeline">("profiles");
   const syncedPlayers = players.map((player) => alignTimelineEntries(player, timeline));
   const relationTargets: RelationTargetOption[] = [
@@ -587,6 +635,7 @@ export default function PlayerEditor({ players, clues, story, timeline, onChange
           {syncedPlayers.map((player, idx) => (
             <PlayerForm
               key={player.id}
+              gameId={gameId}
               player={player}
               clues={clues}
               relationTargets={relationTargets}
@@ -596,10 +645,6 @@ export default function PlayerEditor({ players, clues, story, timeline, onChange
           ))}
         </div>
       )}
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">저장</Button>
-      </div>
     </div>
   );
 }

@@ -40,6 +40,10 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 1, "warning", "태그가 아직 없습니다.");
   }
 
+  if (isBlank(game.settings.summary)) {
+    addIssue(issues, 1, "warning", "라이브러리용 소개글이 아직 없습니다.");
+  }
+
   if (isBlank(game.story.victim.name)) {
     addIssue(issues, 2, "error", "피해자 이름이 비어 있습니다.");
   }

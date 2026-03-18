@@ -161,13 +161,24 @@ export default function JoinPage() {
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-dark-100">{player.name}</p>
-                      {player.background && (
-                        <p className="text-xs text-dark-500 mt-0.5 line-clamp-1">
-                          {player.background}
-                        </p>
-                      )}
+                    <div className="flex min-w-0 items-center gap-3">
+                      {player.cardImage ? (
+                        <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
+                          <img
+                            src={player.cardImage}
+                            alt={player.name}
+                            className="h-full w-full object-cover object-center"
+                          />
+                        </div>
+                      ) : null}
+                      <div className="min-w-0">
+                        <p className="font-semibold text-dark-100">{player.name}</p>
+                        {player.background && (
+                          <p className="mt-0.5 line-clamp-1 text-xs text-dark-500">
+                            {player.background}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {taken ? (
                       <span className="text-xs text-amber-400 shrink-0">복귀 가능</span>

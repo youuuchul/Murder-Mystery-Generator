@@ -92,22 +92,33 @@ function ImageFrame({
   src,
   alt,
   compact = false,
+  variant = "default",
 }: {
   src: string;
   alt: string;
   compact?: boolean;
+  variant?: "default" | "portrait" | "document";
 }) {
   return (
     <div
       className={[
         "overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40 shrink-0",
-        compact ? "w-16 h-16" : "w-full aspect-[4/3]",
+        compact
+          ? "w-16 h-16"
+          : variant === "portrait"
+            ? "w-full aspect-[3/4]"
+            : variant === "document"
+              ? "w-full aspect-[4/5]"
+              : "w-full aspect-[4/3]",
       ].join(" ")}
     >
       <img
         src={src}
         alt={alt}
-        className="w-full h-full object-cover"
+        className={[
+          "w-full h-full",
+          variant === "document" ? "object-contain" : "object-cover object-center",
+        ].join(" ")}
       />
     </div>
   );
@@ -160,7 +171,7 @@ function PersonInfoPanel({
         roleLabel: "캐릭터",
         name: player.name,
         background: player.background,
-        imageUrl: undefined,
+        imageUrl: player.cardImage,
         impressions: collectViewerImpressions(currentPlayer, "player", player.id),
       })),
     {
@@ -198,7 +209,7 @@ function PersonInfoPanel({
           <div className="flex items-start gap-3">
             {person.imageUrl ? (
               <div className="w-20">
-                <ImageFrame src={person.imageUrl} alt={person.name || person.roleLabel} compact={false} />
+                <ImageFrame src={person.imageUrl} alt={person.name || person.roleLabel} compact={false} variant="portrait" />
               </div>
             ) : null}
             <div className="flex-1 min-w-0">
@@ -352,6 +363,7 @@ function CardDetailModal({
             <ImageFrame
               src={clue.imageUrl}
               alt={clue.title || "단서 카드 이미지"}
+              variant="document"
             />
           ) : null}
           <p className="text-dark-200 text-sm leading-relaxed">{clue?.description ?? "—"}</p>
@@ -434,6 +446,7 @@ function SceneClueModal({
             <ImageFrame
               src={clue.imageUrl}
               alt={clue.title || "현장 단서 이미지"}
+              variant="document"
             />
           ) : null}
           <p className="text-dark-200 text-sm leading-relaxed whitespace-pre-line">{clue.description || "—"}</p>
@@ -646,13 +659,20 @@ function VoteScreen({
             type="button"
             onClick={() => setSelectedId(p.id)}
             className={[
-              "w-full text-left px-4 py-3.5 rounded-xl border transition-all",
+              "w-full rounded-xl border px-4 py-3.5 text-left transition-all",
               selectedId === p.id
                 ? "border-mystery-600 bg-mystery-950/30 ring-1 ring-mystery-600"
                 : "border-dark-700 bg-dark-900 hover:border-dark-500",
             ].join(" ")}
           >
-            <p className="font-semibold text-dark-100">{p.name}</p>
+            <div className="flex items-center gap-3">
+              {p.cardImage ? (
+                <div className="w-14 shrink-0">
+                  <ImageFrame src={p.cardImage} alt={p.name} compact={false} variant="portrait" />
+                </div>
+              ) : null}
+              <p className="font-semibold text-dark-100">{p.name}</p>
+            </div>
           </button>
         ))}
       </div>
@@ -1067,6 +1087,7 @@ export default function PlayerView() {
                           src={clue.imageUrl}
                           alt={clue.title || "단서 카드 이미지"}
                           compact
+                          variant="document"
                         />
                       ) : (
                         <div className="w-16 h-16 shrink-0 rounded-xl border border-dark-800 bg-dark-950/60 flex items-center justify-center">

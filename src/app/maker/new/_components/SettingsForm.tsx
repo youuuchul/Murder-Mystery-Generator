@@ -8,6 +8,7 @@ import type { GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
 const SettingsSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(100, "제목은 100자 이내로 입력하세요"),
+  summary: z.string().max(220, "소개글은 220자 이내로 입력하세요"),
   playerCount: z.number().int().min(4, "최소 4명").max(8, "최대 8명"),
   difficulty: z.enum(["easy", "normal", "hard"]),
   tags: z.array(z.string().min(1)).min(1, "태그를 1개 이상 추가하세요"),
@@ -73,6 +74,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
 
   const [form, setForm] = useState<SettingsFormData>({
     title: "",
+    summary: "",
     playerCount: 5,
     difficulty: "normal",
     tags: [],
@@ -131,8 +133,14 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
 
     setLoading(true);
     try {
-      const { title, playerCount, difficulty, tags, estimatedDuration } = result.data;
-      const settings: GameSettings = { playerCount, difficulty, tags, estimatedDuration };
+      const { title, summary, playerCount, difficulty, tags, estimatedDuration } = result.data;
+      const settings: GameSettings = {
+        playerCount,
+        difficulty,
+        tags,
+        estimatedDuration,
+        summary: summary.trim() || undefined,
+      };
 
       const res = await fetch("/api/games", {
         method: "POST",
@@ -170,6 +178,23 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
           className={`w-full ${inputClass}`}
         />
         {errors.title && <p className="mt-1 text-xs text-red-400">{errors.title}</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">소개글</label>
+        <textarea
+          rows={3}
+          value={form.summary}
+          onChange={(e) => updateForm("summary", e.target.value)}
+          placeholder="라이브러리 목록에서 보일 한두 문장 소개를 적으세요."
+          maxLength={220}
+          className={`w-full ${inputClass} resize-none`}
+        />
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="text-xs text-dark-500">스포일러 없이 분위기와 테마를 설명하는 짧은 소개글입니다.</p>
+          <span className="shrink-0 text-[11px] text-dark-600">{form.summary.length}/220</span>
+        </div>
+        {errors.summary && <p className="mt-1 text-xs text-red-400">{errors.summary}</p>}
       </div>
 
       {/* ── 태그 ── */}

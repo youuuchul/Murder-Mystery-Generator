@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
-import Button from "@/components/ui/Button";
+import { useState } from "react";
+import ImageAssetField from "./ImageAssetField";
 import type { GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
 interface SettingsEditorProps {
   game: GamePackage;
   onChange: (partial: Partial<GamePackage>) => void;
-  onSave: () => void;
-  saving: boolean;
 }
 
 const TAG_SUGGESTIONS = [
@@ -38,7 +36,7 @@ const PHASE_LABELS: Record<PhaseConfig["type"], string> = {
 const inputClass =
   "bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
-export default function SettingsEditor({ game, onChange, onSave, saving }: SettingsEditorProps) {
+export default function SettingsEditor({ game, onChange }: SettingsEditorProps) {
   const settings = game.settings;
   const rules = game.rules;
   const characterCount = game.players?.length ?? 0;
@@ -90,14 +88,7 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
    * 표지 이미지를 업로드하고 내부 에셋 URL을 설정값에 연결한다.
    * 라이브러리 썸네일은 이 URL을 그대로 사용한다.
    */
-  async function handleCoverUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  async function handleCoverUpload(file: File) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("scope", "covers");
@@ -146,51 +137,37 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
         />
       </div>
 
-      <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-dark-100">표지 이미지</h3>
-            <p className="text-xs text-dark-500 mt-1">
-              라이브러리 카드 썸네일에 표시됩니다. 업로드 후 저장하면 바로 반영됩니다.
-            </p>
-          </div>
-          <label className="shrink-0">
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={handleCoverUpload}
-              disabled={uploadingCover}
-            />
-            <span className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-dark-600 text-sm text-dark-200 hover:border-dark-400 transition-colors cursor-pointer">
-              {uploadingCover ? "업로드 중…" : "표지 업로드"}
-            </span>
-          </label>
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">소개글</label>
+        <textarea
+          rows={3}
+          value={settings.summary ?? ""}
+          onChange={(e) => updateSettings("summary", e.target.value || undefined)}
+          placeholder="라이브러리 목록에서 보일 한두 문장 소개를 적으세요."
+          maxLength={220}
+          className={`w-full ${inputClass} resize-none`}
+        />
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="text-xs text-dark-500">스포일러 없이 분위기, 배경, 톤을 짧게 설명하는 소개글입니다.</p>
+          <span className="shrink-0 text-[11px] text-dark-600">{(settings.summary ?? "").length}/220</span>
         </div>
+      </div>
 
-        {settings.coverImageUrl ? (
-          <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40">
-            <img
-              src={settings.coverImageUrl}
-              alt={game.title || "시나리오 표지 미리보기"}
-              className="w-full h-52 object-cover"
-            />
-            <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-dark-700 bg-dark-900/60">
-              <p className="text-xs text-dark-500 truncate">{settings.coverImageUrl}</p>
-              <button
-                type="button"
-                onClick={() => updateSettings("coverImageUrl", undefined)}
-                className="text-xs text-dark-500 hover:text-red-400 transition-colors shrink-0"
-              >
-                이미지 제거
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="h-40 rounded-xl border border-dashed border-dark-700 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center">
-            <span className="text-xs tracking-[0.24em] uppercase text-mystery-300/70">FILE</span>
-          </div>
-        )}
+      <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
+        <ImageAssetField
+          title="표지 이미지"
+          description="라이브러리 카드 썸네일에 표시됩니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+          value={settings.coverImageUrl}
+          alt={game.title || "시나리오 표지 미리보기"}
+          profile="cover"
+          onChange={(nextValue) => updateSettings("coverImageUrl", nextValue)}
+          onUpload={handleCoverUpload}
+          uploading={uploadingCover}
+          uploadLabel="표지 업로드"
+          emptyStateLabel="아직 연결된 표지 이미지가 없습니다."
+          urlLabel="표지 이미지 URL"
+          urlHint="외부 CDN이나 이미 호스팅된 이미지가 있으면 직접 붙여넣을 수 있습니다."
+        />
       </div>
 
       <div>
@@ -498,12 +475,6 @@ export default function SettingsEditor({ game, onChange, onSave, saving }: Setti
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-end pt-2">
-        <Button onClick={onSave} loading={saving} variant="secondary">
-          저장
-        </Button>
       </div>
     </div>
   );

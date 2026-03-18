@@ -5,6 +5,7 @@ import type { GamePackage } from "@/types/game";
 import {
   MAKER_ASSISTANT_TASK_LABELS,
   type MakerAssistantChatMessage,
+  type MakerAssistantResponseModePreference,
   type MakerAssistantResponse,
   type MakerAssistantTask,
 } from "@/types/assistant";
@@ -30,13 +31,14 @@ export default function useMakerAssistant({
 }: UseMakerAssistantParams) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [responseMode, setResponseMode] = useState<MakerAssistantResponseModePreference>("auto");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<MakerAssistantChatMessage[]>([]);
   const [previousResponseId, setPreviousResponseId] = useState<string | null>(null);
 
   async function runQuickAction(task: Exclude<MakerAssistantTask, "chat">) {
-    await send(task, QUICK_ACTION_PROMPTS[task], QUICK_ACTION_PROMPTS[task]);
+    await send(task, QUICK_ACTION_PROMPTS[task], QUICK_ACTION_PROMPTS[task], "guide");
   }
 
   async function sendChat() {
@@ -46,7 +48,7 @@ export default function useMakerAssistant({
       return;
     }
 
-    await send("chat", trimmed, trimmed);
+    await send("chat", trimmed, trimmed, responseMode);
     setDraft("");
   }
 
@@ -56,7 +58,12 @@ export default function useMakerAssistant({
     setPreviousResponseId(null);
   }
 
-  async function send(task: MakerAssistantTask, message: string, visibleContent: string) {
+  async function send(
+    task: MakerAssistantTask,
+    message: string,
+    visibleContent: string,
+    requestedMode: MakerAssistantResponseModePreference
+  ) {
     if (pending) {
       return;
     }
@@ -88,6 +95,7 @@ export default function useMakerAssistant({
           currentStep,
           message,
           previousResponseId,
+          responseMode: requestedMode,
         }),
       });
 
@@ -111,7 +119,7 @@ export default function useMakerAssistant({
           role: "assistant",
           task,
           label: MAKER_ASSISTANT_TASK_LABELS[task],
-          content: payload.result.summary,
+          content: payload.result.mode === "draft" ? payload.result.body : payload.result.summary,
           createdAt: new Date().toISOString(),
           result: payload.result,
         },
@@ -132,6 +140,8 @@ export default function useMakerAssistant({
     setOpen,
     draft,
     setDraft,
+    responseMode,
+    setResponseMode,
     pending,
     error,
     messages,

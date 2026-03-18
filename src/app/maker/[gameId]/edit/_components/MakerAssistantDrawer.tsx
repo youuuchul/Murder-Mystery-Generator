@@ -3,7 +3,14 @@
 import type { KeyboardEvent } from "react";
 import Button from "@/components/ui/Button";
 import MakerAssistantMessageList from "./MakerAssistantMessageList";
-import { MAKER_ASSISTANT_TASK_LABELS, type MakerAssistantChatMessage, type MakerAssistantTask } from "@/types/assistant";
+import {
+  MAKER_ASSISTANT_RESPONSE_MODE_LABELS,
+  MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES,
+  MAKER_ASSISTANT_TASK_LABELS,
+  type MakerAssistantChatMessage,
+  type MakerAssistantResponseModePreference,
+  type MakerAssistantTask,
+} from "@/types/assistant";
 
 const QUICK_ACTIONS: Array<{
   task: Exclude<MakerAssistantTask, "chat">;
@@ -30,10 +37,12 @@ interface MakerAssistantDrawerProps {
   currentStep: number;
   validationIssueCount: number;
   draft: string;
+  responseMode: MakerAssistantResponseModePreference;
   error: string | null;
   messages: MakerAssistantChatMessage[];
   onClose: () => void;
   onDraftChange: (value: string) => void;
+  onResponseModeChange: (value: MakerAssistantResponseModePreference) => void;
   onQuickAction: (task: Exclude<MakerAssistantTask, "chat">) => void;
   onSend: () => void;
   onReset: () => void;
@@ -46,10 +55,12 @@ export default function MakerAssistantDrawer({
   currentStep,
   validationIssueCount,
   draft,
+  responseMode,
   error,
   messages,
   onClose,
   onDraftChange,
+  onResponseModeChange,
   onQuickAction,
   onSend,
   onReset,
@@ -153,9 +164,29 @@ export default function MakerAssistantDrawer({
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
               onKeyDown={handleComposerKeyDown}
-              placeholder="예: 지금 범인 동선이 너무 노골적인지 봐줘."
+              placeholder={getComposerPlaceholder(responseMode)}
               className="w-full resize-none rounded-2xl border border-dark-700 bg-dark-900 px-4 py-3 text-sm text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500"
             />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] uppercase tracking-[0.16em] text-dark-600">응답 모드</span>
+              {MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onResponseModeChange(mode)}
+                  disabled={pending}
+                  className={[
+                    "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                    responseMode === mode
+                      ? "border-mystery-700 bg-mystery-950/30 text-mystery-200"
+                      : "border-dark-700 text-dark-500 hover:border-dark-500 hover:text-dark-300",
+                  ].join(" ")}
+                >
+                  {MAKER_ASSISTANT_RESPONSE_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
 
             <div className="flex items-center justify-between gap-3">
               <button
@@ -177,4 +208,15 @@ export default function MakerAssistantDrawer({
       </aside>
     </div>
   );
+}
+
+function getComposerPlaceholder(responseMode: MakerAssistantResponseModePreference): string {
+  switch (responseMode) {
+    case "guide":
+      return "예: 지금 범인 동선이 너무 노골적인지 봐줘.";
+    case "draft":
+      return "예: Step 2 오프닝 스토리 텍스트 초안을 3문단으로 써줘.";
+    default:
+      return "예: 지금 범인 동선이 너무 노골적인지 봐줘. / 오프닝 문구 가안을 써줘.";
+  }
 }

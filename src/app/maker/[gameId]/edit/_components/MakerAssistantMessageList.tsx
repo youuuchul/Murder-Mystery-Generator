@@ -2,9 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import {
+  MAKER_ASSISTANT_RESPONSE_MODE_LABELS,
   MAKER_ASSISTANT_TASK_LABELS,
   type MakerAssistantChatMessage,
+  type MakerAssistantDraftResult,
   type MakerAssistantFinding,
+  type MakerAssistantGuideResult,
 } from "@/types/assistant";
 
 interface MakerAssistantMessageListProps {
@@ -38,6 +41,7 @@ export default function MakerAssistantMessageList({
             <li>이 타임라인에서 범인 동선이 너무 튀는지 봐줘.</li>
             <li>이 캐릭터 비밀에 맞는 문서형 단서 3개 제안해줘.</li>
             <li>지금 상태에서 뭘 먼저 채우면 좋은지 순서대로 알려줘.</li>
+            <li>Step 2 오프닝 텍스트 초안을 바로 붙여넣을 수 있게 써줘.</li>
           </ul>
         </div>
       </div>
@@ -76,87 +80,21 @@ export default function MakerAssistantMessageList({
                 </p>
                 <p className="mt-1 text-sm font-medium text-dark-50">AI 응답</p>
               </div>
-              <p className="text-[11px] text-dark-500">
-                {formatTimestamp(message.createdAt)}
-              </p>
-            </div>
-
-            <p className="mt-3 text-sm leading-relaxed text-dark-100 whitespace-pre-line">
-              {message.result?.summary ?? message.content}
-            </p>
-
-            {message.result && (
-              <div className="mt-4 space-y-3">
-                {message.result.findings.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
-                      주요 포인트
-                    </p>
-                    <div className="space-y-2">
-                      {message.result.findings.map((finding, index) => (
-                        <article
-                          key={`${message.id}-finding-${index}`}
-                          className={[
-                            "rounded-xl border px-3 py-3",
-                            getFindingClasses(finding),
-                          ].join(" ")}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-medium">{finding.title}</p>
-                            {finding.relatedStep ? (
-                              <span className="text-[11px] uppercase tracking-[0.18em] opacity-80">
-                                Step {finding.relatedStep}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-1.5 text-sm leading-relaxed opacity-90">
-                            {finding.detail}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {message.result.suggestedActions.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
-                      추천 액션
-                    </p>
-                    <div className="space-y-2">
-                      {message.result.suggestedActions.map((action, index) => (
-                        <article
-                          key={`${message.id}-action-${index}`}
-                          className="rounded-xl border border-dark-700 bg-dark-950/40 px-3 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-medium text-dark-100">{action.label}</p>
-                            <span className="text-[11px] uppercase tracking-[0.18em] text-mystery-300">
-                              Step {action.step}
-                            </span>
-                          </div>
-                          <p className="mt-1.5 text-sm leading-relaxed text-dark-400">
-                            {action.reason}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {message.result.followUpQuestions.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
-                      이어서 물어볼 것
-                    </p>
-                    <ul className="space-y-2 text-sm text-dark-300">
-                      {message.result.followUpQuestions.map((question, index) => (
-                        <li key={`${message.id}-follow-up-${index}`}>{question}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              <div className="text-right">
+                {message.result ? (
+                  <p className="text-[11px] text-mystery-300/80">
+                    {MAKER_ASSISTANT_RESPONSE_MODE_LABELS[message.result.mode]}
+                  </p>
+                ) : null}
+                <p className="text-[11px] text-dark-500">
+                  {formatTimestamp(message.createdAt)}
+                </p>
               </div>
+            </div>
+            {message.result ? renderAssistantResult(message.id, message.result) : (
+              <p className="mt-3 text-sm leading-relaxed text-dark-100 whitespace-pre-line">
+                {message.content}
+              </p>
             )}
           </section>
         )
@@ -193,4 +131,113 @@ function getFindingClasses(finding: MakerAssistantFinding): string {
     case "idea":
       return "border-mystery-900/70 bg-mystery-950/25 text-mystery-100";
   }
+}
+
+function renderAssistantResult(messageId: string, result: MakerAssistantGuideResult | MakerAssistantDraftResult) {
+  if (result.mode === "draft") {
+    return (
+      <div className="mt-4 space-y-3">
+        {result.title ? (
+          <div className="rounded-xl border border-dark-700 bg-dark-950/30 px-3 py-3">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">제목</p>
+            <p className="mt-2 text-sm font-medium text-dark-50">{result.title}</p>
+          </div>
+        ) : null}
+        <div className="rounded-xl border border-mystery-900/60 bg-black/15 px-4 py-4">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
+          <p className="mt-3 text-sm leading-relaxed whitespace-pre-line text-dark-50">
+            {result.body}
+          </p>
+        </div>
+        {result.notes.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">짧은 메모</p>
+            <ul className="space-y-2 text-sm text-dark-300">
+              {result.notes.map((note, index) => (
+                <li key={`${messageId}-note-${index}`}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <p className="text-sm leading-relaxed text-dark-100 whitespace-pre-line">
+        {result.summary}
+      </p>
+
+      {result.findings.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
+            주요 포인트
+          </p>
+          <div className="space-y-2">
+            {result.findings.map((finding, index) => (
+              <article
+                key={`${messageId}-finding-${index}`}
+                className={[
+                  "rounded-xl border px-3 py-3",
+                  getFindingClasses(finding),
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">{finding.title}</p>
+                  {finding.relatedStep ? (
+                    <span className="text-[11px] uppercase tracking-[0.18em] opacity-80">
+                      Step {finding.relatedStep}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed opacity-90">
+                  {finding.detail}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.suggestedActions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
+            추천 액션
+          </p>
+          <div className="space-y-2">
+            {result.suggestedActions.map((action, index) => (
+              <article
+                key={`${messageId}-action-${index}`}
+                className="rounded-xl border border-dark-700 bg-dark-950/40 px-3 py-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-dark-100">{action.label}</p>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-mystery-300">
+                    Step {action.step}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-dark-400">
+                  {action.reason}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.followUpQuestions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">
+            이어서 물어볼 것
+          </p>
+          <ul className="space-y-2 text-sm text-dark-300">
+            {result.followUpQuestions.map((question, index) => (
+              <li key={`${messageId}-follow-up-${index}`}>{question}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }

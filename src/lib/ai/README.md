@@ -18,11 +18,12 @@ flowchart LR
   A["MakerEditor local game state"] --> B["useMakerAssistant"]
   B --> C["POST /api/maker-assistant"]
   C --> D["buildMakerAssistantContext"]
-  D --> E["buildMakerAssistantSystemPrompt / UserPrompt"]
-  E --> F["OpenAI Responses API (gpt-5-mini)"]
-  F --> G["extractResponseText"]
-  G --> H["parseMakerAssistantResult"]
-  H --> I["Assistant drawer UI"]
+  D --> E["resolveMakerAssistantResponseMode"]
+  E --> F["buildMakerAssistantSystemPrompt / UserPrompt"]
+  F --> G["OpenAI Responses API (gpt-5-mini)"]
+  G --> H["extractResponseText"]
+  H --> I["parseMakerAssistantResult(mode-aware)"]
+  I --> J["Assistant drawer UI"]
 ```
 
 ### 처리 흐름
@@ -30,8 +31,9 @@ flowchart LR
 1. 메이커 화면에서 빠른 액션 또는 자유 질문을 보낸다.
 2. 클라이언트는 현재 저장 전 로컬 `game` 상태를 `/api/maker-assistant`로 전송한다.
 3. 서버는 `game` 전체를 그대로 넘기지 않고, 검증 요약과 핵심 필드만 포함한 축약 컨텍스트를 생성한다.
-4. 모델 응답은 우선 그대로 파싱하고, 형식이 깨지면 line-based 포맷으로 한 번 더 복구한다.
-5. 프론트는 `summary / findings / suggestedActions / followUpQuestions` 구조만 렌더링한다.
+4. chat 요청이면 `자동 / 가이드 / 문안` 설정과 질문 문장을 바탕으로 응답 모드를 결정한다.
+5. 모델 응답은 우선 그대로 파싱하고, 형식이 깨지면 모드별 line-based 포맷으로 한 번 더 복구한다.
+6. 프론트는 `guide` 면 분석 카드, `draft` 면 붙여넣기용 본문 카드로 분리 렌더링한다.
 
 ## 3. 현재는 왜 RAG가 아닌가
 
@@ -129,6 +131,17 @@ QUESTIONS:
 QUESTION|후속 질문
 ```
 
+draft 모드에서는 아래 포맷도 복구한다.
+
+```text
+TITLE:
+오프닝 제안
+BODY:
+실제 본문...
+NOTES:
+NOTE|피해자 이름은 현재 데이터 기준으로 가정함
+```
+
 이렇게 둔 이유는 `gpt-5-mini`가 JSON을 가끔 불완전하게 내보내는 경우가 있어, V1에서는 line-based fallback이 더 안정적이기 때문이다.
 
 ## 8. UI / 호출 위치
@@ -140,19 +153,20 @@ QUESTION|후속 질문
   - [`../../app/maker/[gameId]/edit/_components/MakerAssistantDock.tsx`](../../app/maker/[gameId]/edit/_components/MakerAssistantDock.tsx)
 
 빠른 액션 기본 문구는 `useMakerAssistant.ts`의 `QUICK_ACTION_PROMPTS`에서 수정한다.
+chat 입력창의 모드 토글과 placeholder는 `MakerAssistantDrawer.tsx`를 보면 된다.
 
 ## 9. 이후 작업 추천
 
 ### 단기
 
-- task별 프롬프트 더 정교화
+- 특정 입력칸으로 바로 복사하는 UX
+- Step별 draft 템플릿 더 정교화
 - follow-up question 품질 보정
-- 특정 Step에서 관련 데이터만 더 압축해서 보내는 최적화
 
 ### 중기
 
-- 응답 카드에서 메이커 입력 필드로 바로 복사하는 UX
 - validation 결과와 AI 결과를 묶어 표시하는 패널
+- quick action용 draft 프리셋 도입 여부 검토
 
 ### 장기
 

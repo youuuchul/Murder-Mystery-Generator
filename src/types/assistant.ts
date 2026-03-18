@@ -9,11 +9,27 @@ export const MAKER_ASSISTANT_TASKS = [
 
 export type MakerAssistantTask = (typeof MAKER_ASSISTANT_TASKS)[number];
 
+export const MAKER_ASSISTANT_RESPONSE_MODES = ["guide", "draft"] as const;
+export type MakerAssistantResponseMode = (typeof MAKER_ASSISTANT_RESPONSE_MODES)[number];
+
+export const MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES = ["auto", ...MAKER_ASSISTANT_RESPONSE_MODES] as const;
+export type MakerAssistantResponseModePreference =
+  (typeof MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES)[number];
+
 export const MAKER_ASSISTANT_TASK_LABELS: Record<MakerAssistantTask, string> = {
   validate_consistency: "모순 점검",
   suggest_clues: "단서 제안",
   suggest_next_steps: "다음 작업 추천",
   chat: "자유 질문",
+};
+
+export const MAKER_ASSISTANT_RESPONSE_MODE_LABELS: Record<
+  MakerAssistantResponseModePreference,
+  string
+> = {
+  auto: "자동",
+  guide: "가이드",
+  draft: "문안",
 };
 
 export interface MakerAssistantFinding {
@@ -32,12 +48,24 @@ export interface MakerAssistantSuggestedAction {
   step: number;
 }
 
-export interface MakerAssistantResult {
+export interface MakerAssistantGuideResult {
+  mode: "guide";
   summary: string;
   findings: MakerAssistantFinding[];
   suggestedActions: MakerAssistantSuggestedAction[];
   followUpQuestions: string[];
 }
+
+export interface MakerAssistantDraftResult {
+  mode: "draft";
+  title?: string;
+  body: string;
+  notes: string[];
+}
+
+export type MakerAssistantResult =
+  | MakerAssistantGuideResult
+  | MakerAssistantDraftResult;
 
 export interface MakerAssistantRequest {
   task: MakerAssistantTask;
@@ -45,6 +73,7 @@ export interface MakerAssistantRequest {
   currentStep: number;
   message?: string;
   previousResponseId?: string | null;
+  responseMode?: MakerAssistantResponseModePreference;
 }
 
 export interface MakerAssistantResponse {

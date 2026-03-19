@@ -11,8 +11,18 @@ data/
 │       ├── game.json        ← 전체 게임 패키지
 │       ├── metadata.json    ← 목록 조회용 경량 파일
 │       └── assets/
-│           ├── characters/  ← AI 생성 캐릭터 이미지
-│           └── cards/       ← 카드 렌더링 캐시
+│           ├── covers/
+│           ├── story/
+│           ├── players/
+│           ├── locations/
+│           └── clues/
 └── sessions/
-    └── sessions.db          ← SQLite (게임 세션 상태)
+    └── {session-id}.json    ← 플레이 중 세션 상태
 ```
+
+## 주의
+
+- 이 디렉토리는 현재 로컬 개발/테스트용 런타임 데이터 저장소다.
+- Git에는 포함되지 않는다.
+- 지금 상태에서 배포 환경으로 전환해도 이 데이터가 자동으로 올라가거나 이어지지 않는다.
+- 배포 전환 전에는 별도 백업과 마이그레이션이 필요하다.

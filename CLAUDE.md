@@ -32,9 +32,28 @@
 - **Framework**: Next.js 14+ (App Router)
 - **Language**: TypeScript (Zod로 입력 검증)
 - **Styling**: Tailwind CSS (모바일 우선)
-- **Storage**: 게임 패키지 → 로컬 JSON / 세션 상태 → SQLite
-- **실시간**: SSE (Server-Sent Events)
+- **Current Storage**: 게임 패키지 / 세션 상태 / 업로드 자산 모두 로컬 파일 기반
+- **Current Realtime**: SSE (Server-Sent Events) + polling fallback
+- **Target Deployment Stack**: Vercel + Supabase
+  - Hosting: Vercel
+  - Auth / Database / Storage / Realtime candidate: Supabase
 - **패키지**: npm
+
+## 배포 방향
+
+- 단기 개발 환경은 로컬 JSON + 로컬 업로드를 계속 사용한다.
+- 배포 준비 기준의 목표 스택은 `Vercel + Supabase` 로 고정한다.
+- 따라서 아래 방향을 우선한다.
+  - 로컬 파일 저장 -> Supabase Postgres / Storage 전환
+  - 메이커 무권한 접근 -> Auth + ownership + visibility 모델 도입
+  - 공개 플레이 동선과 제작/관리 동선 분리
+
+관련 문서:
+
+- `docs/research/20260319_VERCEL_SUPABASE_DEPLOYMENT_REVIEW.md`
+- `docs/research/20260319_LOCAL_DATA_DEPLOYMENT_RISK.md`
+- `docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md`
+- `docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md`
 
 ## 핵심 참조 문서
 
@@ -45,9 +64,9 @@
 ## 메이커 작성 순서
 
 ```
-기본 설정 → 사건 개요 → 인물 → 단서 카드 → 스크립트 (오프닝/엔딩)
+기본 설정 → 사건 개요 → 플레이어 → 장소 & 단서 → 스크립트 → 엔딩
 ```
-각 단계는 이전 단계 결과에 의존. 단계별 폼/에디터로 사용자가 직접 입력.
+현재 메이커는 6-step 구조이며, 편집 모드에서는 스텝 간 자유 이동이 가능하다.
 
 ## 에이전트
 

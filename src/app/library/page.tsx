@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { isMakerAccessEnabled } from "@/lib/maker-access";
 import { listGames } from "@/lib/storage/game-storage";
+import GuideMenu from "./_components/GuideMenu";
 import GameGrid from "./_components/GameGrid";
 
 export const dynamic = "force-dynamic"; // 항상 서버에서 최신 목록 렌더링
 
 export default function LibraryPage() {
   const games = listGames();
+  const makerAccessEnabled = isMakerAccessEnabled();
 
   return (
     <div className="min-h-screen bg-dark-950">
@@ -18,12 +21,12 @@ export default function LibraryPage() {
             </h1>
           </div>
           <nav className="flex items-center gap-2">
-            <Link
-              href="/rulebook"
-              className="text-sm text-dark-400 hover:text-dark-100 px-3 py-1.5 transition-colors"
-            >
-              룰북
-            </Link>
+            {makerAccessEnabled ? (
+              <span className="hidden rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300 sm:inline-flex">
+                제작 보호 ON
+              </span>
+            ) : null}
+            <GuideMenu />
             <Link
               href="/maker/new"
               className="text-sm bg-mystery-700 hover:bg-mystery-600 text-white px-4 py-1.5 rounded-md border border-mystery-600 transition-colors"

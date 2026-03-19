@@ -307,7 +307,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
         <div className="mb-5">
           <h3 className="text-base font-semibold text-dark-100">게임 규칙</h3>
           <p className="text-xs text-dark-500 mt-1">
-            룰북에 자동으로 반영됩니다. 플레이어 수에 맞게 기본값이 설정되어 있습니다.
+            가이드와 플레이 흐름에 반영됩니다. 플레이어 수에 맞게 기본값이 설정되어 있습니다.
           </p>
         </div>
 

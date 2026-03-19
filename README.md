@@ -150,8 +150,8 @@ Murder-Mystery_Generator/
 │   │   │   ├── new/                     # 새 게임 생성 (Step 1)
 │   │   │   └── [gameId]/edit/           # 메이커 편집 (Step 1~6)
 │   │   ├── join/                        # 코드 입력 / 캐릭터 선택 / 재접속
+│   │   ├── guide/                       # 제작 / 플레이 사용 가이드
 │   │   ├── play/[gameId]/               # GM 대시보드 / 플레이어 화면
-│   │   ├── rulebook/                    # 규칙/가이드용 라우트 자리
 │   │   └── api/
 │   │       ├── games/[gameId]/          # 게임 CRUD / 자산 업로드
 │   │       ├── join/[sessionCode]/      # 참가용 세션 조회

@@ -144,20 +144,24 @@
 Murder-Mystery_Generator/
 ├── src/
 │   ├── app/
+│   │   ├── (marketing)/                 # 홈/마케팅 라우트 자리
 │   │   ├── library/                     # 게임 목록, 라이브러리 카드
 │   │   ├── maker/
 │   │   │   ├── new/                     # 새 게임 생성 (Step 1)
 │   │   │   └── [gameId]/edit/           # 메이커 편집 (Step 1~6)
 │   │   ├── join/                        # 코드 입력 / 캐릭터 선택 / 재접속
 │   │   ├── play/[gameId]/               # GM 대시보드 / 플레이어 화면
+│   │   ├── rulebook/                    # 규칙/가이드용 라우트 자리
 │   │   └── api/
 │   │       ├── games/[gameId]/          # 게임 CRUD / 자산 업로드
 │   │       ├── join/[sessionCode]/      # 참가용 세션 조회
 │   │       ├── maker-assistant/         # 제작도우미 API
 │   │       ├── server-info/             # LAN 정보 반환
 │   │       └── sessions/[sessionId]/    # 세션 관리, 참가, 재참가, 카드, 투표, SSE
+│   ├── components/ui/                   # 공용 UI 컴포넌트
 │   ├── lib/
 │   │   ├── ai/                          # 프롬프트, 컨텍스트, 스키마, OpenAI client
+│   │   ├── db/                          # 배포 전환용 DB 레이어 자리
 │   │   ├── sse/                         # SSE broadcaster
 │   │   └── storage/                     # 로컬 JSON 저장소 I/O
 │   └── types/
@@ -167,7 +171,14 @@ Murder-Mystery_Generator/
 ├── data/                                # 런타임 데이터 (gitignored)
 │   ├── games/{id}/game.json
 │   └── sessions/{id}.json
-└── docs/
+├── docs/
+│   ├── backlog/                         # 구현 후보 / 정책 백로그
+│   ├── plans/                           # 구현 계획 / 테스트 계획
+│   ├── research/                        # 배포/리스크 검토
+│   ├── handoff/                         # 작업 로그 / 인수인계
+│   ├── SPEC.md
+│   └── README.md
+└── ai_history/                          # 작업 리포트 아카이브
 ```
 
 ## 시작하기
@@ -215,14 +226,25 @@ npm run dev:tunnel
 - 제작도우미 `문안` 결과를 입력칸으로 바로 복사/적용하는 UX
 - Step별 초안 프리셋과 문체 튜닝 고도화
 - 라운드 대표 이미지 업로드와 미디어 편집 UX 정리
+- 공개 라이브러리와 메이커 편집 권한 분리
+  - 플레이는 공개 라이브러리
+  - 편집은 자기 게임만
+- 홈/라이브러리 진입 시 `게임 만들기 / 게임 플레이` 사용 가이드 분리
 - `재참가 허용` 이후 기존 접속자에게 권한 교체 안내 표시
 - 게임 패키지 내보내기/가져오기와 인쇄용 PDF 출력
 - 장기적으로 `RAG + LLM` 기반 NPC 제작 확장
 
 ## 문서
 
+- 문서 인덱스: [`docs/README.md`](docs/README.md)
 - 상세 명세: [`docs/SPEC.md`](docs/SPEC.md)
-- AI 제작도우미 설계 초안: [`docs/LLM_MAKER_ASSISTANT_PLAN.md`](docs/LLM_MAKER_ASSISTANT_PLAN.md)
+- 배포 검토: [`docs/research/20260319_VERCEL_SUPABASE_DEPLOYMENT_REVIEW.md`](docs/research/20260319_VERCEL_SUPABASE_DEPLOYMENT_REVIEW.md)
+- 로컬 데이터/배포 리스크: [`docs/research/20260319_LOCAL_DATA_DEPLOYMENT_RISK.md`](docs/research/20260319_LOCAL_DATA_DEPLOYMENT_RISK.md)
+- AI 제작도우미 설계 초안: [`docs/plans/LLM_MAKER_ASSISTANT_PLAN.md`](docs/plans/LLM_MAKER_ASSISTANT_PLAN.md)
+- 라이브러리/메이커 접근 분리 백로그: [`docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md`](docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md)
+- 라이브러리/메이커 접근 분리 계획: [`docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md`](docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md)
+- 로컬 제작자 유저 테스트 계획: [`docs/plans/20260319_LOCAL_CREATOR_USER_TEST_PLAN.md`](docs/plans/20260319_LOCAL_CREATOR_USER_TEST_PLAN.md)
+- 홈 진입 가이드 백로그: [`docs/backlog/20260319_HOME_ENTRY_GUIDE_BACKLOG.md`](docs/backlog/20260319_HOME_ENTRY_GUIDE_BACKLOG.md)
 - AI 레이어 구현 메모: [`src/lib/ai/README.md`](src/lib/ai/README.md)
 - 환경 변수 예시: [`.env.example`](.env.example)
 

@@ -26,6 +26,7 @@
 - [20260317_MEDIA_CLUE_ENDING_FOLLOWUP_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260317_MEDIA_CLUE_ENDING_FOLLOWUP_PLAN.md)
 - [20260319_LIBRARY_MAKER_ACCESS_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md)
 - [20260319_LOCAL_CREATOR_USER_TEST_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LOCAL_CREATOR_USER_TEST_PLAN.md)
+- [20260319_SUPABASE_SCHEMA_DRAFT.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_SUPABASE_SCHEMA_DRAFT.md)
 
 ## Research
 

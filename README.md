@@ -186,6 +186,7 @@ Murder-Mystery_Generator/
 ```bash
 npm install
 # OpenAI 연동이 필요하면 .env.example 참고 후 .env 설정
+# 제작자 테스트 보호가 필요하면 MAKER_ACCESS_PASSWORD 설정
 npm run dev
 ```
 
@@ -203,6 +204,7 @@ npm run dev:tunnel
 
 - `npm run dev`: 같은 Wi-Fi 또는 LAN 환경 테스트
 - `npm run dev:tunnel`: 외부 네트워크, 공용 Wi-Fi, 원격 모바일 테스트
+- `MAKER_ACCESS_PASSWORD` 를 설정하면 `/library`, `/maker/*`, 게임 수정 API에 임시 비밀번호 게이트가 적용됩니다.
 
 ## 사용 흐름
 

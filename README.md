@@ -205,6 +205,8 @@ npm run dev:tunnel
 - `npm run dev`: 같은 Wi-Fi 또는 LAN 환경 테스트
 - `npm run dev:tunnel`: 외부 네트워크, 공용 Wi-Fi, 원격 모바일 테스트
 - `MAKER_ACCESS_PASSWORD` 를 설정하면 `/library`, `/maker/*`, 게임 수정 API에 임시 비밀번호 게이트가 적용됩니다.
+- 이 값은 `게임별 비밀번호` 가 아니라 `메이커 전체 공통 비밀번호` 입니다.
+- 즉 비밀번호를 아는 사용자는 현재 모든 게임을 편집할 수 있습니다.
 
 ## 사용 흐름
 

@@ -4,7 +4,6 @@ import { useState } from "react";
 import ImageAssetField from "./ImageAssetField";
 import type {
   GamePackage,
-  Player,
   ScriptSegment,
   Story,
   StoryNpc,
@@ -17,7 +16,6 @@ interface StoryEditorProps {
   gameId: GamePackage["id"];
   story: Story;
   opening: ScriptSegment;
-  players: Player[];
   onChangeStory: (story: Story) => void;
   onChangeOpening: (opening: ScriptSegment) => void;
 }
@@ -41,7 +39,6 @@ function Field({ label, hint, required, children }: {
 
 const ta = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition resize-none";
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
-const sel = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 const DEFAULT_TIMELINE_SLOT_LABELS = ["19:00", "19:30", "20:00", "20:30"];
 
 /** 타임라인 슬롯 1개를 생성한다. */
@@ -71,7 +68,6 @@ export default function StoryEditor({
   gameId,
   story,
   opening,
-  players,
   onChangeStory,
   onChangeOpening,
 }: StoryEditorProps) {
@@ -185,11 +181,11 @@ export default function StoryEditor({
       <div>
         <h2 className="text-xl font-bold text-dark-50">오프닝 / 배경 설정</h2>
         <p className="mt-1 text-sm text-dark-500">
-          오프닝 도입, 범인 지정, 대표 지도, 피해자/NPC 공개 정보와 타임라인을 함께 설정합니다.
+          오프닝 도입, 대표 지도, 피해자/NPC 공개 정보와 타임라인을 함께 설정합니다.
         </p>
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-2-opening" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-dark-100">오프닝</h3>
           <p className="mt-1 text-xs text-dark-500">
@@ -241,39 +237,6 @@ export default function StoryEditor({
 
       <div className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-dark-100">범인 지정</h3>
-          <p className="mt-1 text-xs text-dark-500">
-            엔딩 분기와 투표 결과 판정에 사용할 범인을 지정합니다.
-          </p>
-        </div>
-
-        <Field
-          label="범인"
-          hint={players.length === 0 ? "Step 3(플레이어)에서 먼저 캐릭터를 추가하세요." : undefined}
-        >
-          <select
-            value={story.culpritPlayerId}
-            onChange={(e) => updateStory("culpritPlayerId", e.target.value)}
-            disabled={players.length === 0}
-            className={sel}
-          >
-            <option value="">— 범인을 선택하세요 —</option>
-            {players.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.name || "(이름 없음)"}
-              </option>
-            ))}
-          </select>
-          {story.culpritPlayerId && (
-            <p className="mt-1 text-xs text-mystery-400">
-              선택됨: {players.find((player) => player.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
-            </p>
-          )}
-        </Field>
-      </div>
-
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
-        <div>
           <h3 className="text-sm font-semibold text-dark-100">대표 지도 / 참고 이미지</h3>
           <p className="mt-1 text-xs text-dark-500">
             기본 공통 이미지입니다. 라운드별 이미지가 없으면 이 이미지를 계속 사용합니다.
@@ -296,7 +259,7 @@ export default function StoryEditor({
         />
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-2-victim" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-dark-100">피해자 정보</h3>
           <span className="text-xs text-dark-500">(플레이어 인물 정보에서 공개)</span>
@@ -337,7 +300,7 @@ export default function StoryEditor({
         </Field>
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-2-npcs" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-dark-100">NPC 인물</h3>
@@ -414,7 +377,7 @@ export default function StoryEditor({
         )}
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-2-timeline" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-sm font-semibold text-dark-100">행동 타임라인</h3>

@@ -113,7 +113,7 @@ export default function EndingEditor({
         </p>
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-6-branches" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-dark-100">분기 엔딩</h3>
@@ -317,7 +317,7 @@ export default function EndingEditor({
         )}
       </div>
 
-      <div className="rounded-xl border border-dark-700 p-5 space-y-4">
+      <div data-maker-anchor="step-6-author-notes" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-dark-100">작가 추가 설명</h3>

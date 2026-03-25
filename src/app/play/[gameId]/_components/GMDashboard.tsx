@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import {
   ENDING_STAGE_LABELS,
@@ -10,11 +11,12 @@ import {
   resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
 import type { GamePackage, GameRules } from "@/types/game";
-import type { EndingStage, GameSession, SharedState, CharacterSlot } from "@/types/session";
+import type { EndingStage, GameSession, GameSessionSummary, SharedState, CharacterSlot } from "@/types/session";
 
 interface GMDashboardProps {
   game: GamePackage;
   initialSession: GameSession | null;
+  initialSessionSummaries: GameSessionSummary[];
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -38,6 +40,30 @@ const SUB_PHASE_LABELS: Record<ActiveSubPhase, string> = {
 
 function normalizeSubPhase(subPhase?: string): ActiveSubPhase {
   return subPhase === "discussion" || subPhase === "briefing" ? "discussion" : "investigation";
+}
+
+/**
+ * 세션 목록 카드에서 한 줄 상태 요약을 만든다.
+ */
+function getSessionBadgeLabel(session: GameSessionSummary): string {
+  if (session.phase.startsWith("round-")) {
+    const subPhase = normalizeSubPhase(session.currentSubPhase);
+    return `Round ${session.currentRound} · ${SUB_PHASE_LABELS[subPhase]}`;
+  }
+
+  return phaseLabel(session.phase);
+}
+
+/**
+ * 세션 생성 시각을 GM이 빠르게 구분할 수 있는 짧은 문자열로 포맷한다.
+ */
+function formatSessionCreatedAt(value: string): string {
+  return new Date(value).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 type VideoSource =
@@ -810,8 +836,15 @@ function EventLog({ entries }: { entries: GameSession["sharedState"]["eventLog"]
 }
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
-export default function GMDashboard({ game, initialSession }: GMDashboardProps) {
+export default function GMDashboard({
+  game,
+  initialSession,
+  initialSessionSummaries,
+}: GMDashboardProps) {
+  const router = useRouter();
   const [session, setSession] = useState<GameSession | null>(initialSession);
+  const [sessionSummaries, setSessionSummaries] = useState<GameSessionSummary[]>(initialSessionSummaries);
+  const [showSessionList, setShowSessionList] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [advancingEndingStage, setAdvancingEndingStage] = useState(false);
@@ -820,6 +853,43 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
   const [endingSession, setEndingSession] = useState(false);
   const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
+
+  useEffect(() => {
+    setSession(initialSession);
+  }, [initialSession]);
+
+  useEffect(() => {
+    setSessionSummaries(initialSessionSummaries);
+    void refreshSessionSummaries(initialSession?.id);
+  }, [initialSession?.id, initialSessionSummaries]);
+
+  /**
+   * 현재 게임의 활성 세션 목록을 다시 읽고,
+   * 필요하면 특정 세션을 현재 선택 세션으로 맞춘다.
+   */
+  async function refreshSessionSummaries(preferredSessionId?: string) {
+    try {
+      const res = await fetch(`/api/sessions?gameId=${game.id}`);
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json() as { sessions?: GameSessionSummary[] };
+      const nextSummaries = data.sessions ?? [];
+      setSessionSummaries(nextSummaries);
+
+      if (preferredSessionId) {
+        const preferred = nextSummaries.find((item) => item.id === preferredSessionId);
+        if (!preferred) {
+          return;
+        }
+      }
+
+      if (nextSummaries.length === 0 && session?.endedAt) {
+        setSession(null);
+      }
+    } catch {}
+  }
 
   // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 세션 상태 동기화
   useEffect(() => {
@@ -830,6 +900,7 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
         if (!res.ok) return;
         const data = await res.json();
         setSession((prev) => (prev ? { ...prev, ...data.session } : prev));
+        await refreshSessionSummaries(session.id);
       } catch {}
     }, 3000);
     return () => clearInterval(id);
@@ -854,19 +925,25 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
 
   async function createSession() {
     setCreating(true);
-    const res = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId: game.id }),
-    });
-    if (res.ok) {
-      const { session: created } = await res.json();
-      setSession(created);
-    } else {
-      const err = await res.json();
-      alert(err.error ?? "세션 생성 실패");
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id }),
+      });
+      if (res.ok) {
+        const { session: created } = await res.json() as { session: GameSession };
+        setSession(created);
+        setShowSessionList(false);
+        await refreshSessionSummaries(created.id);
+        router.push(`/play/${game.id}?session=${created.id}`);
+      } else {
+        const err = await res.json();
+        alert(err.error ?? "세션 생성 실패");
+      }
+    } finally {
+      setCreating(false);
     }
-    setCreating(false);
   }
 
   async function advancePhase() {
@@ -991,21 +1068,33 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
     if (!session) return;
     if (!confirm("세션을 강제 종료하시겠습니까? 플레이어들이 엔딩 화면으로 이동합니다.")) return;
     setEndingSession(true);
-    await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "end_session" }),
-    });
-    setEndingSession(false);
+    try {
+      await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "end_session" }),
+      });
+      setSession((prev) => (
+        prev ? { ...prev, endedAt: new Date().toISOString() } : prev
+      ));
+      await refreshSessionSummaries();
+    } finally {
+      setEndingSession(false);
+    }
   }
 
   async function deleteSession() {
     if (!session) return;
     if (!confirm("세션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
     setDeleting(true);
-    await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
-    setDeleting(false);
-    // session_deleted SSE 이벤트로 setSession(null) 처리됨
+    try {
+      await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+      setSession(null);
+      await refreshSessionSummaries();
+    } finally {
+      setDeleting(false);
+    }
+    // session_deleted SSE 이벤트도 함께 전달됨
   }
 
   async function unlockSlot(playerId: string) {
@@ -1112,20 +1201,164 @@ export default function GMDashboard({ game, initialSession }: GMDashboardProps) 
 
       {/* 세션 없음 */}
       {!session ? (
-        <div className="text-center py-20 border-2 border-dashed border-dark-700 rounded-2xl">
-          <p className="text-dark-400 mb-6">아직 활성 세션이 없습니다.</p>
-          <button
-            onClick={createSession}
-            disabled={creating}
-            className="px-6 py-3 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
-          >
-            {creating ? "생성 중…" : "새 세션 시작"}
-          </button>
+        <div className="space-y-4">
+          {sessionSummaries.length > 0 ? (
+            <div className="rounded-2xl border border-dark-800 bg-dark-900 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-dark-600">Active Sessions</p>
+                  <h2 className="mt-1 text-lg font-semibold text-dark-50">활성 세션 {sessionSummaries.length}개</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSessionList((prev) => !prev)}
+                    className="rounded-xl border border-dark-700 px-4 py-2 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                  >
+                    {showSessionList ? "세션 목록 닫기" : "세션 목록 보기"}
+                  </button>
+                  <button
+                    onClick={createSession}
+                    disabled={creating}
+                    className="rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+                  >
+                    {creating ? "생성 중…" : "새 세션 시작"}
+                  </button>
+                </div>
+              </div>
+              {showSessionList ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {sessionSummaries.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setShowSessionList(false);
+                        router.push(`/play/${game.id}?session=${item.id}`);
+                      }}
+                      className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-dark-50">{item.sessionCode}</p>
+                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
+                          {getSessionBadgeLabel(item)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
+                      <p className="mt-3 text-sm text-dark-300">
+                        {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="text-center py-20 border-2 border-dashed border-dark-700 rounded-2xl">
+            <p className="text-dark-400 mb-6">아직 활성 세션이 없습니다.</p>
+            <button
+              onClick={createSession}
+              disabled={creating}
+              className="px-6 py-3 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+            >
+              {creating ? "생성 중…" : "새 세션 시작"}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 왼쪽: 세션 코드 + 페이즈 제어 */}
           <div className="space-y-4">
+            <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-dark-500">활성 세션</p>
+                  <p className="text-sm font-semibold text-dark-100">
+                    현재 {session.sessionCode} · 총 {sessionSummaries.length}개
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {sessionSummaries.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowSessionList((prev) => !prev)}
+                      className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                    >
+                      {showSessionList ? "목록 닫기" : "세션 목록"}
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={createSession}
+                    disabled={creating}
+                    className="rounded-lg border border-mystery-600 bg-mystery-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+                  >
+                    {creating ? "생성 중…" : "새 세션 시작"}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-dark-100">현재 세션 상태</p>
+                  <span className="text-[11px] text-dark-500">{formatSessionCreatedAt(session.createdAt)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                  <span className="text-mystery-300">
+                    {getSessionBadgeLabel({
+                      id: session.id,
+                      sessionCode: session.sessionCode,
+                      createdAt: session.createdAt,
+                      startedAt: session.startedAt,
+                      phase: session.sharedState.phase,
+                      currentRound: session.sharedState.currentRound,
+                      currentSubPhase: session.sharedState.currentSubPhase,
+                      lockedPlayerCount: session.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
+                      totalPlayerCount: session.sharedState.characterSlots.length,
+                    })}
+                  </span>
+                  <span className="text-dark-500">
+                    {session.sharedState.characterSlots.filter((slot) => slot.isLocked).length}/{session.sharedState.characterSlots.length}명
+                  </span>
+                </div>
+              </div>
+              {showSessionList ? (
+                <div className="space-y-2">
+                  {sessionSummaries.map((item) => {
+                    const isSelected = item.id === session.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setShowSessionList(false);
+                          router.push(`/play/${game.id}?session=${item.id}`);
+                        }}
+                        className={[
+                          "w-full rounded-xl border px-3 py-3 text-left transition-colors",
+                          isSelected
+                            ? "border-mystery-600 bg-mystery-950/25"
+                            : "border-dark-700 bg-dark-950/60 hover:border-dark-500",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-dark-100">{item.sessionCode}</p>
+                          <span className="text-[11px] text-dark-500">{formatSessionCreatedAt(item.createdAt)}</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                          <span className={isSelected ? "text-mystery-300" : "text-dark-400"}>
+                            {getSessionBadgeLabel(item)}
+                          </span>
+                          <span className="text-dark-500">
+                            {item.lockedPlayerCount}/{item.totalPlayerCount}명
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+
             <SessionCode code={session.sessionCode} />
 
             {/* 페이즈 제어 */}

@@ -11,8 +11,8 @@ interface Step {
 
 const STEPS: Step[] = [
   { id: 1, label: "기본 설정", description: "태그·인원·난이도·시간" },
-  { id: 2, label: "오프닝 / 배경 설정", description: "오프닝·범인·대표지도·피해자·NPC" },
-  { id: 3, label: "플레이어", description: "캐릭터별 배경·상세 스토리·비밀" },
+  { id: 2, label: "오프닝 / 배경 설정", description: "오프닝·대표지도·피해자·NPC" },
+  { id: 3, label: "플레이어", description: "범인·배경·상세 스토리·비밀" },
   { id: 4, label: "단서 카드", description: "물적 증거·증언·현장 단서" },
   { id: 5, label: "스크립트", description: "라운드 가이드·미디어·이벤트" },
   { id: 6, label: "엔딩", description: "분기 엔딩·개인 엔딩·작가 노트" },

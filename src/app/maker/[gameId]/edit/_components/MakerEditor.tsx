@@ -11,7 +11,10 @@ import EndingEditor from "./EndingEditor";
 import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
 import type { GamePackage, Player, Story } from "@/types/game";
-import { validateMakerGame } from "@/lib/maker-validation";
+import {
+  validateMakerGame,
+  type MakerValidationIssue,
+} from "@/lib/maker-validation";
 
 interface MakerEditorProps {
   initialGame: GamePackage;
@@ -58,6 +61,7 @@ function pruneDanglingRelationships(players: Player[], story: Story): Player[] {
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const editVersionRef = useRef(0);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
+  const validationPanelRef = useRef<HTMLDivElement | null>(null);
   const [game, setGame] = useState<GamePackage>(initialGame);
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -65,7 +69,14 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [assistantLauncherBottomOffset, setAssistantLauncherBottomOffset] = useState(120);
+  const [focusRequest, setFocusRequest] = useState<{ target: string | null; token: number }>({
+    target: null,
+    token: 0,
+  });
   const validation = validateMakerGame(game);
+  const currentStepIssues = validation.stepIssues[currentStep] ?? [];
+  const currentStepErrorIssues = currentStepIssues.filter((issue) => issue.level === "error");
+  const currentStepWarningIssues = currentStepIssues.filter((issue) => issue.level === "warning");
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
     setGame((prev) => {
@@ -130,6 +141,81 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
       window.removeEventListener("resize", updateLauncherOffset);
     };
   }, []);
+
+  /**
+   * 검증 이슈 문구를 현재 편집기 내부 섹션 anchor로 매핑한다.
+   * 완전히 일치하는 필드가 없더라도 사용자가 가장 빨리 수정할 수 있는 블록으로 이동시키는 목적이다.
+   */
+  function getValidationAnchor(issue: MakerValidationIssue): string | null {
+    const { step, message } = issue;
+
+    if (step === 1) {
+      if (message.includes("시나리오 제목")) return "step-1-title";
+      if (message.includes("태그")) return "step-1-tags";
+      if (message.includes("소개글")) return "step-1-summary";
+      if (message.includes("플레이어 수") || message.includes("등록 캐릭터")) return "step-1-player-count";
+      return "step-1-title";
+    }
+
+    if (step === 2) {
+      if (message.includes("오프닝 스토리")) return "step-2-opening";
+      if (message.includes("피해자")) return "step-2-victim";
+      if (message.includes("NPC")) return "step-2-npcs";
+      if (message.includes("타임라인") || message.includes("시간대 슬롯")) return "step-2-timeline";
+      return "step-2-opening";
+    }
+
+    if (step === 3) {
+      if (message.includes("범인")) return "step-3-culprit";
+      if (message.includes("행동 타임라인")) return "step-3-timeline";
+      return "step-3-players";
+    }
+
+    if (step === 4) {
+      if (message.includes("단서")) return "step-4-clues";
+      return "step-4-locations";
+    }
+
+    if (step === 5) {
+      if (message.includes("투표")) return "step-5-vote";
+      return "step-5-rounds";
+    }
+
+    if (step === 6) {
+      if (message.includes("작가 추가 설명")) return "step-6-author-notes";
+      return "step-6-branches";
+    }
+
+    return null;
+  }
+
+  /**
+   * 현재 스텝의 검증 이슈 위치로 이동한다.
+   * 탭 전환이 필요한 컴포넌트도 있어 한 번 더 지연 호출해 DOM이 바뀐 뒤 다시 스크롤한다.
+   */
+  function focusValidationIssue(issue: MakerValidationIssue) {
+    const target = getValidationAnchor(issue);
+    setFocusRequest((prev) => ({
+      target,
+      token: prev.token + 1,
+    }));
+
+    const runScroll = () => {
+      const anchor = target
+        ? document.querySelector<HTMLElement>(`[data-maker-anchor="${target}"]`)
+        : validationPanelRef.current;
+
+      if (!anchor) {
+        return;
+      }
+
+      const top = Math.max(anchor.getBoundingClientRect().top + window.scrollY - 20, 0);
+      window.scrollTo({ top, behavior: "smooth" });
+    };
+
+    window.requestAnimationFrame(runScroll);
+    window.setTimeout(runScroll, 180);
+  }
 
   async function save(updatedGame: GamePackage = game): Promise<boolean> {
     if (saving) {
@@ -223,6 +309,51 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           </div>
         )}
 
+        {currentStepIssues.length > 0 && (
+          <div
+            ref={validationPanelRef}
+            className={`rounded-2xl border px-5 py-4 ${
+              currentStepErrorIssues.length > 0
+                ? "border-red-900/70 bg-red-950/20"
+                : "border-yellow-900/70 bg-yellow-950/20"
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
+                <p className="mt-1 text-xs text-dark-400">
+                  에러 {currentStepErrorIssues.length}개
+                  {currentStepWarningIssues.length > 0 ? ` · 경고 ${currentStepWarningIssues.length}개` : ""}
+                  {" · "}에러는 우선 수정이 필요한 항목이고, 경고는 보완 권장 항목입니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {currentStepIssues.map((issue, index) => (
+                <button
+                  key={`${issue.step}-${issue.level}-${index}`}
+                  type="button"
+                  onClick={() => focusValidationIssue(issue)}
+                  className="flex w-full items-start justify-between gap-3 rounded-xl border border-dark-700/80 bg-dark-950/40 px-3 py-3 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
+                >
+                  <div className="min-w-0">
+                    <p
+                      className={`text-[11px] font-medium uppercase tracking-[0.18em] ${
+                        issue.level === "error" ? "text-red-300" : "text-yellow-300"
+                      }`}
+                    >
+                      {issue.level === "error" ? "필수 입력 필요" : "보완 권장"}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-dark-100">{issue.message}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-mystery-300">위치 보기</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
           {currentStep === 1 && (
             <SettingsEditor
@@ -235,7 +366,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               gameId={game.id}
               story={game.story}
               opening={game.scripts.opening}
-              players={game.players ?? []}
               onChangeStory={(story) => updateGame({ story })}
               onChangeOpening={(opening) => updateGame({
                 scripts: {
@@ -252,7 +382,20 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               clues={game.clues}
               story={game.story}
               timeline={game.story.timeline}
-              onChange={(players) => updateGame({ players })}
+              onChange={(players) => updateGame({
+                players,
+                story: players.some((player) => player.id === game.story.culpritPlayerId)
+                  ? game.story
+                  : { ...game.story, culpritPlayerId: "" },
+              })}
+              onChangeCulprit={(culpritPlayerId) => updateGame({
+                story: {
+                  ...game.story,
+                  culpritPlayerId,
+                },
+              })}
+              focusTarget={focusRequest.target}
+              focusToken={focusRequest.token}
             />
           )}
           {currentStep === 4 && (
@@ -273,6 +416,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}
               onChange={(scripts) => updateGame({ scripts })}
+              focusTarget={focusRequest.target}
+              focusToken={focusRequest.token}
             />
           )}
           {currentStep === 6 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Location, RoundScript, ScriptSegment, Scripts } from "@/types/game";
 
 interface ScriptEditorProps {
@@ -8,6 +8,8 @@ interface ScriptEditorProps {
   rounds: number;
   locations: Location[];
   onChange: (scripts: Scripts) => void;
+  focusTarget?: string | null;
+  focusToken?: number;
 }
 
 type Tab = "lobby" | "rounds" | "vote";
@@ -462,6 +464,8 @@ export default function ScriptEditor({
   rounds,
   locations,
   onChange,
+  focusTarget,
+  focusToken,
 }: ScriptEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("lobby");
 
@@ -494,6 +498,21 @@ export default function ScriptEditor({
     { id: "rounds", label: `라운드 (${roundCount}개)`, status: getRoundsTabStatus(normalizedRounds) },
     { id: "vote", label: "투표", status: getSegmentStatus(scripts.vote) },
   ];
+
+  useEffect(() => {
+    if (!focusTarget) {
+      return;
+    }
+
+    if (focusTarget === "step-5-vote") {
+      setActiveTab("vote");
+      return;
+    }
+
+    if (focusTarget === "step-5-rounds") {
+      setActiveTab("rounds");
+    }
+  }, [focusTarget, focusToken]);
 
   return (
     <div className="space-y-6">
@@ -537,7 +556,7 @@ export default function ScriptEditor({
       )}
 
       {activeTab === "rounds" && (
-        <div className="space-y-3">
+        <div data-maker-anchor="step-5-rounds" className="space-y-3">
           <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
             <p className="text-sm font-semibold text-dark-100">라운드 작성 현황</p>
             <p className="text-xs text-dark-500">
@@ -560,15 +579,17 @@ export default function ScriptEditor({
       )}
 
       {activeTab === "vote" && (
-        <SegmentEditor
-          label="투표"
-          phaseLabel="투표"
-          segment={scripts.vote}
-          guidance={SEGMENT_GUIDANCE.vote}
-          onChange={(vote) => onChange({ ...scripts, vote })}
-          textLabel="투표 안내 텍스트"
-          textBadgeLabel="안내 텍스트"
-        />
+        <div data-maker-anchor="step-5-vote">
+          <SegmentEditor
+            label="투표"
+            phaseLabel="투표"
+            segment={scripts.vote}
+            guidance={SEGMENT_GUIDANCE.vote}
+            onChange={(vote) => onChange({ ...scripts, vote })}
+            textLabel="투표 안내 텍스트"
+            textBadgeLabel="안내 텍스트"
+          />
+        </div>
       )}
     </div>
   );

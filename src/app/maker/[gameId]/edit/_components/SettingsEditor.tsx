@@ -126,7 +126,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         <p className="text-sm text-dark-500 mt-1">시나리오 제목, 태그, 난이도, 게임 규칙을 수정합니다.</p>
       </div>
 
-      <div>
+      <div data-maker-anchor="step-1-title">
         <label className="block text-sm font-medium text-dark-200 mb-2">시나리오 제목</label>
         <input
           type="text"
@@ -137,7 +137,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         />
       </div>
 
-      <div>
+      <div data-maker-anchor="step-1-summary">
         <label className="block text-sm font-medium text-dark-200 mb-2">소개글</label>
         <textarea
           rows={3}
@@ -170,7 +170,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         />
       </div>
 
-      <div>
+      <div data-maker-anchor="step-1-tags">
         <label className="block text-sm font-medium text-dark-200 mb-3">태그</label>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -228,7 +228,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div>
+        <div data-maker-anchor="step-1-player-count">
           <label className="block text-sm font-medium text-dark-200 mb-3">플레이어 수</label>
           <div className="flex items-center gap-3">
             <button

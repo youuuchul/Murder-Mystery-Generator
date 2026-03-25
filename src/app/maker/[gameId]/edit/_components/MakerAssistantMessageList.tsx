@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   MAKER_ASSISTANT_RESPONSE_MODE_LABELS,
   MAKER_ASSISTANT_TASK_LABELS,
@@ -135,32 +135,7 @@ function getFindingClasses(finding: MakerAssistantFinding): string {
 
 function renderAssistantResult(messageId: string, result: MakerAssistantGuideResult | MakerAssistantDraftResult) {
   if (result.mode === "draft") {
-    return (
-      <div className="mt-4 space-y-3">
-        {result.title ? (
-          <div className="rounded-xl border border-dark-700 bg-dark-950/30 px-3 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">제목</p>
-            <p className="mt-2 text-sm font-medium text-dark-50">{result.title}</p>
-          </div>
-        ) : null}
-        <div className="rounded-xl border border-mystery-900/60 bg-black/15 px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
-          <p className="mt-3 text-sm leading-relaxed whitespace-pre-line text-dark-50">
-            {result.body}
-          </p>
-        </div>
-        {result.notes.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">짧은 메모</p>
-            <ul className="space-y-2 text-sm text-dark-300">
-              {result.notes.map((note, index) => (
-                <li key={`${messageId}-note-${index}`}>{note}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-    );
+    return <DraftResultPanel messageId={messageId} result={result} />;
   }
 
   return (
@@ -238,6 +213,63 @@ function renderAssistantResult(messageId: string, result: MakerAssistantGuideRes
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function DraftResultPanel({
+  messageId,
+  result,
+}: {
+  messageId: string;
+  result: MakerAssistantDraftResult;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(result.body);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+      alert("복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      {result.title ? (
+        <div className="rounded-xl border border-dark-700 bg-dark-950/30 px-3 py-3">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">제목</p>
+          <p className="mt-2 text-sm font-medium text-dark-50">{result.title}</p>
+        </div>
+      ) : null}
+      <div className="rounded-xl border border-mystery-900/60 bg-black/15 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-lg border border-mystery-700/70 bg-mystery-950/30 px-3 py-1.5 text-xs font-medium text-mystery-200 transition-colors hover:border-mystery-600 hover:bg-mystery-950/45"
+          >
+            {copied ? "복사됨" : "본문 복사"}
+          </button>
+        </div>
+        <pre className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-dark-50 font-sans">
+          {result.body}
+        </pre>
+      </div>
+      {result.notes.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">짧은 메모</p>
+          <ul className="space-y-2 text-sm text-dark-300">
+            {result.notes.map((note, index) => (
+              <li key={`${messageId}-note-${index}`}>{note}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

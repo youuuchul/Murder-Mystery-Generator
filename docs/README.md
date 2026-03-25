@@ -21,6 +21,7 @@
 - [20260317_PLAYER_REJOIN_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260317_PLAYER_REJOIN_BACKLOG.md)
 - [20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md)
 - [20260319_HOME_ENTRY_GUIDE_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_HOME_ENTRY_GUIDE_BACKLOG.md)
+- [20260319_CREATOR_TEST_NOTES_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_CREATOR_TEST_NOTES_BACKLOG.md)
 
 ## Plans
 

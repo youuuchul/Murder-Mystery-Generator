@@ -2,20 +2,44 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getGame } from "@/lib/storage/game-storage";
 import { listActiveSessions } from "@/lib/storage/session-storage";
+import type { GameSession, GameSessionSummary } from "@/types/session";
 import GMDashboard from "./_components/GMDashboard";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * GM 진입 시 보여줄 세션 선택용 경량 요약 정보로 변환한다.
+ */
+function toSessionSummary(session: GameSession): GameSessionSummary {
+  return {
+    id: session.id,
+    sessionCode: session.sessionCode,
+    createdAt: session.createdAt,
+    startedAt: session.startedAt,
+    phase: session.sharedState.phase,
+    currentRound: session.sharedState.currentRound,
+    currentSubPhase: session.sharedState.currentSubPhase,
+    lockedPlayerCount: session.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
+    totalPlayerCount: session.sharedState.characterSlots.length,
+  };
+}
+
 export default async function PlayPage({
   params,
+  searchParams,
 }: {
   params: { gameId: string };
+  searchParams?: { session?: string };
 }) {
   const game = getGame(params.gameId);
   if (!game) notFound();
 
   const activeSessions = listActiveSessions(params.gameId);
-  const currentSession = activeSessions[0] ?? null;
+  const requestedSessionId = searchParams?.session;
+  const currentSession = activeSessions.find((item) => item.id === requestedSessionId)
+    ?? activeSessions[0]
+    ?? null;
+  const initialSessionSummaries = activeSessions.map(toSessionSummary);
 
   return (
     <div className="min-h-screen bg-dark-950 text-dark-100">
@@ -30,7 +54,11 @@ export default async function PlayPage({
         </div>
       </header>
       <main className="max-w-6xl mx-auto p-4 sm:p-6">
-        <GMDashboard game={game} initialSession={currentSession} />
+        <GMDashboard
+          game={game}
+          initialSession={currentSession}
+          initialSessionSummaries={initialSessionSummaries}
+        />
       </main>
     </div>
   );

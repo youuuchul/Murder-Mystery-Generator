@@ -690,7 +690,7 @@ export default function LocationEditor({
   const totalClues = clues.length;
 
   return (
-    <div className="space-y-6">
+    <div data-maker-anchor="step-4-locations" className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-dark-50">장소 & 단서 카드</h2>
@@ -780,7 +780,7 @@ export default function LocationEditor({
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div data-maker-anchor="step-4-clues" className="space-y-3">
           {locations.map((location, idx) => {
             const locationClues = clues.filter((c) => c.locationId === location.id);
             return (

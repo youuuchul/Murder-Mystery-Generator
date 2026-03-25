@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type {
+  Response as OpenAIResponse,
+  ResponseCreateParamsNonStreaming,
+} from "openai/resources/responses/responses";
 import { ZodError } from "zod";
 import {
   getMakerAssistantModel,
@@ -17,6 +21,14 @@ import {
   parseMakerAssistantResult,
 } from "@/lib/ai/maker-assistant-schema";
 import type { MakerAssistantResponse, MakerAssistantResult } from "@/types/assistant";
+
+const PRIMARY_RESPONSE_MAX_OUTPUT_TOKENS = 1800;
+const PRIMARY_RESPONSE_RETRY_MAX_OUTPUT_TOKENS = 3200;
+const REPAIR_RESPONSE_MAX_OUTPUT_TOKENS = 1200;
+const REPAIR_RESPONSE_RETRY_MAX_OUTPUT_TOKENS = 2200;
+
+type ResponseTextSource = Pick<OpenAIResponse, "output_text" | "output" | "incomplete_details">;
+type MakerAssistantResponseRequest = Omit<ResponseCreateParamsNonStreaming, "max_output_tokens">;
 
 /** POST /api/maker-assistant — 메이커 편집 화면용 LLM 제작 도우미 */
 export async function POST(request: NextRequest) {
@@ -45,7 +57,7 @@ export async function POST(request: NextRequest) {
       requestedMode: payload.responseMode,
     });
 
-    const response = await client.responses.create({
+    const response = await createResponseWithTokenRetry(client, {
       model: getMakerAssistantModel(),
       store: false,
       instructions: buildMakerAssistantSystemPrompt(payload.task, responseMode),
@@ -59,7 +71,9 @@ export async function POST(request: NextRequest) {
       reasoning: {
         effort: getMakerAssistantReasoningEffort(),
       },
-      max_output_tokens: 900,
+    }, {
+      initialMaxOutputTokens: PRIMARY_RESPONSE_MAX_OUTPUT_TOKENS,
+      retryMaxOutputTokens: PRIMARY_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
     });
 
     const rawText = extractResponseText(response);
@@ -115,7 +129,7 @@ async function resolveMakerAssistantResult(
   let repairSource = rawText;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const repaired = await client.responses.create({
+    const repaired = await createResponseWithTokenRetry(client, {
       model: getMakerAssistantModel(),
       store: false,
       instructions: buildRepairInstructions(responseMode),
@@ -123,7 +137,9 @@ async function resolveMakerAssistantResult(
       reasoning: {
         effort: "low",
       },
-      max_output_tokens: 900,
+    }, {
+      initialMaxOutputTokens: REPAIR_RESPONSE_MAX_OUTPUT_TOKENS,
+      retryMaxOutputTokens: REPAIR_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
     });
 
     const repairedText = extractResponseText(repaired);
@@ -137,6 +153,44 @@ async function resolveMakerAssistantResult(
   }
 
   throw new Error("모델 응답을 유효한 JSON 결과로 복구하지 못했습니다.");
+}
+
+/**
+ * 출력 토큰 상한 때문에 응답이 중간에 잘린 경우 한 번 더 넉넉한 한도로 재시도한다.
+ * 그래도 잘리면 부분 응답을 그대로 쓰지 않고 명시적 오류로 돌려서 잘린 글이 UI에 남지 않게 한다.
+ */
+async function createResponseWithTokenRetry(
+  client: ReturnType<typeof getOpenAIClient>,
+  request: Omit<MakerAssistantResponseRequest, "max_output_tokens">,
+  tokenBudget: {
+    initialMaxOutputTokens: number;
+    retryMaxOutputTokens: number;
+  }
+): Promise<ResponseTextSource> {
+  const firstResponse = await client.responses.create({
+    ...request,
+    max_output_tokens: tokenBudget.initialMaxOutputTokens,
+  });
+
+  if (!isMaxOutputTokenTruncated(firstResponse)) {
+    return firstResponse;
+  }
+
+  const retriedResponse = await client.responses.create({
+    ...request,
+    max_output_tokens: tokenBudget.retryMaxOutputTokens,
+  });
+
+  if (isMaxOutputTokenTruncated(retriedResponse)) {
+    throw new Error("모델 응답이 길어 중간에 잘렸습니다. 질문 범위를 조금 줄이거나 다시 시도해 주세요.");
+  }
+
+  return retriedResponse;
+}
+
+/** Responses API가 `max_output_tokens` 때문에 중간 종료됐는지 판별한다. */
+function isMaxOutputTokenTruncated(response: ResponseTextSource): boolean {
+  return response.incomplete_details?.reason === "max_output_tokens";
 }
 
 /** 파싱 실패 시 기대 모드에 맞는 line 포맷으로만 다시 정리하도록 모델에 지시한다. */

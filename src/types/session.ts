@@ -111,3 +111,16 @@ export interface GameSession {
   playerStates: PlayerState[];
   votes: Record<string, string>; // token → targetPlayerId (비공개, 서버 전용)
 }
+
+/** 세션 목록/선택 UI에서 사용하는 경량 요약 정보 */
+export interface GameSessionSummary {
+  id: string;
+  sessionCode: string;
+  createdAt: string;
+  startedAt?: string;
+  phase: GamePhase;
+  currentRound: number;
+  currentSubPhase?: SharedState["currentSubPhase"];
+  lockedPlayerCount: number;
+  totalPlayerCount: number;
+}

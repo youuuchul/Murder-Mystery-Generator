@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import ImageAssetField from "./ImageAssetField";
 import type {
@@ -21,6 +21,9 @@ interface PlayerEditorProps {
   story: Story;
   timeline: StoryTimeline;
   onChange: (players: Player[]) => void;
+  onChangeCulprit: (playerId: string) => void;
+  focusTarget?: string | null;
+  focusToken?: number;
 }
 
 interface RelationTargetOption {
@@ -180,6 +183,7 @@ function PlayerForm({
   player,
   clues,
   relationTargets,
+  isCulprit,
   onChange,
   onDelete,
 }: {
@@ -187,6 +191,7 @@ function PlayerForm({
   player: Player;
   clues: Clue[];
   relationTargets: RelationTargetOption[];
+  isCulprit: boolean;
   onChange: (p: Player) => void;
   onDelete: () => void;
 }) {
@@ -270,6 +275,11 @@ function PlayerForm({
           <span className="font-medium text-dark-100 truncate">
             {player.name || <span className="text-dark-500 italic">이름 없음</span>}
           </span>
+          {isCulprit && (
+            <span className="shrink-0 rounded-full border border-red-800 bg-red-950/30 px-2 py-0.5 text-xs text-red-200">
+              범인
+            </span>
+          )}
           {conditionInfo && (
             <span className={`text-xs px-2 py-0.5 rounded-full border ${conditionInfo.color} shrink-0`}>
               {conditionInfo.label}
@@ -553,7 +563,17 @@ function PlayerForm({
   );
 }
 
-export default function PlayerEditor({ gameId, players, clues, story, timeline, onChange }: PlayerEditorProps) {
+export default function PlayerEditor({
+  gameId,
+  players,
+  clues,
+  story,
+  timeline,
+  onChange,
+  onChangeCulprit,
+  focusTarget,
+  focusToken,
+}: PlayerEditorProps) {
   const [view, setView] = useState<"profiles" | "timeline">("profiles");
   const syncedPlayers = players.map((player) => alignTimelineEntries(player, timeline));
   const relationTargets: RelationTargetOption[] = [
@@ -571,9 +591,24 @@ export default function PlayerEditor({ gameId, players, clues, story, timeline, 
     })),
   ];
 
+  useEffect(() => {
+    if (!focusTarget) {
+      return;
+    }
+
+    if (focusTarget === "step-3-timeline" && timeline.enabled) {
+      setView("timeline");
+      return;
+    }
+
+    if (focusTarget.startsWith("step-3-")) {
+      setView("profiles");
+    }
+  }, [focusTarget, focusToken, timeline.enabled]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div data-maker-anchor="step-3-players" className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-dark-50">플레이어</h2>
           <p className="text-sm text-dark-500 mt-1">
@@ -586,6 +621,39 @@ export default function PlayerEditor({ gameId, players, clues, story, timeline, 
           )}
         </div>
         <Button size="sm" onClick={() => onChange([...players, createPlayer()])}>+ 플레이어 추가</Button>
+      </div>
+
+      <div data-maker-anchor="step-3-culprit" className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-dark-100">범인 지정</p>
+          <p className="mt-1 text-xs text-dark-500">
+            엔딩 분기와 투표 결과 판정에 사용할 범인을 플레이어 기준으로 선택합니다.
+          </p>
+        </div>
+
+        <select
+          value={story.culpritPlayerId}
+          onChange={(e) => onChangeCulprit(e.target.value)}
+          disabled={syncedPlayers.length === 0}
+          className={inp}
+        >
+          <option value="">— 범인을 선택하세요 —</option>
+          {syncedPlayers.map((player) => (
+            <option key={player.id} value={player.id}>
+              {player.name || "(이름 없음)"}
+            </option>
+          ))}
+        </select>
+
+        {syncedPlayers.length === 0 ? (
+          <p className="text-xs text-dark-600">플레이어를 추가한 뒤 범인을 선택할 수 있습니다.</p>
+        ) : story.culpritPlayerId ? (
+          <p className="text-xs text-mystery-400">
+            선택됨: {syncedPlayers.find((player) => player.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
+          </p>
+        ) : (
+          <p className="text-xs text-yellow-300">아직 범인이 지정되지 않았습니다.</p>
+        )}
       </div>
 
       <div className="flex gap-1 bg-dark-900 p-1 rounded-xl border border-dark-800">
@@ -614,11 +682,13 @@ export default function PlayerEditor({ gameId, players, clues, story, timeline, 
       </div>
 
       {view === "timeline" && timeline.enabled ? (
-        <TimelineMatrixEditor
-          players={syncedPlayers}
-          timeline={timeline}
-          onChange={onChange}
-        />
+        <div data-maker-anchor="step-3-timeline">
+          <TimelineMatrixEditor
+            players={syncedPlayers}
+            timeline={timeline}
+            onChange={onChange}
+          />
+        </div>
       ) : players.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-dark-700 rounded-xl">
           <p className="text-dark-500">등록된 플레이어가 없습니다.</p>
@@ -639,6 +709,7 @@ export default function PlayerEditor({ gameId, players, clues, story, timeline, 
               player={player}
               clues={clues}
               relationTargets={relationTargets}
+              isCulprit={player.id === story.culpritPlayerId}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}
               onDelete={() => onChange(players.filter((_, i) => i !== idx))}
             />

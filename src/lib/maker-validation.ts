@@ -27,15 +27,6 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 1, "error", "시나리오 제목을 입력하세요.");
   }
 
-  if (playerCount > 0 && playerCount !== expectedPlayerCount) {
-    addIssue(
-      issues,
-      1,
-      "error",
-      `설정 플레이어 수 ${expectedPlayerCount}명과 등록 캐릭터 ${playerCount}명이 일치하지 않습니다.`
-    );
-  }
-
   if (game.settings.tags.length === 0) {
     addIssue(issues, 1, "warning", "태그가 아직 없습니다.");
   }
@@ -63,12 +54,6 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
   }
 
   if (playerCount === 0) {
-    addIssue(issues, 2, "warning", "플레이어를 추가해야 범인을 지정할 수 있습니다.");
-  } else if (isBlank(game.story.culpritPlayerId)) {
-    addIssue(issues, 2, "error", "범인을 지정하세요.");
-  }
-
-  if (playerCount === 0) {
     addIssue(issues, 3, "error", `플레이어 ${expectedPlayerCount}명을 등록해야 합니다.`);
   } else {
     const namelessPlayers = countPlayersBy(game.players, (player) => isBlank(player.name));
@@ -93,6 +78,10 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
 
     if (namelessPlayers > 0) {
       addIssue(issues, 3, "error", `이름이 비어 있는 캐릭터가 ${namelessPlayers}명 있습니다.`);
+    }
+
+    if (isBlank(game.story.culpritPlayerId) || !game.players.some((player) => player.id === game.story.culpritPlayerId)) {
+      addIssue(issues, 3, "error", "범인을 지정하세요.");
     }
 
     if (backgroundlessPlayers > 0) {

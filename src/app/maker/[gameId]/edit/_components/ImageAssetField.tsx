@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useState, type ChangeEvent } from "react";
 import { optimizeImageForUpload } from "./image-upload-processing";
 import { getImageAssetProfileConfig, type ImageAssetProfile } from "./image-upload-profiles";
 
@@ -43,9 +43,16 @@ export default function ImageAssetField({
   urlPlaceholder = "https://...",
 }: ImageAssetFieldProps) {
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputId = useId();
   const hasValue = Boolean(value?.trim());
   const profileConfig = getImageAssetProfileConfig(profile);
+
+  useEffect(() => {
+    if (!hasValue) {
+      setShowPreview(false);
+    }
+  }, [hasValue]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -83,6 +90,28 @@ export default function ImageAssetField({
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
+          <span
+            className={[
+              "inline-flex rounded-full border px-2.5 py-1 text-[11px]",
+              hasValue
+                ? "border-emerald-800 bg-emerald-950/20 text-emerald-300"
+                : "border-dark-700 bg-dark-950/70 text-dark-400",
+            ].join(" ")}
+          >
+            {hasValue ? "이미지 연결됨" : "이미지 미연결"}
+          </span>
+          <span className="inline-flex rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] text-dark-400">
+            {profileConfig.recommendedRatioLabel}
+          </span>
+          {hasValue && (
+            <button
+              type="button"
+              onClick={() => setShowPreview((current) => !current)}
+              className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+            >
+              {showPreview ? "미리보기 접기" : "미리보기 보기"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowUrlInput((current) => !current)}
@@ -101,6 +130,34 @@ export default function ImageAssetField({
           )}
         </div>
 
+        {hasValue && (
+          <button
+            type="button"
+            onClick={() => setShowPreview((current) => !current)}
+            className="mt-3 flex w-full items-center gap-3 rounded-xl border border-dark-700 bg-dark-950/50 p-3 text-left transition-colors hover:border-dark-500 hover:bg-dark-950/70"
+          >
+            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
+              <img
+                src={value}
+                alt={alt}
+                className={[
+                  "h-full w-full",
+                  profileConfig.previewImageClassName,
+                ].join(" ")}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-dark-200">현재 연결된 이미지</p>
+              <p className="mt-1 text-xs leading-relaxed text-dark-500">
+                큰 미리보기는 필요할 때만 열어 확인합니다.
+              </p>
+            </div>
+            <span className="ml-auto shrink-0 text-xs text-mystery-300">
+              {showPreview ? "접기" : "열기"}
+            </span>
+          </button>
+        )}
+
         {showUrlInput && (
           <div className="mt-3 rounded-xl border border-dark-700 bg-dark-950/40 p-3">
             <label className="mb-1 block text-sm font-medium text-dark-200">{urlLabel}</label>
@@ -116,7 +173,7 @@ export default function ImageAssetField({
         )}
       </div>
 
-      {hasValue ? (
+      {hasValue && showPreview ? (
         <div
           className={[
             "overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40",
@@ -132,7 +189,7 @@ export default function ImageAssetField({
             ].join(" ")}
           />
         </div>
-      ) : (
+      ) : !hasValue ? (
         <div className="rounded-xl border border-dashed border-dark-700 bg-gradient-to-br from-dark-900/90 via-dark-900 to-dark-950 px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -149,7 +206,7 @@ export default function ImageAssetField({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

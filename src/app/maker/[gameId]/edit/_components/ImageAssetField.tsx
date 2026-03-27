@@ -15,17 +15,13 @@ interface ImageAssetFieldProps {
   uploading?: boolean;
   uploadLabel?: string;
   emptyStateLabel?: string;
-  urlLabel?: string;
-  urlHint?: string;
-  urlPlaceholder?: string;
 }
 
 const FILE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
-const inputClass = "w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition";
 
 /**
  * 업로드 기반 이미지 필드.
- * 기본 CTA는 파일 업로드로 두고, 외부 URL 입력은 필요할 때만 펼쳐서 보여준다.
+ * 연결 상태는 작은 썸네일 요약으로 먼저 보여주고, 큰 미리보기는 필요할 때만 펼친다.
  */
 export default function ImageAssetField({
   title,
@@ -38,11 +34,7 @@ export default function ImageAssetField({
   uploading = false,
   uploadLabel = "이미지 업로드",
   emptyStateLabel = "아직 연결된 이미지가 없습니다.",
-  urlLabel = "외부 이미지 URL",
-  urlHint,
-  urlPlaceholder = "https://...",
 }: ImageAssetFieldProps) {
-  const [showUrlInput, setShowUrlInput] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const fileInputId = useId();
   const hasValue = Boolean(value?.trim());
@@ -92,7 +84,7 @@ export default function ImageAssetField({
         <div className="mt-3 flex flex-wrap gap-2">
           <span
             className={[
-              "inline-flex rounded-full border px-2.5 py-1 text-[11px]",
+              "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] leading-none",
               hasValue
                 ? "border-emerald-800 bg-emerald-950/20 text-emerald-300"
                 : "border-dark-700 bg-dark-950/70 text-dark-400",
@@ -100,25 +92,6 @@ export default function ImageAssetField({
           >
             {hasValue ? "이미지 연결됨" : "이미지 미연결"}
           </span>
-          <span className="inline-flex rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] text-dark-400">
-            {profileConfig.recommendedRatioLabel}
-          </span>
-          {hasValue && (
-            <button
-              type="button"
-              onClick={() => setShowPreview((current) => !current)}
-              className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
-            >
-              {showPreview ? "미리보기 접기" : "미리보기 보기"}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowUrlInput((current) => !current)}
-            className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-400 transition-colors hover:border-dark-500 hover:text-dark-200"
-          >
-            {showUrlInput ? "URL 입력 닫기" : hasValue ? "외부 URL 수정" : "외부 URL 직접 입력"}
-          </button>
           {hasValue && (
             <button
               type="button"
@@ -147,29 +120,12 @@ export default function ImageAssetField({
               />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-dark-200">현재 연결된 이미지</p>
-              <p className="mt-1 text-xs leading-relaxed text-dark-500">
-                큰 미리보기는 필요할 때만 열어 확인합니다.
-              </p>
+              <p className="text-sm font-medium text-dark-200">미리보기 이미지</p>
             </div>
             <span className="ml-auto shrink-0 text-xs text-mystery-300">
               {showPreview ? "접기" : "열기"}
             </span>
           </button>
-        )}
-
-        {showUrlInput && (
-          <div className="mt-3 rounded-xl border border-dark-700 bg-dark-950/40 p-3">
-            <label className="mb-1 block text-sm font-medium text-dark-200">{urlLabel}</label>
-            {urlHint && <p className="mb-2 text-xs text-dark-500">{urlHint}</p>}
-            <input
-              type="url"
-              value={value ?? ""}
-              onChange={(event) => onChange(event.target.value || undefined)}
-              placeholder={urlPlaceholder}
-              className={inputClass}
-            />
-          </div>
         )}
       </div>
 
@@ -197,9 +153,6 @@ export default function ImageAssetField({
               <p className="mt-1 text-xs leading-relaxed text-dark-600">{emptyStateLabel}</p>
             </div>
             <div className="shrink-0 space-y-1 text-right">
-              <span className="inline-flex rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] text-dark-400">
-                {profileConfig.recommendedRatioLabel}
-              </span>
               <p className="text-[11px] text-dark-600">
                 최대 {profileConfig.maxWidth}×{profileConfig.maxHeight}
               </p>

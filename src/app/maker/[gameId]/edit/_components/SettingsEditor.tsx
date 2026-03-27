@@ -156,7 +156,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
         <ImageAssetField
           title="표지 이미지"
-          description="라이브러리 카드 썸네일에 표시됩니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+          description="라이브러리 카드 썸네일에 표시됩니다."
           value={settings.coverImageUrl}
           alt={game.title || "시나리오 표지 미리보기"}
           profile="cover"
@@ -165,8 +165,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           uploading={uploadingCover}
           uploadLabel="표지 업로드"
           emptyStateLabel="아직 연결된 표지 이미지가 없습니다."
-          urlLabel="표지 이미지 URL"
-          urlHint="외부 CDN이나 이미 호스팅된 이미지가 있으면 직접 붙여넣을 수 있습니다."
         />
       </div>
 

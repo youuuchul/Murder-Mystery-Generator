@@ -387,7 +387,7 @@ function LocationBlock({
           <div className="space-y-3">
             <ImageAssetField
               title="장소 대표 이미지"
-              description="플레이어 장소 카드에 함께 노출됩니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+              description="플레이어 장소 카드에 함께 노출됩니다."
               value={location.imageUrl}
               alt={location.name || "장소 이미지 미리보기"}
               profile="location"
@@ -396,7 +396,6 @@ function LocationBlock({
               uploading={uploadingImage}
               uploadLabel="이미지 업로드"
               emptyStateLabel="아직 연결된 장소 이미지가 없습니다."
-              urlLabel="장소 대표 이미지 URL"
             />
           </div>
 
@@ -611,8 +610,6 @@ function ClueForm({
             uploading={uploadingImage}
             uploadLabel="단서 이미지 업로드"
             emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
-            urlLabel="단서 이미지 URL"
-            urlHint="이미 호스팅된 카드 이미지가 있으면 외부 URL도 사용할 수 있습니다."
           />
 
           {/* 단서 획득 조건 */}

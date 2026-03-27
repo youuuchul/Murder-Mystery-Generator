@@ -245,7 +245,7 @@ export default function StoryEditor({
 
         <ImageAssetField
           title="대표 지도 업로드"
-          description="라운드별 override가 없으면 이 이미지를 계속 사용합니다. 기본은 업로드를 쓰고, 외부 URL은 필요할 때만 입력합니다."
+          description="라운드별 override가 없으면 이 이미지를 계속 사용합니다."
           value={story.mapImageUrl}
           alt="대표 지도 미리보기"
           profile="map"
@@ -254,8 +254,6 @@ export default function StoryEditor({
           uploading={isUploadingAsset("map")}
           uploadLabel="이미지 업로드"
           emptyStateLabel="아직 연결된 대표 지도 이미지가 없습니다."
-          urlLabel="대표 지도 / 참고 이미지 URL"
-          urlHint="GM 메인 보드에 띄울 기본 지도 또는 참고 이미지입니다."
         />
       </div>
 
@@ -286,7 +284,6 @@ export default function StoryEditor({
           uploading={isUploadingAsset("victim")}
           uploadLabel="이미지 업로드"
           emptyStateLabel="아직 연결된 피해자 사진이 없습니다."
-          urlLabel="피해자 사진 URL"
         />
 
         <Field label="배경">
@@ -359,7 +356,6 @@ export default function StoryEditor({
                   uploading={isUploadingAsset(`npc:${npc.id}`)}
                   uploadLabel="이미지 업로드"
                   emptyStateLabel="아직 연결된 NPC 사진이 없습니다."
-                  urlLabel="NPC 사진 URL"
                 />
 
                 <Field label="배경">

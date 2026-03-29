@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mockup A - Gold Sage Red</title>
+    <style>
+      :root {
+        --bg: #170f12;
+        --panel: #21161a;
+        --panel-soft: #2a0d12;
+        --border: #3a2a2f;
+        --text: #f2ece8;
+        --text-muted: #a99b96;
+        --text-dim: #6e6264;
+        --primary: #b8923b;
+        --primary-hover: #cda44a;
+        --primary-soft: rgba(184, 146, 59, 0.16);
+        --complete: #6f8177;
+        --complete-hover: #7f9388;
+        --complete-soft: rgba(111, 129, 119, 0.16);
+        --warning: #c9822b;
+        --warning-soft: rgba(201, 130, 43, 0.16);
+        --danger: #b72d29;
+        --danger-soft: rgba(183, 45, 41, 0.16);
+        --inactive: #4a4346;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Apple SD Gothic Neo", serif;
+        background:
+          radial-gradient(circle at top left, rgba(111, 129, 119, 0.08), transparent 18%),
+          radial-gradient(circle at bottom right, rgba(42, 13, 18, 0.22), transparent 28%),
+          linear-gradient(180deg, #0f090c, #170f12 52%, #120c0f);
+        color: var(--text);
+      }
+
+      .shell {
+        width: min(1480px, calc(100vw - 72px));
+        margin: 0 auto;
+        padding: 44px 0 72px;
+      }
+
+      .hero {
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        color: var(--primary);
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 10px 0 8px;
+        font-size: 42px;
+        line-height: 1;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 900px;
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 30px;
+        background:
+          linear-gradient(180deg, rgba(33, 22, 26, 0.96), rgba(23, 15, 18, 0.98));
+        box-shadow:
+          0 28px 60px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .stage-panel {
+        padding: 34px 38px 38px;
+      }
+
+      .progress-track {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 18px;
+        margin: 18px 56px 22px;
+      }
+
+      .progress-track span {
+        display: block;
+        height: 3px;
+        border-radius: 999px;
+      }
+
+      .complete-track {
+        background: var(--complete);
+      }
+
+      .current-track {
+        background: var(--primary);
+      }
+
+      .future-track {
+        background: #353033;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .step {
+        border: 1px solid transparent;
+        border-radius: 24px;
+        padding: 22px 18px 20px;
+        min-height: 228px;
+        background: rgba(255, 255, 255, 0.01);
+      }
+
+      .step.current {
+        border-color: rgba(184, 146, 59, 0.45);
+        background: linear-gradient(180deg, rgba(184, 146, 59, 0.06), rgba(23, 15, 18, 0.42));
+      }
+
+      .step-number {
+        width: 62px;
+        height: 62px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0 auto 16px;
+        border: 3px solid var(--inactive);
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.01);
+      }
+
+      .step.complete .step-number {
+        border-color: var(--complete);
+        color: #d5e1db;
+        background: var(--complete-soft);
+      }
+
+      .step.current .step-number {
+        border-color: var(--primary);
+        color: #fff1cc;
+        background: var(--primary-soft);
+      }
+
+      .step.future .step-number {
+        border-color: var(--inactive);
+        color: var(--text-dim);
+      }
+
+      .step h2 {
+        margin: 0;
+        text-align: center;
+        font-size: 22px;
+      }
+
+      .step.complete h2 {
+        color: #d8e2dd;
+      }
+
+      .step.current h2 {
+        color: #f0d791;
+      }
+
+      .step.future h2 {
+        color: var(--text-muted);
+      }
+
+      .step p {
+        margin: 10px 0 16px;
+        color: var(--text-dim);
+        text-align: center;
+        line-height: 1.45;
+        font-size: 14px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 88px;
+        margin: 0 auto;
+        padding: 9px 16px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .chip.warning {
+        color: #f0c071;
+        background: var(--warning-soft);
+        border-color: rgba(201, 130, 43, 0.45);
+      }
+
+      .chip.error {
+        color: #ef9d97;
+        background: var(--danger-soft);
+        border-color: rgba(183, 45, 41, 0.52);
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 0.95fr;
+        gap: 22px;
+        margin-top: 24px;
+      }
+
+      .card {
+        padding: 26px 28px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      .card p,
+      .card li {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .info-box {
+        border: 1px solid rgba(90, 70, 52, 0.95);
+        background: linear-gradient(180deg, rgba(184, 146, 59, 0.06), rgba(42, 13, 18, 0.12));
+      }
+
+      .info-box h3 {
+        color: #d7b15a;
+      }
+
+      ul {
+        margin: 12px 0 0;
+        padding-left: 18px;
+      }
+
+      .button-row,
+      .badge-row,
+      .swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .button {
+        appearance: none;
+        border-radius: 16px;
+        padding: 14px 20px;
+        font-size: 15px;
+        font-weight: 700;
+        border: 1px solid transparent;
+        color: var(--text);
+        background: transparent;
+      }
+
+      .button.primary {
+        color: #170f12;
+        background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+        box-shadow: 0 12px 24px rgba(184, 146, 59, 0.22);
+      }
+
+      .button.secondary {
+        border-color: rgba(111, 129, 119, 0.48);
+        background: rgba(111, 129, 119, 0.08);
+        color: #e8dfd7;
+      }
+
+      .button.ghost {
+        border-color: var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text-muted);
+      }
+
+      .button.danger {
+        border-color: rgba(183, 45, 41, 0.52);
+        background: rgba(183, 45, 41, 0.12);
+        color: #efb0ab;
+      }
+
+      .status-badge {
+        padding: 10px 14px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .status-badge.complete {
+        color: #d8e2dd;
+        border-color: rgba(111, 129, 119, 0.45);
+        background: rgba(111, 129, 119, 0.15);
+      }
+
+      .status-badge.warning {
+        color: #efc47f;
+        border-color: rgba(201, 130, 43, 0.52);
+        background: rgba(201, 130, 43, 0.15);
+      }
+
+      .status-badge.error {
+        color: #ef9d97;
+        border-color: rgba(183, 45, 41, 0.55);
+        background: rgba(183, 45, 41, 0.15);
+      }
+
+      .swatches {
+        margin-top: 14px;
+      }
+
+      .swatch {
+        width: 148px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .swatch-color {
+        height: 84px;
+      }
+
+      .swatch-label {
+        padding: 12px 14px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <span class="eyebrow">Option A</span>
+        <h1>Gold + Sage + Red</h1>
+        <p>
+          현재 단계와 메인 액션은 골드로, 완료 상태는 세이지로 분리한 안입니다.
+          경고는 앰버, 오류와 삭제만 레드로 남겨서 “전부 위험해 보이는” 문제를 줄입니다.
+        </p>
+      </section>
+
+      <section class="panel stage-panel">
+        <div class="progress-track">
+          <span class="complete-track"></span>
+          <span class="complete-track"></span>
+          <span class="current-track"></span>
+          <span class="future-track"></span>
+          <span class="future-track"></span>
+        </div>
+        <div class="steps">
+          <article class="step complete">
+            <div class="step-number">1</div>
+            <h2>기본 설정</h2>
+            <p>태그·인원·난이도·시간</p>
+          </article>
+          <article class="step complete">
+            <div class="step-number">2</div>
+            <h2>오프닝 / 배경</h2>
+            <p>오프닝·대표지도·피해자·NPC</p>
+          </article>
+          <article class="step complete">
+            <div class="step-number">3</div>
+            <h2>플레이어</h2>
+            <p>범인·배경·상세 스토리·비밀</p>
+            <div class="chip warning">주의 2</div>
+          </article>
+          <article class="step current">
+            <div class="step-number">4</div>
+            <h2>단서 카드</h2>
+            <p>물적 증거·증언·현장 단서</p>
+            <div class="chip warning">주의 1</div>
+          </article>
+          <article class="step future">
+            <div class="step-number">5</div>
+            <h2>스크립트</h2>
+            <p>라운드 가이드·미디어·이벤트</p>
+            <div class="chip error">오류 2</div>
+          </article>
+          <article class="step future">
+            <div class="step-number">6</div>
+            <h2>엔딩</h2>
+            <p>분기 엔딩·개인 엔딩·작가 노트</p>
+            <div class="chip error">오류 3</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="detail-grid">
+        <article class="panel card info-box">
+          <h3>현재 단계 안내 박스</h3>
+          <p>실제 경고 박스처럼 보이지 않도록, 일반 안내는 골드-브라운 축으로만 처리한 예시입니다.</p>
+          <ul>
+            <li>안내 제목은 골드 톤으로 강조</li>
+            <li>본문은 따뜻한 회백색으로 유지</li>
+            <li>진짜 오류가 아닌 상태에서는 레드 보더를 사용하지 않음</li>
+          </ul>
+        </article>
+
+        <article class="panel card">
+          <h3>버튼 / 상태 샘플</h3>
+          <p>메인 CTA는 골드 fill, 보조는 세이지 outline, 위험 액션만 레드입니다.</p>
+          <div class="button-row">
+            <button class="button primary">확인하고 진행</button>
+            <button class="button secondary">검토 완료</button>
+            <button class="button ghost">나중에 확인</button>
+            <button class="button danger">삭제</button>
+          </div>
+          <div class="badge-row" style="margin-top: 18px;">
+            <span class="status-badge complete">완료됨</span>
+            <span class="status-badge warning">주의 필요</span>
+            <span class="status-badge error">오류 있음</span>
+          </div>
+          <div class="swatches">
+            <div class="swatch">
+              <div class="swatch-color" style="background:#b8923b;"></div>
+              <div class="swatch-label">Primary / Gold<br />#B8923B</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background:#6f8177;"></div>
+              <div class="swatch-label">Complete / Sage<br />#6F8177</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background:#c9822b;"></div>
+              <div class="swatch-label">Warning / Amber<br />#C9822B</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background:#b72d29;"></div>
+              <div class="swatch-label">Danger / Red<br />#B72D29</div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

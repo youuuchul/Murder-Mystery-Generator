@@ -292,7 +292,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   return (
     <>
       <div className="space-y-6">
-        <div className="bg-dark-900 border border-dark-800 rounded-2xl p-5">
+        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.62),rgba(23,15,18,0.9))] p-5 shadow-[0_18px_40px_rgba(23,15,18,0.35)]">
           <StepWizard
             currentStep={currentStep}
             onStepClick={(step) => { void moveToStep(step); }}
@@ -354,7 +354,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           </div>
         )}
 
-        <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6 sm:p-8">
+        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 shadow-[0_20px_48px_rgba(23,15,18,0.4)] sm:p-8">
           {currentStep === 1 && (
             <SettingsEditor
               game={game}
@@ -432,14 +432,14 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         </div>
 
         <div ref={actionBarRef} className="sticky bottom-4 z-10">
-          <div className="flex flex-col gap-4 rounded-2xl border border-dark-700 bg-dark-950/95 px-5 py-4 shadow-2xl shadow-black/30 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-dark-600 bg-[linear-gradient(180deg,rgba(23,15,18,0.95),rgba(42,46,47,0.82))] px-5 py-4 shadow-[0_20px_48px_rgba(23,15,18,0.55)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className={`text-sm font-medium ${
                 saveError
                   ? "text-red-300"
                   : hasUnsavedChanges
                     ? "text-yellow-300"
-                    : "text-emerald-300"
+                    : "text-sage-300"
               }`}>
                 {saveHeadline}
               </p>

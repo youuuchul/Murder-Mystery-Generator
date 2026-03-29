@@ -86,7 +86,7 @@ export default function ImageAssetField({
             className={[
               "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] leading-none",
               hasValue
-                ? "border-emerald-800 bg-emerald-950/20 text-emerald-300"
+                ? "border-sage-700 bg-sage-900/25 text-sage-300"
                 : "border-dark-700 bg-dark-950/70 text-dark-400",
             ].join(" ")}
           >

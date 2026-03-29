@@ -11,13 +11,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-mystery-600 hover:bg-mystery-700 text-white border border-mystery-500 shadow-lg shadow-mystery-900/30",
+    "bg-[linear-gradient(135deg,rgba(183,45,41,0.96),rgba(152,32,31,0.96))] hover:bg-[linear-gradient(135deg,rgba(203,108,101,0.98),rgba(183,45,41,0.98))] text-white border border-mystery-400 shadow-lg shadow-mystery-950/40",
   secondary:
-    "bg-dark-800 hover:bg-dark-700 text-dark-100 border border-dark-600",
+    "bg-dark-800/95 hover:bg-dark-700 text-dark-100 border border-dark-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
   ghost:
-    "bg-transparent hover:bg-dark-800 text-dark-200 hover:text-dark-50 border border-transparent",
+    "bg-transparent hover:bg-dark-800/80 text-dark-200 hover:text-dark-50 border border-transparent",
   danger:
-    "bg-red-900/50 hover:bg-red-800/70 text-red-300 border border-red-800",
+    "bg-red-950/45 hover:bg-red-900/60 text-red-200 border border-red-900/70",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -44,7 +44,7 @@ export default function Button({
         "inline-flex items-center justify-center gap-2 font-medium",
         "transition-colors duration-150 cursor-pointer",
         "disabled:opacity-50 disabled:cursor-not-allowed",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mystery-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mystery-400 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900",
         variantClasses[variant],
         sizeClasses[size],
         className,

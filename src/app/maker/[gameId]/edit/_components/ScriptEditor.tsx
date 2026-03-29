@@ -112,7 +112,7 @@ function statusLabel(status: EditorStatus): string {
  */
 function statusClassName(status: EditorStatus): string {
   if (status === "complete") {
-    return "border-emerald-800 bg-emerald-950/20 text-emerald-300";
+    return "border-sage-700 bg-sage-900/25 text-sage-300";
   }
   if (status === "partial") {
     return "border-yellow-800 bg-yellow-950/20 text-yellow-300";
@@ -139,7 +139,7 @@ function FieldHeader({
 }) {
   const status = filled ? "작성됨" : optional ? "비워 둠" : "미작성";
   const className = filled
-    ? "border-emerald-800 bg-emerald-950/20 text-emerald-300"
+    ? "border-sage-700 bg-sage-900/25 text-sage-300"
     : optional
       ? "border-dark-700 bg-dark-900 text-dark-500"
       : "border-yellow-800 bg-yellow-950/20 text-yellow-300";
@@ -235,16 +235,16 @@ function SegmentEditor({
         </div>
 
         <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+          <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
           </span>
-          <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+          <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             진행 가이드 {hasGuide ? "작성됨" : "미작성"}
           </span>
-          <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+          <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
           </span>
-          <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+          <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             영상 {hasVideo ? "연결됨" : "비워 둠"}
           </span>
         </div>
@@ -300,10 +300,10 @@ function SegmentEditor({
             <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-[11px]">
-            <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
               배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
             </span>
-            <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+            <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
               영상 {hasVideo ? "연결됨" : "비워 둠"}
             </span>
           </div>
@@ -372,10 +372,10 @@ function RoundScriptForm({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold text-dark-100">Round {round.round} 작성 메모</p>
               <div className="flex flex-wrap gap-2 text-[11px]">
-                <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   라운드 이벤트 {hasNarration ? "작성됨" : "미작성"}
                 </span>
-                <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   진행 가이드 {hasGuide ? "작성됨" : "미작성"}
                 </span>
               </div>
@@ -466,10 +466,10 @@ function RoundScriptForm({
                 <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px]">
-                <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
                 </span>
-                <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   영상 {hasVideo ? "연결됨" : "비워 둠"}
                 </span>
               </div>

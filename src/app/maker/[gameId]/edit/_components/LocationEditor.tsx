@@ -288,7 +288,7 @@ function LocationBlock({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(33,18,44,0.28),rgba(10,12,18,0.92))] shadow-[0_12px_36px_rgba(0,0,0,0.18)]">
+    <div className="overflow-hidden rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(58,16,20,0.26),rgba(23,15,18,0.94))] shadow-[0_12px_36px_rgba(23,15,18,0.26)]">
       {/* 장소 헤더 */}
       <button
         type="button"
@@ -448,7 +448,7 @@ function LocationBlock({
           </section>
 
           {/* 이 장소의 단서 카드들 */}
-          <section className="rounded-2xl border border-mystery-900/40 bg-[linear-gradient(180deg,rgba(28,20,36,0.72),rgba(10,12,18,0.92))] p-4">
+          <section className="rounded-2xl border border-mystery-900/40 bg-[linear-gradient(180deg,rgba(58,16,20,0.72),rgba(23,15,18,0.96))] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <label className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">단서 카드</label>
@@ -804,7 +804,7 @@ export default function LocationEditor({
                 className={[
                   "flex-1 py-2 text-sm rounded-lg border transition-colors",
                   (rules.allowLocationRevisit ?? true)
-                    ? "border-green-700 bg-green-900/20 text-green-300"
+                    ? "border-sage-700 bg-sage-900/25 text-sage-300"
                     : "border-dark-600 text-dark-500 hover:border-dark-500",
                 ].join(" ")}
               >

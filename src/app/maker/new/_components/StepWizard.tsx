@@ -59,8 +59,8 @@ export default function StepWizard({
                 title={tooltip}
                 className={[
                   "flex flex-col items-center gap-2 w-full py-3 px-2 rounded-lg transition-colors",
-                  isCurrent && "bg-mystery-950/50",
-                  isClickable && !isCurrent && "hover:bg-dark-800 cursor-pointer",
+                  isCurrent && "bg-[rgba(23,15,18,0.92)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+                  isClickable && !isCurrent && "hover:bg-dark-800/70 cursor-pointer",
                   !isClickable && "cursor-default",
                   highestLevel === "error" && isCurrent && "ring-1 ring-red-700/70",
                   highestLevel === "warning" && isCurrent && "ring-1 ring-yellow-700/60",
@@ -73,9 +73,9 @@ export default function StepWizard({
                   className={[
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors",
                     isCurrent
-                      ? "border-mystery-500 bg-mystery-700 text-white"
+                      ? "border-dark-500 bg-dark-900 text-dark-50"
                       : isPast
-                        ? "border-mystery-600 bg-mystery-800/50 text-mystery-300"
+                        ? "border-sage-700 bg-sage-900/25 text-sage-300"
                         : highestLevel === "error"
                           ? "border-red-800 bg-red-950/20 text-red-300"
                           : highestLevel === "warning"
@@ -91,13 +91,13 @@ export default function StepWizard({
                   <p
                     className={`text-xs font-medium ${
                       isCurrent
-                        ? "text-mystery-300"
+                        ? "text-dark-100"
                         : highestLevel === "error"
                           ? "text-red-300"
                           : highestLevel === "warning"
                             ? "text-yellow-300"
                             : isPast
-                              ? "text-dark-300"
+                              ? "text-sage-300"
                               : "text-dark-500"
                     }`}
                   >
@@ -120,7 +120,7 @@ export default function StepWizard({
               {idx < STEPS.length - 1 && (
                 <div className="flex-shrink-0 mt-7 w-8 flex items-center">
                   <div
-                    className={`h-0.5 w-full ${isPast ? "bg-mystery-700" : "bg-dark-700"}`}
+                    className={`h-0.5 w-full ${isPast ? "bg-sage-700/70" : "bg-dark-700"}`}
                   />
                 </div>
               )}
@@ -134,7 +134,7 @@ export default function StepWizard({
         <span className="text-sm text-dark-400">
           단계 {currentStep} / {STEPS.length}
         </span>
-        <span className="text-sm font-medium text-mystery-300">
+        <span className="text-sm font-medium text-dark-100">
           {STEPS.find((s) => s.id === currentStep)?.label}
         </span>
         <div className="flex gap-1">
@@ -150,9 +150,9 @@ export default function StepWizard({
                   : (stepIssues[s.id] ?? []).length > 0
                     ? "bg-yellow-500"
                     : s.id < currentStep
-                  ? "bg-mystery-600"
+                  ? "bg-sage-600"
                   : s.id === currentStep
-                    ? "bg-mystery-400"
+                    ? "bg-dark-200"
                     : "bg-dark-700"
               }`}
             />

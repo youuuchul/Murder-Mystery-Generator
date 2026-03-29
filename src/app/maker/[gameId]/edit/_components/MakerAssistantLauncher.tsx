@@ -26,7 +26,7 @@ export default function MakerAssistantLauncher({
         "backdrop-blur-md sm:right-6",
         open
           ? "pointer-events-none translate-y-3 opacity-0"
-          : "border-mystery-700 bg-[linear-gradient(135deg,rgba(105,41,122,0.95),rgba(31,41,55,0.95))] text-white hover:border-mystery-500 hover:shadow-mystery-950/50",
+          : "border-mystery-700 bg-[linear-gradient(135deg,rgba(183,45,41,0.92),rgba(42,13,18,0.96)_58%,rgba(23,15,18,0.98))] text-white hover:border-mystery-400 hover:shadow-mystery-950/50",
       ].join(" ")}
       aria-label="제작 도우미 열기"
     >

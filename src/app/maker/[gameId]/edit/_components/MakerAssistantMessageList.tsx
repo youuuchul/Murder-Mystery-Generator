@@ -59,7 +59,7 @@ export default function MakerAssistantMessageList({
         ) : (
           <section
             key={message.id}
-            className="mr-6 rounded-2xl border border-mystery-900/70 bg-[linear-gradient(155deg,rgba(46,16,58,0.78),rgba(15,23,42,0.92))] p-4 shadow-lg shadow-mystery-950/20"
+            className="mr-6 rounded-2xl border border-mystery-900/70 bg-[linear-gradient(155deg,rgba(58,16,20,0.88),rgba(42,13,18,0.95)_52%,rgba(23,15,18,0.98))] p-4 shadow-lg shadow-mystery-950/25"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -233,7 +233,7 @@ function DraftResultPanel({
           <p className="mt-2 text-sm font-medium text-dark-50">{result.title}</p>
         </div>
       ) : null}
-      <div className="rounded-xl border border-mystery-900/60 bg-black/15 px-4 py-4">
+      <div className="rounded-xl border border-mystery-900/60 bg-[linear-gradient(180deg,rgba(58,16,20,0.32),rgba(23,15,18,0.2))] px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
           <button

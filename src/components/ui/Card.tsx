@@ -8,8 +8,8 @@ export default function Card({ hover = false, className = "", children, ...props
   return (
     <div
       className={[
-        "bg-dark-900 border border-dark-700 rounded-xl p-5",
-        hover && "transition-all duration-200 hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 cursor-pointer",
+        "rounded-xl border border-dark-700/80 bg-dark-900/88 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
+        hover && "cursor-pointer transition-all duration-200 hover:border-mystery-500/70 hover:shadow-[0_18px_40px_rgba(23,15,18,0.48)]",
         className,
       ]
         .filter(Boolean)

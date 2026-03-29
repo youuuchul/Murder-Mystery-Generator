@@ -43,7 +43,7 @@ export default function GameCard({ game }: GameCardProps) {
   return (
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
       {/* 썸네일 영역 */}
-      <div className="h-32 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center relative overflow-hidden">
+      <div className="h-40 bg-gradient-to-br from-mystery-950 via-dark-800 to-dark-900 flex items-center justify-center relative overflow-hidden">
         {game.settings.coverImageUrl ? (
           <>
             <img

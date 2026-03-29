@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mockup C - Muted Brass</title>
+    <style>
+      :root {
+        --bg: #150f12;
+        --panel: #1d1518;
+        --panel-alt: #22181c;
+        --border: #392d31;
+        --text: #f0e8e3;
+        --text-muted: #a89b96;
+        --text-dim: #6a5f62;
+        --primary: #9f7a43;
+        --primary-hover: #b58b4d;
+        --primary-soft: rgba(159, 122, 67, 0.14);
+        --complete: #68716c;
+        --complete-soft: rgba(104, 113, 108, 0.14);
+        --warning: #c9822b;
+        --warning-soft: rgba(201, 130, 43, 0.14);
+        --danger: #b72d29;
+        --danger-soft: rgba(183, 45, 41, 0.14);
+        --inactive: #474043;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", "Noto Sans KR", sans-serif;
+        background:
+          radial-gradient(circle at top center, rgba(159, 122, 67, 0.08), transparent 16%),
+          linear-gradient(180deg, #0f090c, #150f12 50%, #110b0e);
+        color: var(--text);
+      }
+
+      .shell {
+        width: min(1440px, calc(100vw - 80px));
+        margin: 0 auto;
+        padding: 46px 0 70px;
+      }
+
+      .hero span {
+        display: inline-block;
+        color: #d0ae73;
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .hero h1 {
+        margin: 10px 0 8px;
+        font-size: 38px;
+      }
+
+      .hero p {
+        margin: 0 0 24px;
+        color: var(--text-muted);
+        line-height: 1.65;
+        max-width: 920px;
+      }
+
+      .panel {
+        border-radius: 30px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(29, 21, 24, 0.98), rgba(21, 15, 18, 0.98));
+        box-shadow: 0 26px 54px rgba(0, 0, 0, 0.34);
+      }
+
+      .stage-panel { padding: 34px; }
+
+      .grid-line {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin: 0 56px 20px;
+      }
+
+      .grid-line span {
+        display: block;
+        height: 2px;
+        border-radius: 999px;
+      }
+
+      .done { background: #68716c; }
+      .now { background: #9f7a43; }
+      .later { background: #302b2e; }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .step {
+        min-height: 212px;
+        border-radius: 22px;
+        padding: 20px 14px 18px;
+        border: 1px solid transparent;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.015);
+      }
+
+      .step.current {
+        border-color: rgba(159, 122, 67, 0.42);
+        background: linear-gradient(180deg, rgba(159, 122, 67, 0.08), rgba(21, 15, 18, 0.28));
+      }
+
+      .step-number {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 14px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        border: 3px solid var(--inactive);
+        color: var(--text-dim);
+        font-weight: 700;
+        font-size: 22px;
+      }
+
+      .step.complete .step-number {
+        border-color: var(--complete);
+        background: var(--complete-soft);
+        color: #d3dbd6;
+      }
+
+      .step.current .step-number {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+        color: #f1d6a4;
+      }
+
+      .step h2 { margin: 0; font-size: 20px; }
+      .step.complete h2 { color: #d3dbd6; }
+      .step.current h2 { color: #f1d6a4; }
+      .step.future h2 { color: var(--text-muted); }
+
+      .step p {
+        margin: 10px 0 16px;
+        color: var(--text-dim);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .chip {
+        display: inline-flex;
+        min-width: 88px;
+        justify-content: center;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .chip.warning {
+        color: #e9bf82;
+        border-color: rgba(201, 130, 43, 0.45);
+        background: var(--warning-soft);
+      }
+
+      .chip.error {
+        color: #ee9f99;
+        border-color: rgba(183, 45, 41, 0.5);
+        background: var(--danger-soft);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: 1.15fr 1.15fr 0.9fr;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .card {
+        padding: 24px 24px 22px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 22px;
+      }
+
+      .card p, .card li {
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+
+      ul { margin: 8px 0 0; padding-left: 18px; }
+
+      .button {
+        display: block;
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid transparent;
+        font-size: 15px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 12px;
+      }
+
+      .button.primary {
+        color: #170f12;
+        background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      }
+
+      .button.secondary {
+        color: var(--text);
+        border-color: rgba(104, 113, 108, 0.4);
+        background: rgba(104, 113, 108, 0.08);
+      }
+
+      .button.ghost {
+        color: var(--text-muted);
+        border-color: var(--border);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .button.danger {
+        color: #efb0ab;
+        border-color: rgba(183, 45, 41, 0.5);
+        background: rgba(183, 45, 41, 0.12);
+      }
+
+      .swatch {
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        margin-bottom: 12px;
+      }
+
+      .swatch-color { height: 76px; }
+      .swatch-label {
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <span>Option C</span>
+        <h1>Muted Brass</h1>
+        <p>
+          A안보다 포인트를 조금 눌러서, 전체를 더 차갑고 고요하게 만든 비교안입니다.
+          골드는 유지하되 채도를 낮춰 네비가 덜 튀고, 패널도 더 무거운 차콜로 읽히게 했습니다.
+        </p>
+      </section>
+
+      <section class="panel stage-panel">
+        <div class="grid-line">
+          <span class="done"></span>
+          <span class="done"></span>
+          <span class="now"></span>
+          <span class="later"></span>
+          <span class="later"></span>
+        </div>
+        <div class="steps">
+          <article class="step complete">
+            <div class="step-number">1</div>
+            <h2>기본 설정</h2>
+            <p>태그·인원·난이도·시간</p>
+          </article>
+          <article class="step complete">
+            <div class="step-number">2</div>
+            <h2>오프닝 / 배경</h2>
+            <p>오프닝·대표지도·피해자·NPC</p>
+          </article>
+          <article class="step complete">
+            <div class="step-number">3</div>
+            <h2>플레이어</h2>
+            <p>범인·배경·상세 스토리·비밀</p>
+            <div class="chip warning">주의 2</div>
+          </article>
+          <article class="step current">
+            <div class="step-number">4</div>
+            <h2>단서 카드</h2>
+            <p>물적 증거·증언·현장 단서</p>
+            <div class="chip warning">주의 1</div>
+          </article>
+          <article class="step future">
+            <div class="step-number">5</div>
+            <h2>스크립트</h2>
+            <p>라운드 가이드·미디어·이벤트</p>
+            <div class="chip error">오류 2</div>
+          </article>
+          <article class="step future">
+            <div class="step-number">6</div>
+            <h2>엔딩</h2>
+            <p>분기 엔딩·개인 엔딩·작가 노트</p>
+            <div class="chip error">오류 3</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="cards">
+        <article class="panel card">
+          <h3>단계 / 안내 박스</h3>
+          <p>가장 조용한 안입니다. 단계 네비와 안내 박스를 다소 눌러서, 콘텐츠가 더 중심에 오게 만듭니다.</p>
+          <ul>
+            <li>현재 단계는 muted brass</li>
+            <li>완료 단계는 재색감 세이지</li>
+            <li>주의는 앰버, 오류만 레드 유지</li>
+          </ul>
+        </article>
+        <article class="panel card">
+          <h3>버튼 샘플</h3>
+          <button class="button primary">확인하고 진행</button>
+          <button class="button secondary">검토 완료</button>
+          <button class="button ghost">나중에 확인</button>
+          <button class="button danger">삭제</button>
+        </article>
+        <article class="panel card">
+          <h3>핵심 토큰</h3>
+          <div class="swatch">
+            <div class="swatch-color" style="background:#9f7a43;"></div>
+            <div class="swatch-label">Primary<br />#9F7A43</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background:#68716c;"></div>
+            <div class="swatch-label">Complete<br />#68716C</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background:#c9822b;"></div>
+            <div class="swatch-label">Warning<br />#C9822B</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

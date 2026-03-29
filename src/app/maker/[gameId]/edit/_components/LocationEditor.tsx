@@ -342,7 +342,7 @@ function LocationBlock({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">장소 설정</p>
-                <p className="mt-1 text-xs text-dark-500">장소 기본 정보와 공개 설명을 입력합니다.</p>
+                <p className="mt-1 text-xs text-dark-500">이 장소의 이름, 공개 설명, 개방 시점을 정합니다.</p>
               </div>
               <span className="rounded-full border border-dark-700 bg-dark-950/60 px-2.5 py-1 text-[11px] text-dark-400">
                 장소 카드
@@ -452,7 +452,7 @@ function LocationBlock({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <label className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">단서 카드</label>
-                <p className="mt-1 text-xs text-dark-500">이 장소의 단서를 입력합니다.</p>
+                <p className="mt-1 text-xs text-dark-500">이 장소에서 발견할 단서를 관리합니다.</p>
               </div>
               <button
                 type="button"

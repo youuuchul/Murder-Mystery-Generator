@@ -181,7 +181,7 @@ export default function StoryEditor({
       <div>
         <h2 className="text-xl font-bold text-dark-50">오프닝 / 배경 설정</h2>
         <p className="mt-1 text-sm text-dark-500">
-          오프닝 도입, 대표 지도, 피해자/NPC 공개 정보와 타임라인을 입력합니다.
+          게임 시작 전에 공개될 장면, 공통 이미지, 인물 정보를 준비합니다.
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export default function StoryEditor({
         <div>
           <h3 className="text-sm font-semibold text-dark-100">오프닝</h3>
           <p className="mt-1 text-xs text-dark-500">
-            오프닝 스토리와 오프닝 미디어를 입력합니다.
+            플레이어가 처음 마주할 장면과 미디어를 준비합니다.
           </p>
         </div>
 

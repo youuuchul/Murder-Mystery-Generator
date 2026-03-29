@@ -6,6 +6,7 @@ import ImageAssetField from "./ImageAssetField";
 import type {
   Player,
   Clue,
+  Location,
   Story,
   VictoryCondition,
   ScoreCondition,
@@ -18,6 +19,7 @@ interface PlayerEditorProps {
   gameId: string;
   players: Player[];
   clues: Clue[];
+  locations: Location[];
   story: Story;
   timeline: StoryTimeline;
   onChange: (players: Player[]) => void;
@@ -182,6 +184,7 @@ function PlayerForm({
   gameId,
   player,
   clues,
+  locations,
   relationTargets,
   isCulprit,
   onChange,
@@ -190,6 +193,7 @@ function PlayerForm({
   gameId: string;
   player: Player;
   clues: Clue[];
+  locations: Location[];
   relationTargets: RelationTargetOption[];
   isCulprit: boolean;
   onChange: (p: Player) => void;
@@ -256,6 +260,13 @@ function PlayerForm({
 
   const conditionInfo = VICTORY_OPTIONS.find((v) => v.value === player.victoryCondition);
   const filteredRelationTargets = relationTargets.filter((target) => target.value !== `player:${player.id}`);
+  const clueOptions = clues.map((clue) => {
+    const locationName = locations.find((location) => location.id === clue.locationId)?.name?.trim() || "위치 미지정";
+    return {
+      id: clue.id,
+      label: `${locationName} · ${clue.title || "(제목 없음)"}`,
+    };
+  });
 
   const tabs = [
     { id: "basic" as const, label: "기본 정보" },
@@ -466,9 +477,9 @@ function PlayerForm({
                       className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
                     >
                       <option value="">— 단서 선택 —</option>
-                      {clues.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title || "(제목 없음)"} [{c.type}]
+                      {clueOptions.map((clue) => (
+                        <option key={clue.id} value={clue.id}>
+                          {clue.label}
                         </option>
                       ))}
                     </select>
@@ -565,6 +576,7 @@ export default function PlayerEditor({
   gameId,
   players,
   clues,
+  locations,
   story,
   timeline,
   onChange,
@@ -706,6 +718,7 @@ export default function PlayerEditor({
               gameId={gameId}
               player={player}
               clues={clues}
+              locations={locations}
               relationTargets={relationTargets}
               isCulprit={player.id === story.culpritPlayerId}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}

@@ -380,6 +380,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               gameId={game.id}
               players={game.players ?? []}
               clues={game.clues}
+              locations={game.locations ?? []}
               story={game.story}
               timeline={game.story.timeline}
               onChange={(players) => updateGame({

@@ -25,6 +25,15 @@ const CLUE_TYPES: { value: Clue["type"]; label: string }[] = [
 const inputClass =
   "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
+/**
+ * 단서 선택 옵션에 장소명과 유형을 함께 보여줘 긴 목록에서도 찾기 쉽게 만든다.
+ */
+function getClueOptionLabel(clue: Clue, locations: Location[]): string {
+  const locationName = locations.find((location) => location.id === clue.locationId)?.name?.trim() || "위치 미지정";
+  const clueTypeLabel = CLUE_TYPES.find((type) => type.value === clue.type)?.label ?? "유형 없음";
+  return `${locationName} · ${clue.title || "(제목 없음)"} · ${clueTypeLabel}`;
+}
+
 function createLocation(): Location {
   return {
     id: crypto.randomUUID(),
@@ -58,6 +67,7 @@ function ConditionForm({
   condition,
   onChange,
   allClues,
+  allLocations,
   allCharacters,
   excludeClueId,
 }: {
@@ -65,6 +75,7 @@ function ConditionForm({
   condition: ClueCondition | undefined;
   onChange: (c: ClueCondition | undefined) => void;
   allClues: Clue[];
+  allLocations: Location[];
   allCharacters: Player[];
   excludeClueId?: string;
 }) {
@@ -151,8 +162,7 @@ function ConditionForm({
                       className="accent-mystery-500 w-3.5 h-3.5 shrink-0"
                     />
                     <span className="text-xs text-dark-300">
-                      {c.title || "(제목 없음)"}
-                      <span className="text-dark-600 ml-1">[{c.type}]</span>
+                      {getClueOptionLabel(c, allLocations)}
                     </span>
                   </label>
                 ))}
@@ -230,8 +240,18 @@ function LocationBlock({
   onChangeClue: (clue: Clue) => void;
   onDeleteClue: (clueId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!location.name && clues.length === 0);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const visibleSummaryBadges = [
+    `${clues.length}개 단서`,
+    location.unlocksAtRound !== null ? `Round ${location.unlocksAtRound} 해제` : "처음부터 접근",
+    location.ownerPlayerId
+      ? `${allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "소유자"} 접근 불가`
+      : null,
+    location.imageUrl ? "이미지 연결" : null,
+    location.accessCondition ? "입장 조건" : null,
+  ].filter(Boolean) as string[];
+  const summaryText = location.description.trim() || "장소 설명이 아직 없습니다.";
 
   function update<K extends keyof Location>(key: K, value: Location[K]) {
     onChangeLocation({ ...location, [key]: value });
@@ -268,123 +288,135 @@ function LocationBlock({
   }
 
   return (
-    <div className="border border-dark-700 rounded-xl overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(33,18,44,0.28),rgba(10,12,18,0.92))] shadow-[0_12px_36px_rgba(0,0,0,0.18)]">
       {/* 장소 헤더 */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-dark-800/60 hover:bg-dark-800 transition-colors text-left"
+        className="w-full px-4 py-4 text-left transition-colors hover:bg-dark-900/30"
       >
-        <div className="flex items-center gap-3">
-          <span className="font-medium text-dark-100">
-            {location.name || <span className="text-dark-500 italic">장소 이름 없음</span>}
-          </span>
-          <span className="text-xs text-dark-500 bg-dark-700 px-2 py-0.5 rounded-full">
-            단서 {clues.length}개
-          </span>
-          {location.unlocksAtRound !== null && (
-            <span className="text-xs text-mystery-400 bg-mystery-950/40 border border-mystery-800 px-2 py-0.5 rounded-full">
-              Round {location.unlocksAtRound} 해제
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span className="rounded-full border border-mystery-800/70 bg-mystery-950/30 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-mystery-300/80">
+                장소
+              </span>
+              <span className="text-xs text-dark-600">{location.id.slice(0, 8)}</span>
+            </div>
+            <p className="mt-3 text-base font-semibold text-dark-50">
+              {location.name || <span className="italic text-dark-500">장소 이름 없음</span>}
+            </p>
+            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-dark-500">
+              {summaryText}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {visibleSummaryBadges.map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-full border border-dark-700 bg-dark-950/60 px-2.5 py-1 text-[11px] text-dark-300"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDeleteLocation(); }}
+              className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-500 transition-colors hover:border-red-900/50 hover:text-red-400"
+            >
+              삭제
+            </button>
+            <span className="rounded-lg border border-dark-700 bg-dark-950/50 px-3 py-2 text-xs text-dark-400">
+              {expanded ? "접기" : "열기"}
             </span>
-          )}
-          {location.unlocksAtRound === null && (
-            <span className="text-xs text-green-400 bg-green-950/40 border border-green-800 px-2 py-0.5 rounded-full">
-              처음부터 접근 가능
-            </span>
-          )}
-          {location.ownerPlayerId && (
-            <span className="text-xs text-orange-400 bg-orange-950/40 border border-orange-800 px-2 py-0.5 rounded-full">
-              {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "소유자"} 접근 불가
-            </span>
-          )}
-          {location.imageUrl && (
-            <span className="text-xs text-sky-400 bg-sky-950/30 border border-sky-900 px-2 py-0.5 rounded-full">
-              이미지
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDeleteLocation(); }}
-            className="text-xs text-dark-500 hover:text-red-400 transition-colors px-2 py-1"
-          >
-            삭제
-          </button>
-          <span className="text-dark-500 text-sm">{expanded ? "접기" : "열기"}</span>
+          </div>
         </div>
       </button>
 
       {expanded && (
-        <div className="p-4 space-y-5">
+        <div className="space-y-5 border-t border-dark-700/80 bg-dark-950/25 p-4">
           {/* 장소 기본 정보 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-dark-400 mb-1">장소 이름 *</label>
-              <input
-                type="text"
-                value={location.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder="예: 에드워드의 방, 지하 창고, 정원"
-                className={inputClass}
-              />
+          <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-dark-100">장소 설정</p>
+                <p className="mt-1 text-xs text-dark-500">장소 기본 정보와 공개 설명을 먼저 정리합니다.</p>
+              </div>
+              <span className="rounded-full border border-dark-700 bg-dark-950/60 px-2.5 py-1 text-[11px] text-dark-400">
+                보드 카드
+              </span>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-dark-400 mb-1">장소 이름 *</label>
+                <input
+                  type="text"
+                  value={location.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder="예: 에드워드의 방, 지하 창고, 정원"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-dark-400 mb-1">
+                  잠금 해제 라운드
+                  <span className="text-dark-600 font-normal ml-1">(비우면 처음부터)</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={location.unlocksAtRound ?? ""}
+                  onChange={(e) =>
+                    update("unlocksAtRound", e.target.value === "" ? null : Number(e.target.value))
+                  }
+                  placeholder="없음"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            {/* 소유자 캐릭터 */}
             <div>
               <label className="block text-xs font-medium text-dark-400 mb-1">
-                잠금 해제 라운드
-                <span className="text-dark-600 font-normal ml-1">(비우면 처음부터)</span>
+                접근 불가 캐릭터 <span className="text-dark-600 font-normal">(소유자 — 자기 공간에는 들어갈 수 없음)</span>
               </label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={location.unlocksAtRound ?? ""}
-                onChange={(e) =>
-                  update("unlocksAtRound", e.target.value === "" ? null : Number(e.target.value))
-                }
-                placeholder="없음"
+              <select
+                value={location.ownerPlayerId ?? ""}
+                onChange={(e) => update("ownerPlayerId", e.target.value || undefined)}
                 className={inputClass}
+              >
+                <option value="">— 없음 (모든 캐릭터 접근 가능) —</option>
+                {allCharacters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || `(이름 없음)`}
+                  </option>
+                ))}
+              </select>
+              {location.ownerPlayerId && (
+                <p className="text-xs text-orange-400 mt-1">
+                  {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "해당 캐릭터"}
+                  은(는) 이 장소에서 단서를 획득할 수 없습니다.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-dark-400 mb-1">장소 설명</label>
+              <textarea
+                rows={2}
+                value={location.description}
+                onChange={(e) => update("description", e.target.value)}
+                placeholder="플레이어가 이 장소에 방문했을 때 보게 되는 설명"
+                className={inputClass + " resize-none"}
               />
             </div>
-          </div>
+          </section>
 
-          {/* 소유자 캐릭터 */}
-          <div>
-            <label className="block text-xs font-medium text-dark-400 mb-1">
-              접근 불가 캐릭터 <span className="text-dark-600 font-normal">(소유자 — 자기 공간에는 들어갈 수 없음)</span>
-            </label>
-            <select
-              value={location.ownerPlayerId ?? ""}
-              onChange={(e) => update("ownerPlayerId", e.target.value || undefined)}
-              className={inputClass}
-            >
-              <option value="">— 없음 (모든 캐릭터 접근 가능) —</option>
-              {allCharacters.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name || `(이름 없음)`}
-                </option>
-              ))}
-            </select>
-            {location.ownerPlayerId && (
-              <p className="text-xs text-orange-400 mt-1">
-                {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "해당 캐릭터"}
-                은(는) 이 장소에서 단서를 획득할 수 없습니다.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-dark-400 mb-1">장소 설명</label>
-            <textarea
-              rows={2}
-              value={location.description}
-              onChange={(e) => update("description", e.target.value)}
-              placeholder="플레이어가 이 장소에 방문했을 때 보게 되는 설명"
-              className={inputClass + " resize-none"}
-            />
-          </div>
-
-          <div className="space-y-3">
+          <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <ImageAssetField
               title="장소 대표 이미지"
               description="플레이어 장소 카드에 함께 노출됩니다."
@@ -397,10 +429,10 @@ function LocationBlock({
               uploadLabel="이미지 업로드"
               emptyStateLabel="아직 연결된 장소 이미지가 없습니다."
             />
-          </div>
+          </section>
 
           {/* 장소 입장 조건 */}
-          <div>
+          <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <label className="block text-xs font-medium text-dark-400 mb-2">
               장소 입장 조건
               <span className="text-dark-600 font-normal ml-1">— 조건 미충족 시 이 장소의 모든 단서 획득 불가</span>
@@ -410,35 +442,40 @@ function LocationBlock({
               condition={location.accessCondition}
               onChange={(c) => update("accessCondition", c)}
               allClues={allClues}
+              allLocations={allLocations}
               allCharacters={allCharacters}
             />
-          </div>
+          </section>
 
           {/* 이 장소의 단서 카드들 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-dark-400">단서 카드</label>
+          <section className="rounded-2xl border border-mystery-900/40 bg-[linear-gradient(180deg,rgba(28,20,36,0.72),rgba(10,12,18,0.92))] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">단서 카드</label>
+                <p className="mt-1 text-xs text-dark-500">장소 안쪽 카드처럼 묶어서, 위치 찾기와 정리가 더 쉬워지도록 분리했습니다.</p>
+              </div>
               <button
                 type="button"
                 onClick={onAddClue}
-                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                className="rounded-lg border border-mystery-900/60 bg-mystery-950/25 px-3 py-2 text-xs text-mystery-300 transition-colors hover:border-mystery-700 hover:bg-mystery-950/40"
               >
                 + 단서 추가
               </button>
             </div>
 
             {clues.length === 0 ? (
-              <div className="text-center py-4 border border-dashed border-dark-700 rounded-lg">
+              <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/35 py-6 text-center">
                 <p className="text-xs text-dark-600">이 장소에 배치된 단서가 없습니다.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-2xl border border-dark-800/80 bg-black/10 p-3">
                 {clues.map((clue) => (
                   <ClueForm
                     key={clue.id}
                     gameId={gameId}
                     clue={clue}
                     allClues={allClues}
+                    allLocations={allLocations}
                     allCharacters={allCharacters}
                     onChange={onChangeClue}
                     onDelete={() => onDeleteClue(clue.id)}
@@ -446,7 +483,7 @@ function LocationBlock({
                 ))}
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
     </div>
@@ -458,6 +495,7 @@ function ClueForm({
   gameId,
   clue,
   allClues,
+  allLocations,
   allCharacters,
   onChange,
   onDelete,
@@ -465,11 +503,12 @@ function ClueForm({
   gameId: string;
   clue: Clue;
   allClues: Clue[];
+  allLocations: Location[];
   allCharacters: Player[];
   onChange: (c: Clue) => void;
   onDelete: () => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!clue.title && !clue.description && !clue.imageUrl);
   const [uploadingImage, setUploadingImage] = useState(false);
   const typeInfo = CLUE_TYPES.find((t) => t.value === clue.type);
   const isSceneClue = clue.type === "scene";
@@ -510,45 +549,54 @@ function ClueForm({
   }
 
   return (
-    <div className="border border-dark-700/60 rounded-lg overflow-hidden bg-dark-900/40">
+    <div className="overflow-hidden rounded-xl border border-dark-700/70 bg-dark-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-dark-800/30 transition-colors"
+        className="w-full px-3 py-3 text-left transition-colors hover:bg-dark-900/50"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-dark-200">
-            {clue.title || <span className="text-dark-500 italic">제목 없음</span>}
-          </span>
-          <span className="text-[11px] text-dark-500 border border-dark-700 bg-dark-800 px-1.5 py-0.5 rounded">
-            {typeInfo?.label ?? "유형 없음"}
-          </span>
-          {clue.imageUrl && (
-            <span className="text-xs text-sky-400 border border-sky-900 bg-sky-950/30 px-1.5 py-0.5 rounded">
-              이미지
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400">
+                {typeInfo?.label ?? "유형 없음"}
+              </span>
+              {clue.imageUrl && (
+                <span className="rounded-full border border-sky-900 bg-sky-950/30 px-2 py-0.5 text-[11px] text-sky-400">
+                  이미지
+                </span>
+              )}
+              {clue.condition && !isSceneClue && (
+                <span className="rounded-full border border-mystery-800 bg-mystery-950/30 px-2 py-0.5 text-[11px] text-mystery-400">
+                  잠금 조건
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-sm font-medium text-dark-100">
+              {clue.title || <span className="text-dark-500 italic">제목 없음</span>}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-dark-500">
+              {clue.description.trim() || "단서 설명이 아직 없습니다."}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="rounded-lg border border-dark-700 px-2.5 py-1.5 text-xs text-dark-500 transition-colors hover:border-red-900/50 hover:text-red-400"
+            >
+              삭제
+            </button>
+            <span className="rounded-lg border border-dark-700 bg-dark-900/70 px-2.5 py-1.5 text-xs text-dark-500">
+              {expanded ? "접기" : "열기"}
             </span>
-          )}
-          {clue.condition && !isSceneClue && (
-            <span className="text-xs text-mystery-400 border border-mystery-800 bg-mystery-950/30 px-1.5 py-0.5 rounded">
-              잠금 조건
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="text-xs text-dark-600 hover:text-red-400 transition-colors"
-          >
-            삭제
-          </button>
-          <span className="text-dark-600 text-xs">{expanded ? "접기" : "열기"}</span>
+          </div>
         </div>
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-3 border-t border-dark-800/80 bg-black/10 px-3 pb-3 pt-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label className="block text-xs text-dark-500 mb-1">제목</label>
               <input
@@ -582,7 +630,7 @@ function ClueForm({
             </div>
           </div>
 
-          <div>
+          <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
             <label className="block text-xs text-dark-500 mb-1">단서 내용</label>
             <textarea
               rows={3}
@@ -599,22 +647,24 @@ function ClueForm({
             </div>
           )}
 
-          <ImageAssetField
-            title="단서 이미지"
-            description="인벤토리 카드와 상세 모달에 함께 표시됩니다. 문서형 단서는 잘리지 않도록 여백 포함 이미지를 권장합니다."
-            value={clue.imageUrl}
-            alt={clue.title || "단서 이미지 미리보기"}
-            profile="clue"
-            onChange={(nextValue) => update("imageUrl", nextValue)}
-            onUpload={handleClueImageUpload}
-            uploading={uploadingImage}
-            uploadLabel="단서 이미지 업로드"
-            emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
-          />
+          <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
+            <ImageAssetField
+              title="단서 이미지"
+              description="인벤토리 카드와 상세 모달에 함께 표시됩니다. 문서형 단서는 잘리지 않도록 여백 포함 이미지를 권장합니다."
+              value={clue.imageUrl}
+              alt={clue.title || "단서 이미지 미리보기"}
+              profile="clue"
+              onChange={(nextValue) => update("imageUrl", nextValue)}
+              onUpload={handleClueImageUpload}
+              uploading={uploadingImage}
+              uploadLabel="단서 이미지 업로드"
+              emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
+            />
+          </div>
 
           {/* 단서 획득 조건 */}
           {!isSceneClue && (
-            <div>
+            <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
               <label className="block text-xs text-dark-500 mb-2">
                 단서 획득 조건
                 <span className="text-dark-600 font-normal ml-1">— 조건 충족 시에만 획득 가능</span>
@@ -624,6 +674,7 @@ function ClueForm({
                 condition={clue.condition}
                 onChange={(c) => update("condition", c)}
                 allClues={allClues}
+                allLocations={allLocations}
                 allCharacters={allCharacters}
                 excludeClueId={clue.id}
               />
@@ -685,6 +736,9 @@ export default function LocationEditor({
   }
 
   const totalClues = clues.length;
+  const locationsWithImages = locations.filter((location) => Boolean(location.imageUrl)).length;
+  const lockedLocations = locations.filter((location) => location.unlocksAtRound !== null).length;
+  const conditionalClues = clues.filter((clue) => Boolean(clue.condition)).length;
 
   return (
     <div data-maker-anchor="step-4-locations" className="space-y-6">
@@ -759,6 +813,21 @@ export default function LocationEditor({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "장소", value: `${locations.length}개`, hint: "현재 배치된 탐색 장소" },
+          { label: "단서", value: `${totalClues}개`, hint: "플레이어가 획득하거나 확인할 카드" },
+          { label: "이미지", value: `${locationsWithImages}개`, hint: "대표 이미지 연결된 장소" },
+          { label: "잠금/조건", value: `${lockedLocations + conditionalClues}개`, hint: "라운드 잠금 + 조건형 단서" },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-dark-800 bg-dark-900/45 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-dark-600">{item.label}</p>
+            <p className="mt-2 text-lg font-semibold text-dark-100">{item.value}</p>
+            <p className="mt-1 text-xs text-dark-500">{item.hint}</p>
+          </div>
+        ))}
       </div>
 
       {locations.length === 0 ? (

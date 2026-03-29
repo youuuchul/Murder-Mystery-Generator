@@ -34,14 +34,21 @@ export default function MakerAssistantDock({
         gameTitle={game.title}
         currentStep={currentStep}
         validationIssueCount={validationIssueCount}
+        locations={game.locations}
+        players={game.players}
         draft={assistant.draft}
         responseMode={assistant.responseMode}
         error={assistant.error}
         messages={assistant.messages}
+        clueSuggestionContext={assistant.clueSuggestionContext}
+        clueSuggestionReady={assistant.clueSuggestionReady}
+        clueSuggestionSummary={assistant.clueSuggestionSummary}
+        clueSuggestionHint={assistant.clueSuggestionHint}
         onClose={() => assistant.setOpen(false)}
         onDraftChange={assistant.setDraft}
         onResponseModeChange={assistant.setResponseMode}
         onQuickAction={assistant.runQuickAction}
+        onClueSuggestionContextChange={assistant.setClueSuggestionContext}
         onSend={assistant.sendChat}
         onReset={assistant.resetConversation}
       />

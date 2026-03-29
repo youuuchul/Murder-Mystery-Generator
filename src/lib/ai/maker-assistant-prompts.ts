@@ -1,6 +1,8 @@
 import type { MakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import {
+  MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPE_LABELS,
   MAKER_ASSISTANT_TASK_LABELS,
+  type MakerAssistantClueSuggestionContext,
   type MakerAssistantConversationTurn,
   type MakerAssistantResponseMode,
   type MakerAssistantTask,
@@ -94,6 +96,8 @@ function getTaskGuidelines(task: MakerAssistantTask, responseMode: MakerAssistan
       return [
         "현재 목표는 기존 배경과 비밀에 맞는 새 단서를 제안하는 것이다.",
         "제안은 바로 입력 가능한 수준으로 구체적이어야 하며, 기존 단서와의 연결 이유를 포함해야 한다.",
+        "사용자가 지정한 장소, 관련 인물, 제안 개수를 우선 따르고, 맥락이 비어 있으면 전체 게임 기준으로 자연스럽게 보강한다.",
+        "guide 모드에서는 각 단서 아이디어를 FINDING 한 항목으로 구분해서 작성하고, 요청 개수에 최대한 맞춘다.",
       ].join("\n");
     case "suggest_next_steps":
       return [
@@ -125,18 +129,23 @@ export function buildMakerAssistantUserPrompt(params: {
   context: MakerAssistantContext;
   message?: string;
   conversationHistory?: MakerAssistantConversationTurn[];
+  clueSuggestionContext?: MakerAssistantClueSuggestionContext;
 }): string {
-  const { task, responseMode, context, message, conversationHistory } = params;
+  const { task, responseMode, context, message, conversationHistory, clueSuggestionContext } = params;
   const draftIntent = responseMode === "draft"
     ? inferDraftIntent(message, context.currentStep.number)
     : null;
   const promptContext = draftIntent
     ? buildDraftPromptContext(context, draftIntent)
     : context;
+  const cluePromptContext = task === "suggest_clues" && clueSuggestionContext
+    ? buildClueSuggestionPromptContext(context, clueSuggestionContext)
+    : null;
 
   return [
     `Task: ${MAKER_ASSISTANT_TASK_LABELS[task]}`,
     `Response Mode: ${responseMode}`,
+    cluePromptContext ? `Clue Suggestion Context:\n${cluePromptContext}` : null,
     responseMode === "draft"
       ? `Draft Focus Hint: ${getDraftFocusHint(context.currentStep.number)}`
       : null,
@@ -285,6 +294,56 @@ function buildDraftPromptContext(context: MakerAssistantContext, intent: DraftIn
   };
 }
 
+function buildClueSuggestionPromptContext(
+  context: MakerAssistantContext,
+  clueSuggestionContext: MakerAssistantClueSuggestionContext
+): string {
+  const parts = [
+    `scope: ${MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPE_LABELS[clueSuggestionContext.scope]}`,
+    `requested_count: ${clueSuggestionContext.count}`,
+  ];
+
+  if (clueSuggestionContext.locationId) {
+    parts.push(`location: ${findLocationName(context, clueSuggestionContext.locationId)}`);
+    const locationRecord = context.locations?.find((location) => location.id === clueSuggestionContext.locationId);
+    const description = readStringField(locationRecord, "description");
+    const locationClueTitles = (context.clues ?? [])
+      .filter((clue) => clue.locationId === clueSuggestionContext.locationId)
+      .map((clue) => readStringField(clue, "title"))
+      .filter(Boolean);
+
+    if (description) {
+      parts.push(`location_description: ${description}`);
+    }
+
+    if (locationClueTitles.length > 0) {
+      parts.push(`existing_clues_at_location: ${locationClueTitles.join(", ")}`);
+    }
+  }
+
+  if (clueSuggestionContext.playerId) {
+    parts.push(`player: ${findPlayerName(context, clueSuggestionContext.playerId)}`);
+    const playerRecord = context.players?.find((player) => player.id === clueSuggestionContext.playerId);
+    const background = readStringField(playerRecord, "background");
+    const secret = readStringField(playerRecord, "secret");
+
+    if (background) {
+      parts.push(`player_background: ${background}`);
+    }
+
+    if (secret) {
+      parts.push(`player_secret: ${secret}`);
+    }
+  }
+
+  return parts.join("\n");
+}
+
+function readStringField(record: Record<string, unknown> | undefined, key: string): string {
+  const value = record?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 /** 질문에서 가장 가능성 높은 입력칸 이름을 뽑아 prompt에 짧게 남긴다. */
 function detectDraftTargetLabel(message: string, currentStep: number): string {
   if (/오프닝/u.test(message)) return "오프닝 스토리 텍스트";
@@ -314,4 +373,26 @@ function detectDraftTargetLabel(message: string, currentStep: number): string {
     default:
       return "입력칸용 문안";
   }
+}
+
+function findLocationName(context: MakerAssistantContext, locationId: string): string {
+  const location = context.locations?.find((item) => {
+    const record = item as { id?: unknown };
+    return record.id === locationId;
+  }) as { name?: unknown } | undefined;
+
+  return typeof location?.name === "string" && location.name.trim()
+    ? location.name.trim()
+    : "미선택";
+}
+
+function findPlayerName(context: MakerAssistantContext, playerId: string): string {
+  const player = context.players?.find((item) => {
+    const record = item as { id?: unknown };
+    return record.id === playerId;
+  }) as { name?: unknown } | undefined;
+
+  return typeof player?.name === "string" && player.name.trim()
+    ? player.name.trim()
+    : "미선택";
 }

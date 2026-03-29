@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ImageAssetField from "./ImageAssetField";
 import type { Location, RoundScript, ScriptSegment, Scripts } from "@/types/game";
 
 interface ScriptEditorProps {
+  gameId: string;
   scripts: Scripts;
   rounds: number;
   locations: Location[];
@@ -170,6 +172,32 @@ function ExamplePanel({
   );
 }
 
+function MediaLinkField({
+  label,
+  value,
+  onChange,
+  description,
+}: {
+  label: string;
+  value?: string;
+  onChange: (nextValue?: string) => void;
+  description: string;
+}) {
+  return (
+    <div>
+      <FieldHeader label={label} filled={hasContent(value)} optional />
+      <input
+        type="url"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        placeholder="https://..."
+        className={inputClass}
+      />
+      <p className="mt-1 text-xs text-dark-600">{description}</p>
+    </div>
+  );
+}
+
 function SegmentEditor({
   label,
   phaseLabel,
@@ -265,28 +293,35 @@ function SegmentEditor({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldHeader label="배경 음악 URL" filled={hasMusic} optional />
-          <input
-            type="url"
-            value={segment.backgroundMusic ?? ""}
-            onChange={(e) => onChange({ ...segment, backgroundMusic: e.target.value || undefined })}
-            placeholder="https://..."
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-dark-600">비워 두면 이 페이즈에서는 배경 음악 패널이 숨겨집니다.</p>
+      <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-dark-100">미디어 링크</p>
+            <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+              배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
+            </span>
+            <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+              영상 {hasVideo ? "연결됨" : "비워 둠"}
+            </span>
+          </div>
         </div>
-        <div>
-          <FieldHeader label="영상 URL" filled={hasVideo} optional />
-          <input
-            type="url"
-            value={segment.videoUrl ?? ""}
-            onChange={(e) => onChange({ ...segment, videoUrl: e.target.value || undefined })}
-            placeholder="https://..."
-            className={inputClass}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <MediaLinkField
+            label="배경 음악 링크"
+            value={segment.backgroundMusic}
+            onChange={(nextValue) => onChange({ ...segment, backgroundMusic: nextValue })}
+            description="비워 두면 이 페이즈에서는 배경 음악 패널이 숨겨집니다."
           />
-          <p className="mt-1 text-xs text-dark-600">YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다.</p>
+          <MediaLinkField
+            label="영상 링크"
+            value={segment.videoUrl}
+            onChange={(nextValue) => onChange({ ...segment, videoUrl: nextValue })}
+            description="YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다."
+          />
         </div>
       </div>
     </div>
@@ -297,16 +332,22 @@ function RoundScriptForm({
   round,
   locations,
   onChange,
+  onUploadImage,
+  uploadingImage,
 }: {
   round: RoundScript;
   locations: Location[];
   onChange: (round: RoundScript) => void;
+  onUploadImage: (file: File) => Promise<void>;
+  uploadingImage: boolean;
 }) {
   const [expanded, setExpanded] = useState(round.round === 1);
   const unlockedLocations = locations.filter((location) => location.unlocksAtRound === round.round);
   const status = getRoundStatus(round);
   const hasNarration = hasContent(round.narration);
   const hasGuide = hasContent(round.gmNote);
+  const hasMusic = hasContent(round.backgroundMusic);
+  const hasVideo = hasContent(round.videoUrl);
 
   return (
     <div className="border border-dark-700 rounded-xl overflow-hidden">
@@ -405,39 +446,51 @@ function RoundScriptForm({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <FieldHeader label="라운드 대표 이미지 URL" filled={hasContent(round.imageUrl)} optional />
-              <input
-                type="url"
-                value={round.imageUrl ?? ""}
-                onChange={(e) => onChange({ ...round, imageUrl: e.target.value || undefined })}
-                placeholder="https://..."
-                className={inputClass}
-              />
-              <p className="mt-1 text-xs text-dark-600">비워 두면 Step 2 대표 지도 / 참고 이미지를 그대로 사용합니다.</p>
+          <ImageAssetField
+            title="라운드 대표 이미지"
+            description="라운드 시작 시 GM 보드에 보일 대표 이미지입니다. 없으면 공통 이미지를 사용합니다."
+            value={round.imageUrl}
+            alt={`Round ${round.round} 대표 이미지`}
+            profile="round"
+            onChange={(nextValue) => onChange({ ...round, imageUrl: nextValue })}
+            onUpload={onUploadImage}
+            uploading={uploadingImage}
+            uploadLabel="이미지 업로드"
+            emptyStateLabel="아직 연결된 라운드 대표 이미지가 없습니다."
+          />
+
+          <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-dark-100">미디어 링크</p>
+                <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                  배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
+                </span>
+                <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-emerald-800 bg-emerald-950/20 text-emerald-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+                  영상 {hasVideo ? "연결됨" : "비워 둠"}
+                </span>
+              </div>
             </div>
-            <div>
-              <FieldHeader label="배경 음악 URL" filled={hasContent(round.backgroundMusic)} optional />
-              <input
-                type="url"
-                value={round.backgroundMusic ?? ""}
-                onChange={(e) => onChange({ ...round, backgroundMusic: e.target.value || undefined })}
-                placeholder="https://..."
-                className={inputClass}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <MediaLinkField
+                label="배경 음악 링크"
+                value={round.backgroundMusic}
+                onChange={(nextValue) => onChange({ ...round, backgroundMusic: nextValue })}
+                description="비워 두면 이 라운드에서는 배경 음악 패널이 숨겨집니다."
               />
-            </div>
-            <div className="sm:col-span-2">
-              <FieldHeader label="영상 URL" filled={hasContent(round.videoUrl)} optional />
-              <input
-                type="url"
-                value={round.videoUrl ?? ""}
-                onChange={(e) => onChange({ ...round, videoUrl: e.target.value || undefined })}
-                placeholder="https://..."
-                className={inputClass}
+              <MediaLinkField
+                label="영상 링크"
+                value={round.videoUrl}
+                onChange={(nextValue) => onChange({ ...round, videoUrl: nextValue })}
+                description="YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다."
               />
             </div>
           </div>
+
         </div>
       )}
     </div>
@@ -460,6 +513,7 @@ function getRoundsTabStatus(rounds: RoundScript[]): EditorStatus {
 }
 
 export default function ScriptEditor({
+  gameId,
   scripts,
   rounds,
   locations,
@@ -468,6 +522,7 @@ export default function ScriptEditor({
   focusToken,
 }: ScriptEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("lobby");
+  const [uploadingAssetTarget, setUploadingAssetTarget] = useState<string | null>(null);
 
   function ensureRounds(count: number): RoundScript[] {
     const existing = scripts.rounds;
@@ -513,6 +568,38 @@ export default function ScriptEditor({
       setActiveTab("rounds");
     }
   }, [focusTarget, focusToken]);
+
+  /** 라운드 대표 이미지를 업로드해 Step 5와 GM 보드에서 쓸 내부 URL로 바꾼다. */
+  async function handleRoundImageUpload(roundId: number, file: File): Promise<void> {
+    const target = `round:${roundId}`;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("scope", "rounds");
+
+    setUploadingAssetTarget(target);
+    try {
+      const res = await fetch(`/api/games/${gameId}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error ?? "라운드 이미지 업로드 실패");
+        return;
+      }
+
+      const nextRounds = normalizedRounds.map((round) => (
+        round.round === roundId ? { ...round, imageUrl: data.url } : round
+      ));
+      onChange({ ...scripts, rounds: nextRounds });
+    } catch (error) {
+      console.error("라운드 이미지 업로드 실패:", error);
+      alert("라운드 이미지 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingAssetTarget(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -573,6 +660,8 @@ export default function ScriptEditor({
                 const nextRounds = normalizedRounds.map((item, roundIdx) => (roundIdx === idx ? updatedRound : item));
                 onChange({ ...scripts, rounds: nextRounds });
               }}
+              onUploadImage={(file) => handleRoundImageUpload(round.round, file)}
+              uploadingImage={uploadingAssetTarget === `round:${round.round}`}
             />
           ))}
         </div>

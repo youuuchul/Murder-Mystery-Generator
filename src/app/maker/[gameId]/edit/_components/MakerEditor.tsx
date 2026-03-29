@@ -413,6 +413,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           )}
           {currentStep === 5 && (
             <ScriptEditor
+              gameId={game.id}
               scripts={game.scripts}
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}

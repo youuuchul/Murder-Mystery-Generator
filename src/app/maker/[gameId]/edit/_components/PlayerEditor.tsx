@@ -146,7 +146,7 @@ function TimelineMatrixEditor({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-mystery-300">{slot.label || "이름 없는 슬롯"}</p>
-              <p className="text-xs text-dark-500 mt-1">이 시간대의 행동과 위치를 각 캐릭터별로 정리합니다.</p>
+              <p className="text-xs text-dark-500 mt-1">이 시간대에 각 캐릭터가 어디에 있었는지 적습니다.</p>
             </div>
             <span className="text-xs text-dark-600 shrink-0">{players.length}명</span>
           </div>

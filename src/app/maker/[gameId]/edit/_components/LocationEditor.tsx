@@ -306,7 +306,7 @@ function LocationBlock({
             <p className="mt-3 text-base font-semibold text-dark-50">
               {location.name || <span className="italic text-dark-500">장소 이름 없음</span>}
             </p>
-            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-dark-500">
+            <p className="mt-1 max-w-3xl line-clamp-2 text-sm leading-relaxed text-dark-500">
               {summaryText}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -575,7 +575,7 @@ function ClueForm({
             <p className="mt-2 text-sm font-medium text-dark-100">
               {clue.title || <span className="text-dark-500 italic">제목 없음</span>}
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-dark-500">
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-dark-500">
               {clue.description.trim() || "단서 설명이 아직 없습니다."}
             </p>
           </div>

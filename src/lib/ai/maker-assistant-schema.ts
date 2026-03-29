@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPES,
   MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES,
   MAKER_ASSISTANT_TASKS,
   type MakerAssistantDraftResult,
@@ -11,6 +12,7 @@ import {
 
 const taskSchema = z.enum(MAKER_ASSISTANT_TASKS);
 const responseModePreferenceSchema = z.enum(MAKER_ASSISTANT_RESPONSE_MODE_PREFERENCES);
+const clueSuggestionScopeSchema = z.enum(MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPES);
 
 const gameSchema = z.custom<MakerAssistantRequest["game"]>(
   (value) => typeof value === "object" && value !== null,
@@ -24,6 +26,12 @@ export const makerAssistantRequestSchema = z.object({
   message: z.string().trim().max(4000).optional(),
   previousResponseId: z.string().trim().nullable().optional(),
   responseMode: responseModePreferenceSchema.optional(),
+  clueSuggestionContext: z.object({
+    scope: clueSuggestionScopeSchema,
+    count: z.number().int().min(1).max(5),
+    locationId: z.string().trim().nullable(),
+    playerId: z.string().trim().nullable(),
+  }).optional(),
   conversationHistory: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     task: taskSchema,

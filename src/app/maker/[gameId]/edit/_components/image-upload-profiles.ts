@@ -1,4 +1,4 @@
-export type ImageAssetProfile = "cover" | "map" | "location" | "portrait" | "clue";
+export type ImageAssetProfile = "cover" | "map" | "round" | "location" | "portrait" | "clue";
 
 interface ImageAssetProfileConfig {
   maxWidth: number;
@@ -23,6 +23,16 @@ const PROFILE_CONFIGS: Record<ImageAssetProfile, ImageAssetProfileConfig> = {
     previewImageClassName: "object-cover",
   },
   map: {
+    maxWidth: 2560,
+    maxHeight: 1600,
+    targetBytes: 4_500_000,
+    initialQuality: 0.9,
+    minQuality: 0.72,
+    recommendedRatioLabel: "권장 16:9",
+    previewAspectClassName: "aspect-[16/9]",
+    previewImageClassName: "object-contain",
+  },
+  round: {
     maxWidth: 2560,
     maxHeight: 1600,
     targetBytes: 4_500_000,

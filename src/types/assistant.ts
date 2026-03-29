@@ -32,6 +32,28 @@ export const MAKER_ASSISTANT_RESPONSE_MODE_LABELS: Record<
   draft: "문안",
 };
 
+export const MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPES = ["all", "location", "player", "location_and_player"] as const;
+
+export type MakerAssistantClueSuggestionScope =
+  (typeof MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPES)[number];
+
+export const MAKER_ASSISTANT_CLUE_SUGGESTION_SCOPE_LABELS: Record<
+  MakerAssistantClueSuggestionScope,
+  string
+> = {
+  all: "전체",
+  location: "장소",
+  player: "인물",
+  location_and_player: "장소 + 인물",
+};
+
+export interface MakerAssistantClueSuggestionContext {
+  scope: MakerAssistantClueSuggestionScope;
+  count: number;
+  locationId: string | null;
+  playerId: string | null;
+}
+
 export interface MakerAssistantFinding {
   severity: "error" | "warning" | "idea";
   title: string;
@@ -82,6 +104,7 @@ export interface MakerAssistantRequest {
   previousResponseId?: string | null;
   responseMode?: MakerAssistantResponseModePreference;
   conversationHistory?: MakerAssistantConversationTurn[];
+  clueSuggestionContext?: MakerAssistantClueSuggestionContext;
 }
 
 export interface MakerAssistantResponse {

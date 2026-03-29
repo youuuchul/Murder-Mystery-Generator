@@ -27,23 +27,11 @@ export default function MakerAssistantMessageList({
 
   if (messages.length === 0) {
     return (
-      <div className="space-y-3">
-        <div className="rounded-2xl border border-dark-700 bg-dark-950/60 p-4">
-          <p className="text-sm font-medium text-dark-100">현재 편집 상태 기준으로 바로 도와줍니다.</p>
-          <p className="mt-2 text-sm leading-relaxed text-dark-400">
-            저장하지 않은 내용도 함께 읽습니다. Step을 옮기지 않고 지금 보고 있는 화면에서
-            모순 점검, 단서 제안, 다음 작업 우선순위를 받을 수 있습니다.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-dashed border-dark-700 bg-dark-950/40 p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-dark-600">예시 질문</p>
-          <ul className="mt-3 space-y-2 text-sm text-dark-300">
-            <li>이 타임라인에서 범인 동선이 너무 튀는지 봐줘.</li>
-            <li>이 캐릭터 비밀에 맞는 문서형 단서 3개 제안해줘.</li>
-            <li>지금 상태에서 뭘 먼저 채우면 좋은지 순서대로 알려줘.</li>
-            <li>Step 2 오프닝 텍스트 초안을 바로 붙여넣을 수 있게 써줘.</li>
-          </ul>
-        </div>
+      <div className="rounded-2xl border border-dark-700 bg-dark-950/40 px-4 py-2.5">
+        <p className="text-sm font-medium text-dark-100">현재 화면 기준으로 바로 묻기</p>
+        <p className="mt-1 text-xs leading-relaxed text-dark-400">
+          빠른 액션을 누르거나 아래 입력창에 요청을 적으면 됩니다.
+        </p>
       </div>
     );
   }

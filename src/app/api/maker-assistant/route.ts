@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
         context,
         message: payload.message,
         conversationHistory: payload.conversationHistory,
+        clueSuggestionContext: payload.clueSuggestionContext,
       }),
       reasoning: {
         effort: getMakerAssistantReasoningEffort(),

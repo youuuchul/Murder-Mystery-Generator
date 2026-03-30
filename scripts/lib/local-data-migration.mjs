@@ -172,6 +172,29 @@ export function readLocalSessions() {
 }
 
 /**
+ * 로컬 세션 파일 경로와 파싱된 JSON을 함께 반환한다.
+ * orphan 정리처럼 파일 자체를 이동해야 하는 작업에서 사용한다.
+ *
+ * @returns {{ filePath: string, fileName: string, session: any }[]}
+ */
+function readLocalSessionEntries() {
+  if (!fs.existsSync(SESSIONS_DIR)) {
+    return [];
+  }
+
+  return fs.readdirSync(SESSIONS_DIR)
+    .filter((fileName) => fileName.endsWith(".json"))
+    .map((fileName) => {
+      const filePath = path.join(SESSIONS_DIR, fileName);
+      return {
+        filePath,
+        fileName,
+        session: readJsonFile(filePath),
+      };
+    });
+}
+
+/**
  * 실제 import 전에 로컬 게임/세션 폴더를 타임스탬프 백업으로 복사한다.
  *
  * @param {string} [label]
@@ -211,6 +234,92 @@ export function createLocalDataBackup(label = "pre-supabase-import") {
   );
 
   return { backupDir, manifest };
+}
+
+/**
+ * 로컬 게임 폴더가 없는 세션 파일만 찾는다.
+ * 현재 앱 기준으로는 이런 세션은 `/join` 및 session lookup 에서 복구 불가하므로
+ * active session 폴더에 남겨두기보다 격리 대상이다.
+ *
+ * @returns {{
+ *   id: string,
+ *   gameId: string,
+ *   sessionCode: string,
+ *   fileName: string,
+ *   filePath: string,
+ *   createdAt?: string,
+ *   startedAt?: string,
+ *   endedAt?: string,
+ *   lockedPlayerCount: number,
+ *   playerStateCount: number,
+ * }[]}
+ */
+export function listLocalOrphanSessions() {
+  const localGameIds = new Set(readLocalGames().map((game) => game.id));
+
+  return readLocalSessionEntries()
+    .filter(({ session }) => !localGameIds.has(session.gameId))
+    .map(({ filePath, fileName, session }) => ({
+      id: session.id,
+      gameId: session.gameId,
+      sessionCode: session.sessionCode,
+      fileName,
+      filePath,
+      createdAt: session.createdAt,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      lockedPlayerCount: (session.sharedState?.characterSlots ?? []).filter((slot) => slot?.isLocked).length,
+      playerStateCount: Array.isArray(session.playerStates) ? session.playerStates.length : 0,
+    }));
+}
+
+/**
+ * orphan 세션을 backup 폴더로 이동해 active session 경로에서 분리한다.
+ * 원본 삭제 대신 move 를 사용해 복구 가능성을 남기고, manifest 에 원래 경로를 기록한다.
+ *
+ * @param {string} [label]
+ * @returns {{
+ *   archiveDir: string,
+ *   archivedCount: number,
+ *   archivedSessions: Record<string, unknown>[],
+ * }}
+ */
+export function archiveLocalOrphanSessions(label = "orphan-sessions") {
+  const orphanSessions = listLocalOrphanSessions();
+  const archiveDir = path.join(BACKUPS_DIR, `${formatTimestamp()}-${label}`);
+  const archiveSessionsDir = path.join(archiveDir, "sessions");
+  ensureDir(archiveSessionsDir);
+
+  const archivedSessions = [];
+
+  for (const orphanSession of orphanSessions) {
+    const targetPath = path.join(archiveSessionsDir, orphanSession.fileName);
+    fs.renameSync(orphanSession.filePath, targetPath);
+    archivedSessions.push({
+      ...orphanSession,
+      archivedTo: targetPath,
+    });
+  }
+
+  fs.writeFileSync(
+    path.join(archiveDir, "manifest.json"),
+    JSON.stringify(
+      {
+        createdAt: new Date().toISOString(),
+        archivedCount: archivedSessions.length,
+        archivedSessions,
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  return {
+    archiveDir,
+    archivedCount: archivedSessions.length,
+    archivedSessions,
+  };
 }
 
 /**

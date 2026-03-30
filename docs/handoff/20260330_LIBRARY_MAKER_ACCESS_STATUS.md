@@ -142,6 +142,8 @@
 
 - `scripts/backup-local-data.mjs`
   - `data/games`, `data/sessions` 를 timestamp 백업으로 복사한다.
+- `scripts/archive-orphan-sessions.mjs`
+  - 참조 게임이 없는 orphan session 을 별도 backup 폴더로 이동한다.
 - `scripts/migrate-local-data-to-supabase.mjs`
   - 기본은 dry-run 이고
   - `--apply` 가 있을 때만 실제 upsert 를 수행한다.
@@ -159,45 +161,52 @@
   - owner 미해결 또는 orphan 때문에 skip 되는 sessions `9`
   - 기존 remote collision 은 현재 `0`
 
+### 13. 로컬 데이터 import 결과
+
+- fallback owner
+  - `REDACTED_LOGIN`
+  - `profiles.id = 5a96acfe-df44-473e-a519-c3329ea36fc8`
+- actual import 결과
+  - `games 6`
+  - `game_content 6`
+  - `sessions 21`
+- owner 가 비어 있던 두 게임
+  - `에덴의 조각들`
+  - `마지막 페이지`
+  - 는 모두 `REDACTED_LOGIN` 계정으로 귀속됐다.
+- import 전 자동 backup
+  - `/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/backups/local-data/20260330_200402-pre-supabase-import`
+- orphan session archive
+  - `1c00bdd5-1f63-4c85-a876-f38bdcf78c42`
+  - 는 active `data/sessions` 에서 제거하고
+  - `/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/backups/local-data/20260330_201500-orphan-sessions`
+  - 로 이동했다.
+
 ## 현재 한계
 
-### 1. owner 없는 로컬 게임 2개 때문에 전체 import 는 아직 막혀 있다
+### 1. 로컬 -> Supabase 데이터 동기화는 일회성 import 상태다
 
-- 현재 dry-run 기준 미해결 게임
-  - `919abd27-e7c0-4487-95ba-af47f4c7d69e` `에덴의 조각들`
-  - `d07c0a1c-179e-43a9-8b35-eee099255e1a` `마지막 페이지`
-- 이 두 게임은 `access.ownerId` 가 비어 있어서
-  Supabase `games.owner_id` foreign key 를 만족하지 못한다.
-- 따라서 실제 import 는 fallback owner id 를 정한 뒤
-  `npm run migrate:local-data -- --fallback-owner-id=<profile-id>`
-  로 실행해야 한다.
+- 기존 로컬 게임/세션은 Supabase 로 옮겼다.
+- 다만 이후 양쪽을 동시에 쓰는 동기화 경로는 없으므로,
+  운영 기준으로는 `APP_PERSISTENCE_PROVIDER=supabase` 를 유지하고
+  로컬 JSON 은 backup/reference 용으로만 다루는 쪽이 맞다.
 
-### 2. orphan session 1개가 있다
-
-- `data/sessions` 안에
-  - `1c00bdd5-1f63-4c85-a876-f38bdcf78c42`
-  - 가 `eda4ba32-9159-414c-8001-5fa3cbf8d1c0`
-  - 게임을 가리키지만, 해당 local game 폴더는 없다.
-- 현재 tool 은 이 세션을 자동 skip 한다.
-
-### 3. 대상 작업자 찾기 UX 가 약하다
+### 2. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
-### 4. ESLint/lint 경로가 아직 비어 있다
+### 3. ESLint/lint 경로가 아직 비어 있다
 
 - `npm run build` 는 통과한다.
 - `npm run lint` 는 아직 ESLint 초기 설정이 없어 interactive setup 프롬프트에서 멈춘다.
 
 ## 다음 우선순위
 
-1. fallback owner 로 쓸 `profiles.id` 확정
-2. `npm run migrate:local-data -- --fallback-owner-id=<profile-id>` 실행
-3. import 뒤 library/session count 재검증
-4. 대상 작업자 찾기 UX 보강
-5. `profiles` 기반 협업자 모델 준비
-6. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
+1. `APP_PERSISTENCE_PROVIDER=supabase` 운영 고정 기준으로 library/manage 실사용 점검
+2. 대상 작업자 찾기 UX 보강
+3. `profiles` 기반 협업자 모델 준비
+4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

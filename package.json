@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "backup:local-data": "node scripts/backup-local-data.mjs",
+    "archive:orphan-sessions": "node scripts/archive-orphan-sessions.mjs",
     "migrate:local-data:dry-run": "node scripts/migrate-local-data-to-supabase.mjs --dry-run",
     "migrate:local-data": "node scripts/migrate-local-data-to-supabase.mjs --apply"
   },

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const { gameId } = await req.json().catch(() => ({})) as { gameId?: string };
   if (!gameId) return NextResponse.json({ error: "gameId required" }, { status: 400 });
 
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
   const currentUser = await getRequestMakerUser(req);
 
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (currentUser && game.access.visibility !== "public") {
     const editableGame = resolveEditableGameForUser(game, currentUser.id);
     if (editableGame?.claimed) {
-      saveGame(editableGame.game);
+      await saveGame(editableGame.game);
     }
   }
 
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
   const gameId = searchParams.get("gameId");
   if (!gameId) return NextResponse.json({ error: "gameId required" }, { status: 400 });
 
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   const currentUser = await getRequestMakerUser(req);

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"; // 항상 서버에서 최신 목록 렌
 
 export default async function LibraryPage() {
   const currentUser = await getCurrentMakerUser();
-  const games = listPublicGames();
+  const games = await listPublicGames();
 
   return (
     <div className="min-h-screen bg-dark-950">

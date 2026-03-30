@@ -5,13 +5,15 @@ import { broadcast } from "@/lib/sse/broadcaster";
 import type { VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
+type LoadedGame = NonNullable<Awaited<ReturnType<typeof getGame>>>;
+type LoadedSession = NonNullable<ReturnType<typeof getSession>>;
 
 /**
  * 현재 검거 대상과 설정된 엔딩 분기 목록을 바탕으로 적용할 분기 ID를 찾는다.
  * 동률 GM 선택 UI는 이후 단계에서 붙일 예정이라 현재는 확정된 검거 대상 1명만 받는다.
  */
 function resolveEndingBranchId(
-  game: NonNullable<ReturnType<typeof getGame>>,
+  game: LoadedGame,
   arrestedPlayerId: string,
   resultType: "culprit-captured" | "wrong-arrest"
 ): string | undefined {
@@ -27,7 +29,7 @@ function resolveEndingBranchId(
 }
 
 /** 현재 세션의 비공개 표 데이터를 정렬된 득표 집계로 변환한다. */
-function buildVoteTally(session: NonNullable<ReturnType<typeof getSession>>): VoteTally[] {
+function buildVoteTally(session: LoadedSession): VoteTally[] {
   session.votes = session.votes ?? {};
   const tallyMap = new Map<string, { count: number; voterNames: string[] }>();
   for (const [token, targetPlayerId] of Object.entries(session.votes)) {
@@ -61,16 +63,16 @@ function resolveTiedCandidates(tally: VoteTally[]): string[] {
  * 득표 결과를 엔딩 공개 상태로 바꾸거나, 동률이면 GM 선택 대기 상태로 전환한다.
  * 강제 검거 대상이 전달되면 동률 후보 중 해당 캐릭터를 최종 검거 대상으로 확정한다.
  */
-function revealVotes(
+async function revealVotes(
   sessionId: string,
-  session: Awaited<ReturnType<typeof getSession>>,
+  session: LoadedSession | null,
   forcedArrestedPlayerId?: string
 ) {
   if (!session) {
     return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
   }
 
-  const game = getGame(session.gameId);
+  const game = await getGame(session.gameId);
   const culpritPlayerId = game?.story.culpritPlayerId ?? "";
   const tally = buildVoteTally(session);
   const tiedCandidates = resolveTiedCandidates(tally);
@@ -180,9 +182,9 @@ export async function POST(req: Request, { params }: Params) {
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   // 전원 투표 완료 시 자동 공개
-  let revealState: ReturnType<typeof revealVotes> | null = null;
+  let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
   if (allVoted) {
-    revealState = revealVotes(sessionId, session);
+    revealState = await revealVotes(sessionId, session);
   }
 
   return NextResponse.json({
@@ -215,7 +217,7 @@ export async function PATCH(req: Request, { params }: Params) {
     }
   }
 
-  const revealState = revealVotes(sessionId, session, arrestedPlayerId);
+  const revealState = await revealVotes(sessionId, session, arrestedPlayerId);
   return NextResponse.json({
     ok: true,
     session: {

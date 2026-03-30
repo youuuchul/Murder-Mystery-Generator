@@ -2,6 +2,8 @@ export type PersistenceProvider = "local" | "supabase";
 
 export interface PersistenceProviderConfig {
   provider: PersistenceProvider;
+  supabaseUrl: string;
+  supabaseServiceRoleKey: string;
 }
 
 /**
@@ -19,5 +21,39 @@ function normalizePersistenceProvider(value: string | undefined): PersistencePro
 export function getPersistenceProviderConfig(): PersistenceProviderConfig {
   return {
     provider: normalizePersistenceProvider(process.env.APP_PERSISTENCE_PROVIDER),
+    supabaseUrl: (
+      process.env.NEXT_PUBLIC_SUPABASE_URL
+      ?? process.env.SUPABASE_URL
+      ?? ""
+    ).trim(),
+    supabaseServiceRoleKey: (
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+      ?? process.env.SUPABASE_SECRET_KEY
+      ?? ""
+    ).trim(),
   };
+}
+
+/**
+ * Supabase persistence provider 사용에 필요한 환경변수 중 비어 있는 항목을 반환한다.
+ * 게임 저장소는 서버 전용 service-role client를 사용하므로 URL과 service-role key만 검사한다.
+ */
+export function getMissingSupabasePersistenceEnv(
+  config: PersistenceProviderConfig = getPersistenceProviderConfig()
+): string[] {
+  if (config.provider !== "supabase") {
+    return [];
+  }
+
+  const missing: string[] = [];
+
+  if (!config.supabaseUrl) {
+    missing.push("NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL");
+  }
+
+  if (!config.supabaseServiceRoleKey) {
+    missing.push("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY");
+  }
+
+  return missing;
 }

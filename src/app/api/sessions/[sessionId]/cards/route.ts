@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: Params) {
   const session = getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  const game = getGame(session.gameId);
+  const game = await getGame(session.gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   // ── 단서 획득 ──────────────────────────────────────────────

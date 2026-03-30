@@ -27,7 +27,7 @@ function resolveAssetPath(gameId: string, assetPath: string[]): string | null {
 /** GET /api/games/[gameId]/assets/[...assetPath] — 업로드한 자산 파일 반환 */
 export async function GET(_request: Request, { params }: Params) {
   const { gameId, assetPath } = await params;
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
 
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다." }, { status: 404 });

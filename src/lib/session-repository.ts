@@ -46,10 +46,12 @@ const localSessionRepository: SessionRepository = {
 
 let cachedProvider: ReturnType<typeof getPersistenceProviderConfig>["provider"] | null = null;
 let cachedRepository: SessionRepository | null = null;
+let hasWarnedSupabaseSessionFallback = false;
 
 /**
  * 현재 세션 저장소 구현을 반환한다.
- * Supabase DB 전환 전까지는 local provider 만 실제로 구현한다.
+ * 현재 단계에서는 게임만 Supabase로 이관하고, 세션은 계속 로컬 JSON 저장소를 쓴다.
+ * Vercel 배포 전에는 sessions도 별도 adapter로 옮겨야 한다.
  */
 export function getSessionRepository(): SessionRepository {
   const config = getPersistenceProviderConfig();
@@ -61,7 +63,15 @@ export function getSessionRepository(): SessionRepository {
   cachedProvider = config.provider;
 
   if (config.provider === "supabase") {
-    throw new Error("APP_PERSISTENCE_PROVIDER=supabase is not implemented for sessions yet.");
+    if (!hasWarnedSupabaseSessionFallback) {
+      console.warn(
+        "[session-repository] APP_PERSISTENCE_PROVIDER=supabase still uses local session storage until the session adapter is implemented."
+      );
+      hasWarnedSupabaseSessionFallback = true;
+    }
+
+    cachedRepository = localSessionRepository;
+    return cachedRepository;
   }
 
   cachedRepository = localSessionRepository;

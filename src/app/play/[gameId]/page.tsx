@@ -33,7 +33,7 @@ export default async function PlayPage({
   params: { gameId: string };
   searchParams?: { session?: string };
 }) {
-  const game = getGame(params.gameId);
+  const game = await getGame(params.gameId);
   if (!game) notFound();
   const currentUser = await getCurrentMakerUser();
 
@@ -65,7 +65,7 @@ export default async function PlayPage({
   if (currentUser && game.access.visibility !== "public") {
     const editableGame = resolveEditableGameForUser(game, currentUser.id);
     if (editableGame?.claimed) {
-      saveGame(editableGame.game);
+      await saveGame(editableGame.game);
     }
   }
 

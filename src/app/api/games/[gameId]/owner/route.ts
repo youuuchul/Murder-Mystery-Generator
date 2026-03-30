@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const { gameId } = await params;
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다." }, { status: 404 });
   }
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const nextGame = reassignGameOwnership(game, currentUser.id);
-    saveGame(nextGame);
+    await saveGame(nextGame);
 
     return NextResponse.json({
       game: nextGame,
@@ -100,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const nextGame = reassignGameOwnership(game, targetIdentity.id);
-  saveGame(nextGame);
+  await saveGame(nextGame);
 
   return NextResponse.json({
     game: nextGame,

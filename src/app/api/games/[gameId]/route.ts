@@ -11,7 +11,7 @@ type Params = { params: Promise<{ gameId: string }> };
 export async function GET(_req: NextRequest, { params }: Params) {
   const { gameId } = await params;
 
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -31,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     );
   }
 
-  const existing = getGame(gameId);
+  const existing = await getGame(gameId);
   if (!existing) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       updatedAt: new Date().toISOString(),
     };
 
-    saveGame(updated);
+    await saveGame(updated);
 
     return NextResponse.json({ game: updated });
   } catch (error) {
@@ -79,7 +79,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     );
   }
 
-  const existing = getGame(gameId);
+  const existing = await getGame(gameId);
   if (!existing) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     );
   }
 
-  const deleted = deleteGame(gameId);
+  const deleted = await deleteGame(gameId);
   if (!deleted) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }

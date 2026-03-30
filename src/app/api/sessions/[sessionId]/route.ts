@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: Params) {
   if (token) {
     const pState = session.playerStates.find((p) => p.token === token);
     if (!pState) return NextResponse.json({ error: "Invalid token" }, { status: 403 });
-    const game = getGame(session.gameId);
+    const game = await getGame(session.gameId);
     if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
     return NextResponse.json({
       sharedState: session.sharedState,
@@ -61,7 +61,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const session = getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  const game = getGame(session.gameId);
+  const game = await getGame(session.gameId);
   const maxRound = game?.rules?.roundCount ?? 4;
 
   const { sharedState } = session;

@@ -10,7 +10,7 @@ type Props = { params: Promise<{ gameId: string }> };
 export default async function EditGamePage({ params }: Props) {
   const { gameId } = await params;
   const currentUser = await requireCurrentMakerUser(`/maker/${gameId}/edit`);
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
 
   if (!game) notFound();
 
@@ -37,7 +37,7 @@ export default async function EditGamePage({ params }: Props) {
   }
 
   if (editableGame.claimed) {
-    saveGame(editableGame.game);
+    await saveGame(editableGame.game);
   }
 
   return (

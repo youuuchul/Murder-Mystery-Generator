@@ -91,7 +91,7 @@
   - 실제 인증 상태는 Supabase 세션으로 판단하고
   - legacy `mm_maker_user` 쿠키는 recovery key 힌트용으로만 보조 사용한다.
 
-### 10. 게임 / 세션 저장소 경계 분리 시작
+### 10. 게임 / 세션 저장소 경계와 Supabase 게임 adapter
 
 - route/page 계층이 `src/lib/storage/*` 구현을 직접 읽지 않도록
   - `src/lib/game-repository.ts`
@@ -101,28 +101,56 @@
 - 현재 `APP_PERSISTENCE_PROVIDER`
   - `local`
   - `supabase`
-  - 설정을 읽지만, 실제 구현은 아직 `local` 만 있다.
-- 즉 현재 동작은 그대로 로컬 JSON 저장이지만,
-  이후 Supabase DB/Storage adapter 는 repository 내부에만 추가하면 된다.
+  - 를 읽는다.
+- `games`
+  - `src/lib/supabase/persistence.ts`
+  - `supabase/migrations/20260330_000002_create_games_and_game_content.sql`
+  - 기준으로 실제 Supabase `games + game_content` adapter 가 추가됐다.
+- `listGames / listPublicGames`
+  - `games` 메타 테이블로 정렬/필터링하고
+  - publish readiness 는 `game_content.content_json` 으로 다시 계산한다.
+- `saveGame / deleteGame / getGame`
+  - 는 `APP_PERSISTENCE_PROVIDER=supabase` 일 때 실제 Supabase DB를 사용한다.
+- `sessions`
+  - 는 아직 Supabase adapter 가 없어
+  - `APP_PERSISTENCE_PROVIDER=supabase` 여도 현재 단계에서는 local JSON fallback 을 유지한다.
 
 ## 현재 한계
 
-### 1. 데이터 저장 원천은 아직 로컬 JSON 이다
+### 1. 게임 migration 을 아직 Supabase에 적용하지 않았다
 
-- 인증은 Supabase SSR 세션으로 통합됐지만, 게임/세션 저장은 여전히 `data/games`, `data/sessions` 로컬 JSON 이다.
+- `profiles` migration 은 적용됐지만
+  - `public.games`
+  - `public.game_content`
+  - 는 아직 콘솔에 적용되지 않았다.
+- 현재 runtime smoke test 결과
+  - `APP_PERSISTENCE_PROVIDER=supabase`
+  - `GET /api/games`
+  - 호출 시 `Could not find the table 'public.games' in the schema cache`
+  - 로 실패한다.
+- 즉 코드 준비는 끝났고, 다음 콘솔 작업은
+  - `supabase/migrations/20260330_000002_create_games_and_game_content.sql`
+  - 실행이다.
+
+### 2. 세션 저장은 아직 로컬 JSON fallback 이다
+
+- 게임은 Supabase DB 를 쓰도록 adapter 가 들어갔지만,
+  세션은 아직 `data/sessions` 로컬 JSON 저장을 유지한다.
 - 따라서 배포 기준 최종 형태인 `Vercel + Supabase DB/Storage` 전환은 아직 남아 있다.
 
-### 2. 대상 작업자 찾기 UX 가 약하다
+### 3. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
 ## 다음 우선순위
 
-1. `game/session repository` 뒤에 Supabase DB/Storage adapter 실제 추가
-2. 대상 작업자 찾기 UX 보강
-3. `profiles` 기반 협업자 모델 준비
-4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
+1. `supabase/migrations/20260330_000002_create_games_and_game_content.sql` 콘솔 적용
+2. `APP_PERSISTENCE_PROVIDER=supabase` 상태로 `GET/POST /api/games` 재검증
+3. `session repository` Supabase adapter 추가
+4. 대상 작업자 찾기 UX 보강
+5. `profiles` 기반 협업자 모델 준비
+6. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

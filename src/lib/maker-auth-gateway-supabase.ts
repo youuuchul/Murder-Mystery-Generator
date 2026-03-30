@@ -79,7 +79,7 @@ async function getSupabaseProfileByLoginId(
 
 /**
  * Supabase Auth + profiles 기반 메이커 인증 gateway 를 만든다.
- * 현재 세션 관리는 기존 `mm_maker_user` 쿠키를 유지하고, 계정 원본만 Supabase 로 옮기는 과도기 구조다.
+ * 현재 작업자 세션은 Supabase SSR auth 쿠키를 기준으로 복원하고, 계정/프로필 원본도 Supabase에 둔다.
  */
 export function createSupabaseMakerAuthGateway(
   config: MakerAuthProviderConfig
@@ -222,7 +222,7 @@ export function createSupabaseMakerAuthGateway(
       }
 
       if (migrateOwnerIdFrom && migrateOwnerIdFrom.trim() !== data.user.id) {
-        migrateLocalGameOwnership(migrateOwnerIdFrom, data.user.id, now);
+        await migrateLocalGameOwnership(migrateOwnerIdFrom, data.user.id, now);
       }
 
       return toMakerAccountIdentity(profileData as unknown as SupabaseMakerProfileRow);

@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   }
 
-  const game = getGame(gameId);
+  const game = await getGame(gameId);
 
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다." }, { status: 404 });
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   if (editableGame.claimed) {
-    saveGame(editableGame.game);
+    await saveGame(editableGame.game);
   }
 
   try {

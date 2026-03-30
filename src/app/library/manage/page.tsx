@@ -24,7 +24,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const includeReadonly = resolvedSearchParams?.scope === "all";
   const makerUsers = await makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
-  const managedGames = listGames()
+  const managedGames = (await listGames())
     .map((game) => {
       const ownershipState = getGameOwnershipState(game, currentUser.id);
 
@@ -92,7 +92,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
           <h1 className="mt-4 text-3xl font-semibold text-dark-50">내 게임 관리</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
             내가 만든 게임과 아직 귀속되지 않은 레거시 게임을 관리합니다.
-            공개 상태를 바꾸면 즉시 공개 라이브러리에 반영됩니다.
+            공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2">

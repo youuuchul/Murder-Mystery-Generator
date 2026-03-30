@@ -42,7 +42,7 @@ const CreateGameSchema = z.object({
 /** GET /api/games — 게임 목록 */
 export async function GET() {
   try {
-    const games = listGames();
+    const games = await listGames();
     return NextResponse.json({ games });
   } catch (error) {
     console.error("[GET /api/games]", error);
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    saveGame(game);
+    await saveGame(game);
 
     return NextResponse.json({ game }, { status: 201 });
   } catch (error) {

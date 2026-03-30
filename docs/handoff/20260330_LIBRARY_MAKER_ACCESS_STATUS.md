@@ -73,6 +73,7 @@
 - Supabase 계정 생성 시 기존 로컬 `ownerId` 는 새 auth user id 로 로컬 게임 JSON에서 자동 이관된다.
 - 다만 현재 세션 자체는 아직 Supabase SSR 쿠키가 아니라 기존 `mm_maker_user` 쿠키를 유지하는 과도기 구조다.
 - `temporary` 작업자 로그인 탭은 `local` provider 에서만 허용된다.
+- 현재 Supabase 프로젝트에는 `public.profiles` 테이블이 아직 없어, repo에 최소 migration 파일을 추가했다.
 
 ## 현재 한계
 

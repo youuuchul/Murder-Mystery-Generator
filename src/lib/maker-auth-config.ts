@@ -3,7 +3,7 @@ export type MakerAuthProvider = "local" | "supabase";
 export interface MakerAuthProviderConfig {
   provider: MakerAuthProvider;
   supabaseUrl: string;
-  supabaseAnonKey: string;
+  supabasePublishableKey: string;
   supabaseServiceRoleKey: string;
 }
 
@@ -22,9 +22,22 @@ function normalizeMakerAuthProvider(value: string | undefined): MakerAuthProvide
 export function getMakerAuthProviderConfig(): MakerAuthProviderConfig {
   return {
     provider: normalizeMakerAuthProvider(process.env.MAKER_AUTH_PROVIDER),
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "",
-    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "",
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "",
+    supabaseUrl: (
+      process.env.NEXT_PUBLIC_SUPABASE_URL
+      ?? process.env.SUPABASE_URL
+      ?? ""
+    ).trim(),
+    supabasePublishableKey: (
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ?? process.env.SUPABASE_PUBLISHABLE_KEY
+      ?? ""
+    ).trim(),
+    supabaseServiceRoleKey: (
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+      ?? process.env.SUPABASE_SECRET_KEY
+      ?? ""
+    ).trim(),
   };
 }
 
@@ -44,12 +57,12 @@ export function getMissingSupabaseMakerAuthEnv(
     missing.push("NEXT_PUBLIC_SUPABASE_URL");
   }
 
-  if (!config.supabaseAnonKey) {
-    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!config.supabasePublishableKey) {
+    missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or SUPABASE_PUBLISHABLE_KEY");
   }
 
   if (!config.supabaseServiceRoleKey) {
-    missing.push("SUPABASE_SERVICE_ROLE_KEY");
+    missing.push("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY");
   }
 
   return missing;

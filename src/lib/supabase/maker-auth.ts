@@ -42,7 +42,7 @@ export function getSupabaseMakerProfileColumns(): string {
 export function createSupabaseMakerAuthClient(
   config: MakerAuthProviderConfig
 ): SupabaseClient {
-  return createClient(config.supabaseUrl, config.supabaseAnonKey, {
+  return createClient(config.supabaseUrl, config.supabasePublishableKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

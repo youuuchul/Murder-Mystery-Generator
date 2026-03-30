@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveEditableGameForUser } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { getGamePublishReadiness, getGamePublishReadinessIssues } from "@/lib/game-publish";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
 import type { GameVisibility } from "@/types/game";
 
 type Params = { params: Promise<{ gameId: string }> };

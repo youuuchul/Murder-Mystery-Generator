@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
-import { createSession, listActiveSessions } from "@/lib/storage/session-storage";
+import { createSession, listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 
 /**

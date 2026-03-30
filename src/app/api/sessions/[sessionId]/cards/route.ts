@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession, updateSession } from "@/lib/storage/session-storage";
-import { getGame } from "@/lib/storage/game-storage";
+import { getGame } from "@/lib/game-repository";
+import { getSession, updateSession } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { InventoryCard, PlayerState } from "@/types/session";
 import type { ClueCondition } from "@/types/game";

@@ -1,5 +1,5 @@
 import { isGameOwner, reassignGameOwnership } from "@/lib/game-access";
-import { getGame, listGames, saveGame } from "@/lib/storage/game-storage";
+import { getGame, listGames, saveGame } from "@/lib/game-repository";
 
 export interface OwnershipMigrationResult {
   updatedCount: number;

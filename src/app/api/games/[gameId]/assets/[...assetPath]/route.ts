@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
-import { getGame } from "@/lib/storage/game-storage";
+import { getGame } from "@/lib/game-repository";
 
 type Params = { params: Promise<{ gameId: string; assetPath: string[] }> };
 

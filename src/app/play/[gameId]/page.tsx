@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
-import { listActiveSessions } from "@/lib/storage/session-storage";
+import { listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 import GMDashboard from "./_components/GMDashboard";
 

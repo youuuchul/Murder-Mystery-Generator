@@ -2,8 +2,8 @@ import fs from "fs";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveEditableGameForUser } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
 type AssetScope = "covers" | "locations" | "story" | "players" | "clues" | "rounds";

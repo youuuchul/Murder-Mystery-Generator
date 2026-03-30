@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession, updateSession, deleteSession } from "@/lib/storage/session-storage";
-import { getGame } from "@/lib/storage/game-storage";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
+import { getGame } from "@/lib/game-repository";
+import { deleteSession, getSession, updateSession } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { GamePhase } from "@/types/session";
 

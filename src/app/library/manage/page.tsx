@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { canAccessGmPlay, getGameOwnershipState } from "@/lib/game-access";
+import { listGames } from "@/lib/game-repository";
 import { isMakerAccessEnabled } from "@/lib/maker-access";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
-import { listGames } from "@/lib/storage/game-storage";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
 

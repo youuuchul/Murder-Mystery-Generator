@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { resolveEditableGameForUser } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
 import MakerEditor from "./_components/MakerEditor";
 
 type Props = { params: Promise<{ gameId: string }> };

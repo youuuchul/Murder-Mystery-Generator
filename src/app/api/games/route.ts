@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { listGames, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { listGames, saveGame } from "@/lib/storage/game-storage";
 import type { GamePackage, GameRules } from "@/types/game";
 
 /** 플레이어 수에 따른 기본 게임 규칙 생성 */

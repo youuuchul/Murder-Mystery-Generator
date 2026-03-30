@@ -6,9 +6,9 @@ import {
   isGameOwner,
   reassignGameOwnership,
 } from "@/lib/game-access";
+import { getGame, saveGame } from "@/lib/game-repository";
 import { resolveMakerIdentityTarget } from "@/lib/maker-identity";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
 

@@ -91,6 +91,20 @@
   - 실제 인증 상태는 Supabase 세션으로 판단하고
   - legacy `mm_maker_user` 쿠키는 recovery key 힌트용으로만 보조 사용한다.
 
+### 10. 게임 / 세션 저장소 경계 분리 시작
+
+- route/page 계층이 `src/lib/storage/*` 구현을 직접 읽지 않도록
+  - `src/lib/game-repository.ts`
+  - `src/lib/session-repository.ts`
+  - `src/lib/persistence-config.ts`
+  - 경계를 추가했다.
+- 현재 `APP_PERSISTENCE_PROVIDER`
+  - `local`
+  - `supabase`
+  - 설정을 읽지만, 실제 구현은 아직 `local` 만 있다.
+- 즉 현재 동작은 그대로 로컬 JSON 저장이지만,
+  이후 Supabase DB/Storage adapter 는 repository 내부에만 추가하면 된다.
+
 ## 현재 한계
 
 ### 1. 데이터 저장 원천은 아직 로컬 JSON 이다
@@ -105,7 +119,7 @@
 
 ## 다음 우선순위
 
-1. 로컬 JSON 게임/세션 저장소를 Supabase DB/Storage 로 옮길 경계 설계
+1. `game/session repository` 뒤에 Supabase DB/Storage adapter 실제 추가
 2. 대상 작업자 찾기 UX 보강
 3. `profiles` 기반 협업자 모델 준비
 4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입

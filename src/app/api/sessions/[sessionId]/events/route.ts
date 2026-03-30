@@ -1,5 +1,5 @@
 import { subscribe, unsubscribe } from "@/lib/sse/broadcaster";
-import { getSession } from "@/lib/storage/session-storage";
+import { getSession } from "@/lib/session-repository";
 
 export const dynamic = "force-dynamic";
 

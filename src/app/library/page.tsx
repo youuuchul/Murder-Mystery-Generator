@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { listPublicGames } from "@/lib/game-repository";
 import { buildMakerAccessPath } from "@/lib/maker-user";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
-import { listPublicGames } from "@/lib/storage/game-storage";
 import GuideMenu from "./_components/GuideMenu";
 import PublicGameGrid from "./_components/PublicGameGrid";
 

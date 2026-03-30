@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession, updateSession } from "@/lib/storage/session-storage";
 import { broadcast } from "@/lib/sse/broadcaster";
+import { getSession, updateSession } from "@/lib/session-repository";
 
 type Params = { params: { sessionId: string } };
 interface JoinRequestBody {

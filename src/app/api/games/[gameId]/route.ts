@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveEditableGameForUser } from "@/lib/game-access";
+import { deleteGame, getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getGame, saveGame, deleteGame } from "@/lib/storage/game-storage";
 import { buildPublicGame } from "@/lib/game-sanitizer";
 import type { GamePackage } from "@/types/game";
 

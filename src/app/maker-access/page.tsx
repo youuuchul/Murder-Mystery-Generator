@@ -9,9 +9,11 @@ import {
   getMakerUserFromCookieStore,
   normalizeMakerNextPath,
 } from "@/lib/maker-user";
-import { getMakerAccountById } from "@/lib/storage/maker-account-storage";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 
 type MakerAccessMode = "login" | "signup" | "temporary";
+
+const makerAuthGateway = getMakerAuthGateway();
 
 /** 메이커 접근 화면 모드를 정규화한다. */
 function normalizeMakerAccessMode(value: string | undefined): MakerAccessMode {
@@ -37,7 +39,7 @@ export default async function MakerAccessPage({ searchParams }: Props) {
 
   const cookieStore = cookies();
   const currentUser = getMakerUserFromCookieStore(cookieStore);
-  const currentAccount = currentUser ? getMakerAccountById(currentUser.id) : null;
+  const currentAccount = currentUser ? makerAuthGateway.getAccountById(currentUser.id) : null;
   const granted = await isValidMakerAccessToken(
     cookieStore.get(MAKER_ACCESS_COOKIE_NAME)?.value
   );

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { canAccessGmPlay, getGameOwnershipState } from "@/lib/game-access";
 import { isMakerAccessEnabled } from "@/lib/maker-access";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
-import { getMakerAccountById } from "@/lib/storage/maker-account-storage";
-import { listMakerUsers } from "@/lib/storage/maker-user-storage";
 import { listGames } from "@/lib/storage/game-storage";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
 
 export const dynamic = "force-dynamic";
+
+const makerAuthGateway = getMakerAuthGateway();
 
 type ManageLibraryPageProps = {
   searchParams?: Promise<{
@@ -19,9 +20,9 @@ type ManageLibraryPageProps = {
 export default async function ManageLibraryPage({ searchParams }: ManageLibraryPageProps) {
   const resolvedSearchParams = await searchParams;
   const currentUser = requireCurrentMakerUser("/library/manage");
-  const currentAccount = getMakerAccountById(currentUser.id);
+  const currentAccount = makerAuthGateway.getAccountById(currentUser.id);
   const includeReadonly = resolvedSearchParams?.scope === "all";
-  const makerUsers = listMakerUsers();
+  const makerUsers = makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
   const managedGames = listGames()
     .map((game) => {

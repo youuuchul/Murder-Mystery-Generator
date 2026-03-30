@@ -1,16 +1,14 @@
 import { isValidMakerLoginId, normalizeMakerLoginId } from "@/lib/maker-account";
 import { isValidMakerUserId, normalizeMakerUserId } from "@/lib/maker-user";
-import {
-  findMakerAccountByLoginId,
-  getMakerAccountById,
-} from "@/lib/storage/maker-account-storage";
-import { getMakerUserById } from "@/lib/storage/maker-user-storage";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 
 export interface MakerIdentityTarget {
   id: string;
   displayName: string;
   matchType: "login_id" | "worker_key";
 }
+
+const makerAuthGateway = getMakerAuthGateway();
 
 /**
  * 로그인 ID 또는 작업자 키로 소유권 이전 대상 작업자를 찾는다.
@@ -24,7 +22,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
   }
 
   if (isValidMakerLoginId(value)) {
-    const account = findMakerAccountByLoginId(normalizeMakerLoginId(value));
+    const account = makerAuthGateway.findAccountByLoginId(normalizeMakerLoginId(value));
     if (!account) {
       return null;
     }
@@ -38,7 +36,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
 
   if (isValidMakerUserId(value)) {
     const normalizedUserId = normalizeMakerUserId(value);
-    const account = getMakerAccountById(normalizedUserId);
+    const account = makerAuthGateway.getAccountById(normalizedUserId);
     if (account) {
       return {
         id: account.id,
@@ -47,7 +45,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
       };
     }
 
-    const makerUser = getMakerUserById(normalizedUserId);
+    const makerUser = makerAuthGateway.getUserById(normalizedUserId);
     if (!makerUser) {
       return null;
     }

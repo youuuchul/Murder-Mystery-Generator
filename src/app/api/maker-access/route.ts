@@ -18,27 +18,19 @@ import {
   serializeMakerUser,
 } from "@/lib/maker-user";
 import {
-  hashMakerAccountPassword,
   isValidMakerAccountPassword,
   isValidMakerLoginId,
   normalizeMakerLoginId,
-  verifyMakerAccountPassword,
 } from "@/lib/maker-account";
-import {
-  createMakerAccount,
-  findMakerAccountByLoginId,
-  getMakerAccountById,
-} from "@/lib/storage/maker-account-storage";
-import {
-  findMakerUserByDisplayName,
-  upsertMakerUser,
-} from "@/lib/storage/maker-user-storage";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 
 type MakerAccessIntent =
   | "logout"
   | "account_login"
   | "account_signup"
   | "temporary_login";
+
+const makerAuthGateway = getMakerAuthGateway();
 
 /**
  * 프록시/개발 서버 환경에서도 브라우저가 실제로 접근한 origin을 복원한다.
@@ -155,13 +147,13 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_login_id", "login");
     }
 
-    const account = findMakerAccountByLoginId(loginId);
-    if (!account || !verifyMakerAccountPassword(accountPassword, account)) {
+    const account = makerAuthGateway.authenticateAccount(loginId, accountPassword);
+    if (!account) {
       return redirectToMakerAccess(request, next, "invalid_account_credentials", "login");
     }
 
     const user = createMakerUser(account.displayName, account.id);
-    upsertMakerUser(user);
+    makerAuthGateway.upsertUser(user);
     return buildLoginSuccessResponse(request, next, user, gatePassword);
   }
 
@@ -197,26 +189,23 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_recovery_key", "signup");
     }
 
-    if (findMakerAccountByLoginId(loginId)) {
+    if (makerAuthGateway.findAccountByLoginId(loginId)) {
       return redirectToMakerAccess(request, next, "duplicate_login_id", "signup");
     }
 
     const linkedUserId = recoveryKey || currentSessionUser?.id;
-    if (linkedUserId && getMakerAccountById(linkedUserId)) {
+    if (linkedUserId && makerAuthGateway.getAccountById(linkedUserId)) {
       return redirectToMakerAccess(request, next, "account_already_linked", "signup");
     }
 
     const user = createMakerUser(displayName, linkedUserId);
-    const passwordFields = hashMakerAccountPassword(accountPassword);
-    createMakerAccount({
+    makerAuthGateway.createAccount({
       id: user.id,
       displayName: user.displayName,
       loginId,
-      ...passwordFields,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      password: accountPassword,
     });
-    upsertMakerUser(user);
+    makerAuthGateway.upsertUser(user);
 
     return buildLoginSuccessResponse(request, next, user, gatePassword);
   }
@@ -238,11 +227,11 @@ export async function POST(request: NextRequest) {
   }
 
   const matchedMaker = !currentSessionUser && !recoveryKey
-    ? findMakerUserByDisplayName(displayName)
+    ? makerAuthGateway.findUserByDisplayName(displayName)
     : null;
   const nextUserId = recoveryKey || currentSessionUser?.id || matchedMaker?.id;
   const user = createMakerUser(displayName, nextUserId);
-  upsertMakerUser(user);
+  makerAuthGateway.upsertUser(user);
 
   return buildLoginSuccessResponse(request, next, user, gatePassword);
 }

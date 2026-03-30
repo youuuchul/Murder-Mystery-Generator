@@ -11,6 +11,7 @@ import {
 } from "@/lib/maker-user";
 import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
+import { getCurrentMakerUser } from "@/lib/maker-user.server";
 
 type MakerAccessMode = "login" | "signup" | "temporary";
 
@@ -45,14 +46,15 @@ export default async function MakerAccessPage({ searchParams }: Props) {
       : "login";
 
   const cookieStore = cookies();
-  const currentUser = getMakerUserFromCookieStore(cookieStore);
+  const authenticatedUser = await getCurrentMakerUser();
+  const currentUser = authenticatedUser ?? getMakerUserFromCookieStore(cookieStore);
   const currentAccount = currentUser ? await makerAuthGateway.getAccountById(currentUser.id) : null;
   const granted = await isValidMakerAccessToken(
     cookieStore.get(MAKER_ACCESS_COOKIE_NAME)?.value
   );
   const needsPassword = isMakerAccessEnabled() && !granted;
 
-  if (!needsPassword && currentUser && mode === "login") {
+  if (!needsPassword && authenticatedUser && mode === "login") {
     redirect(nextPath);
   }
 

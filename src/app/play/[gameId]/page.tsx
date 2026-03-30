@@ -35,7 +35,7 @@ export default async function PlayPage({
 }) {
   const game = getGame(params.gameId);
   if (!game) notFound();
-  const currentUser = getCurrentMakerUser();
+  const currentUser = await getCurrentMakerUser();
 
   if (!canAccessGmPlay(game, currentUser?.id)) {
     return (

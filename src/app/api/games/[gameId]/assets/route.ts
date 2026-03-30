@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveEditableGameForUser } from "@/lib/game-access";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getGame, saveGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
@@ -55,7 +55,7 @@ function extensionFromMimeType(mimeType: string): string {
 /** POST /api/games/[gameId]/assets — 게임 이미지 업로드 */
 export async function POST(request: NextRequest, { params }: Params) {
   const { gameId } = await params;
-  const currentUser = getMakerUserFromCookieStore(request.cookies);
+  const currentUser = await getRequestMakerUser(request);
 
   if (!currentUser) {
     return NextResponse.json(

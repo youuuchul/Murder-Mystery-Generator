@@ -7,7 +7,7 @@ import {
   reassignGameOwnership,
 } from "@/lib/game-access";
 import { resolveMakerIdentityTarget } from "@/lib/maker-identity";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getGame, saveGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
@@ -24,7 +24,7 @@ const UpdateGameOwnerSchema = z.discriminatedUnion("action", [
 
 /** PATCH /api/games/[gameId]/owner — 귀속 또는 소유권 이관 */
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const currentUser = getMakerUserFromCookieStore(request.cookies);
+  const currentUser = await getRequestMakerUser(request);
 
   if (!currentUser) {
     return NextResponse.json(

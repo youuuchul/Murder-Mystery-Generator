@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getGame, saveGame } from "@/lib/storage/game-storage";
 import { createSession, listActiveSessions } from "@/lib/storage/session-storage";
 import type { GameSession, GameSessionSummary } from "@/types/session";
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const game = getGame(gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
-  const currentUser = getMakerUserFromCookieStore(req.cookies);
+  const currentUser = await getRequestMakerUser(req);
 
   if (!canAccessGmPlay(game, currentUser?.id)) {
     return NextResponse.json(
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   const game = getGame(gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
-  const currentUser = getMakerUserFromCookieStore(req.cookies);
+  const currentUser = await getRequestMakerUser(req);
   if (!canAccessGmPlay(game, currentUser?.id)) {
     return NextResponse.json(
       { error: "이 게임의 세션 목록을 볼 권한이 없습니다." },

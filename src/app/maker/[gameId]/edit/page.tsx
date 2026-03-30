@@ -9,7 +9,7 @@ type Props = { params: Promise<{ gameId: string }> };
 
 export default async function EditGamePage({ params }: Props) {
   const { gameId } = await params;
-  const currentUser = requireCurrentMakerUser(`/maker/${gameId}/edit`);
+  const currentUser = await requireCurrentMakerUser(`/maker/${gameId}/edit`);
   const game = getGame(gameId);
 
   if (!game) notFound();

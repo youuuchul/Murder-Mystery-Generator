@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { listGames, saveGame } from "@/lib/storage/game-storage";
 import type { GamePackage, GameRules } from "@/types/game";
 
@@ -53,7 +53,7 @@ export async function GET() {
 /** POST /api/games — 새 게임 생성 */
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = getMakerUserFromCookieStore(request.cookies);
+    const currentUser = await getRequestMakerUser(request);
 
     if (!currentUser) {
       return NextResponse.json(

@@ -7,8 +7,8 @@ import PublicGameGrid from "./_components/PublicGameGrid";
 
 export const dynamic = "force-dynamic"; // 항상 서버에서 최신 목록 렌더링
 
-export default function LibraryPage() {
-  const currentUser = getCurrentMakerUser();
+export default async function LibraryPage() {
+  const currentUser = await getCurrentMakerUser();
   const games = listPublicGames();
 
   return (

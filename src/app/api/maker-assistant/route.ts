@@ -4,7 +4,6 @@ import type {
   ResponseCreateParamsNonStreaming,
 } from "openai/resources/responses/responses";
 import { ZodError } from "zod";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
 import {
   getMakerAssistantModel,
   getMakerAssistantReasoningEffort,
@@ -21,6 +20,7 @@ import {
   makerAssistantRequestSchema,
   parseMakerAssistantResult,
 } from "@/lib/ai/maker-assistant-schema";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import type { MakerAssistantResponse, MakerAssistantResult } from "@/types/assistant";
 
 const PRIMARY_RESPONSE_MAX_OUTPUT_TOKENS = 1800;
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const currentUser = getMakerUserFromCookieStore(request.cookies);
+    const currentUser = await getRequestMakerUser(request);
 
     if (!currentUser) {
       return NextResponse.json(

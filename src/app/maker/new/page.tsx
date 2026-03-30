@@ -3,8 +3,8 @@ import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import StepWizard from "./_components/StepWizard";
 import SettingsForm from "./_components/SettingsForm";
 
-export default function NewGamePage() {
-  requireCurrentMakerUser("/maker/new");
+export default async function NewGamePage() {
+  await requireCurrentMakerUser("/maker/new");
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))]">

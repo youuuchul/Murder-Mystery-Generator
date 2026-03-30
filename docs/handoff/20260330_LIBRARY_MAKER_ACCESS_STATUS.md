@@ -71,17 +71,32 @@
   - `profiles`
   - 기반 계정 로그인/생성을 gateway 뒤에서 처리할 수 있다.
 - Supabase 계정 생성 시 기존 로컬 `ownerId` 는 새 auth user id 로 로컬 게임 JSON에서 자동 이관된다.
-- 다만 현재 세션 자체는 아직 Supabase SSR 쿠키가 아니라 기존 `mm_maker_user` 쿠키를 유지하는 과도기 구조다.
 - `temporary` 작업자 로그인 탭은 `local` provider 에서만 허용된다.
-- 현재 Supabase 프로젝트에는 `public.profiles` 테이블이 아직 없어, repo에 최소 migration 파일을 추가했다.
+
+### 9. Supabase SSR 세션 통합
+
+- `@supabase/ssr` 기반 server-side auth helper 가 추가됐다.
+- middleware 에서 Supabase session refresh 를 먼저 수행하고, 갱신된 auth cookie 를 후속 응답에도 복사한다.
+- route/page 의 현재 작업자 판별은 이제
+  - `local`: `mm_maker_user`
+  - `supabase`: 검증된 Supabase Auth user + `profiles`
+  - 기준으로 분기한다.
+- `/api/maker-access`
+  - 계정 로그인
+  - 계정 생성
+  - 로그아웃
+  - 이 Supabase provider 에서는 실제 Supabase session cookie 를 발급/제거한다.
+- 보호 API(`/api/games`, `/api/games/[gameId]`, `/api/sessions`, `/api/maker-assistant`)도 새 current-user resolver 를 사용한다.
+- 메이커 접근 화면에서는
+  - 실제 인증 상태는 Supabase 세션으로 판단하고
+  - legacy `mm_maker_user` 쿠키는 recovery key 힌트용으로만 보조 사용한다.
 
 ## 현재 한계
 
-### 1. 정식 Auth 는 아니다
+### 1. 데이터 저장 원천은 아직 로컬 JSON 이다
 
-- `supabase` provider adapter 는 추가됐지만, 세션 판별은 아직 커스텀 작업자 쿠키를 사용한다.
-- 즉 계정 원본은 Supabase 로 옮길 수 있어도, 앱 전체가 Supabase SSR 세션으로 통일된 상태는 아니다.
-- route/page 레이어는 이미 gateway 경계 뒤로 모였기 때문에, 남은 전환 범위는 이전보다 좁아졌다.
+- 인증은 Supabase SSR 세션으로 통합됐지만, 게임/세션 저장은 여전히 `data/games`, `data/sessions` 로컬 JSON 이다.
+- 따라서 배포 기준 최종 형태인 `Vercel + Supabase DB/Storage` 전환은 아직 남아 있다.
 
 ### 2. 대상 작업자 찾기 UX 가 약하다
 
@@ -90,10 +105,10 @@
 
 ## 다음 우선순위
 
-1. 실제 Supabase `profiles.login_id` 스키마와 환경변수를 맞춘 뒤 `MAKER_AUTH_PROVIDER=supabase` 검증
-2. 커스텀 작업자 쿠키 대신 Supabase SSR 세션으로 current user resolver 통합
-3. 대상 작업자 찾기 UX 보강
-4. 협업자 모델 준비
+1. 로컬 JSON 게임/세션 저장소를 Supabase DB/Storage 로 옮길 경계 설계
+2. 대상 작업자 찾기 UX 보강
+3. `profiles` 기반 협업자 모델 준비
+4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

@@ -6,6 +6,8 @@ import {
   isProtectedMakerPath,
   isValidMakerAccessToken,
 } from "@/lib/maker-access";
+import { updateSupabaseSession } from "@/lib/supabase/middleware";
+import { copySupabaseResponseCookies } from "@/lib/supabase/ssr";
 
 /**
  * 제작/관리 동선에만 임시 비밀번호 게이트를 적용한다.
@@ -13,29 +15,34 @@ import {
  */
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  const sessionResponse = await updateSupabaseSession(request);
 
   if (!isMakerAccessEnabled() || !isProtectedMakerPath(pathname)) {
-    return NextResponse.next();
+    return sessionResponse;
   }
 
   const token = request.cookies.get(MAKER_ACCESS_COOKIE_NAME)?.value;
   const granted = await isValidMakerAccessToken(token);
 
   if (granted) {
-    return NextResponse.next();
+    return sessionResponse;
   }
 
   if (pathname.startsWith("/api/")) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "메이커 접근 비밀번호가 필요합니다." },
       { status: 401 }
     );
+    copySupabaseResponseCookies(sessionResponse, response);
+    return response;
   }
 
   const url = request.nextUrl.clone();
   url.pathname = "/maker-access";
   url.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(url);
+  const response = NextResponse.redirect(url);
+  copySupabaseResponseCookies(sessionResponse, response);
+  return response;
 }
 
 export const config = {

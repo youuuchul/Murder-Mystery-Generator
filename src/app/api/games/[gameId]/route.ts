@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveEditableGameForUser } from "@/lib/game-access";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getGame, saveGame, deleteGame } from "@/lib/storage/game-storage";
 import { buildPublicGame } from "@/lib/game-sanitizer";
 import type { GamePackage } from "@/types/game";
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 /** PUT /api/games/[gameId] — 게임 수정 */
 export async function PUT(request: NextRequest, { params }: Params) {
   const { gameId } = await params;
-  const currentUser = getMakerUserFromCookieStore(request.cookies);
+  const currentUser = await getRequestMakerUser(request);
 
   if (!currentUser) {
     return NextResponse.json(
@@ -70,7 +70,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 /** DELETE /api/games/[gameId] — 게임 삭제 */
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { gameId } = await params;
-  const currentUser = getMakerUserFromCookieStore(request.cookies);
+  const currentUser = await getRequestMakerUser(request);
 
   if (!currentUser) {
     return NextResponse.json(

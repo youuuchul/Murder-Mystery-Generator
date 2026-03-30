@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveEditableGameForUser } from "@/lib/game-access";
 import { getGamePublishReadiness, getGamePublishReadinessIssues } from "@/lib/game-publish";
-import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getGame, saveGame } from "@/lib/storage/game-storage";
 import type { GameVisibility } from "@/types/game";
 
@@ -14,7 +14,7 @@ const UpdateVisibilitySchema = z.object({
 
 /** PATCH /api/games/[gameId]/visibility — 공개 상태 변경 */
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const currentUser = getMakerUserFromCookieStore(request.cookies);
+  const currentUser = await getRequestMakerUser(request);
 
   if (!currentUser) {
     return NextResponse.json(

@@ -4,6 +4,11 @@ import {
   normalizeMakerLoginId,
   verifyMakerAccountPassword,
 } from "@/lib/maker-account";
+import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
+import {
+  getMakerAuthProviderConfig,
+  getMissingSupabaseMakerAuthEnv,
+} from "@/lib/maker-auth-config";
 import {
   createMakerAccount as createLocalMakerAccount,
   findMakerAccountByLoginId as findLocalMakerAccountByLoginId,
@@ -35,6 +40,10 @@ export interface MakerAuthGateway {
   createAccount(input: CreateMakerAccountInput): MakerAccountRecord;
 }
 
+/**
+ * 현재 로컬 JSON 저장소를 감싼 기본 메이커 인증 gateway.
+ * route/page 계층은 이 구현 세부사항을 직접 알지 않도록 유지한다.
+ */
 const localMakerAuthGateway: MakerAuthGateway = {
   listUsers() {
     return listLocalMakerUsers();
@@ -77,9 +86,42 @@ const localMakerAuthGateway: MakerAuthGateway = {
 };
 
 /**
+ * Supabase provider 가 선택됐지만 어댑터가 아직 구현되지 않았을 때
+ * 어디서 막혔는지 즉시 파악할 수 있도록 명시적으로 실패시킨다.
+ */
+function createSupabaseMakerAuthGateway(config: MakerAuthProviderConfig): MakerAuthGateway {
+  const missingEnv = getMissingSupabaseMakerAuthEnv(config);
+
+  if (missingEnv.length > 0) {
+    throw new Error(
+      `MAKER_AUTH_PROVIDER=supabase requires env vars: ${missingEnv.join(", ")}`
+    );
+  }
+
+  throw new Error(
+    "MAKER_AUTH_PROVIDER=supabase is selected, but the Supabase maker auth gateway is not implemented yet."
+  );
+}
+
+let cachedProvider: MakerAuthProviderConfig["provider"] | null = null;
+let cachedGateway: MakerAuthGateway | null = null;
+
+/**
  * 현재 메이커 인증/프로필 저장 구현을 반환한다.
- * 지금은 로컬 JSON 기반이지만, 이후 Supabase Auth + profiles 구현으로 교체할 경계다.
+ * 기본값은 로컬 JSON 기반이며, 이후 Supabase Auth + profiles 구현으로 교체할 경계다.
  */
 export function getMakerAuthGateway(): MakerAuthGateway {
-  return localMakerAuthGateway;
+  const config = getMakerAuthProviderConfig();
+
+  if (cachedGateway && cachedProvider === config.provider) {
+    return cachedGateway;
+  }
+
+  cachedProvider = config.provider;
+  cachedGateway =
+    config.provider === "supabase"
+      ? createSupabaseMakerAuthGateway(config)
+      : localMakerAuthGateway;
+
+  return cachedGateway;
 }

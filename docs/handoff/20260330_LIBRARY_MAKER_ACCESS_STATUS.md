@@ -58,6 +58,16 @@
 - `claimable` 레거시 게임은 관리 카드에서 현재 작업자로 바로 귀속할 수 있다.
 - 현재 소유자는 다른 작업자의 로그인 ID 또는 작업자 키로 ownerId 를 직접 이관할 수 있다.
 
+### 8. 인증 gateway 경계 정리
+
+- route/page 계층은 이제 로컬 JSON 저장소를 직접 읽지 않고 `maker auth gateway` 를 통해 메이커 계정/작업자 정보를 가져온다.
+- `MAKER_AUTH_PROVIDER`
+  - `local`
+  - `supabase`
+  - 두 provider 선택 지점이 추가됐다.
+- 현재 기본값은 `local` 이고, `supabase` 를 켜면 필요한 env 또는 어댑터 구현이 없을 때 즉시 실패하도록 해뒀다.
+- 즉, 아직 Supabase 구현은 아니지만 교체 경계와 실패 지점은 코드에 명시됐다.
+
 ## 현재 한계
 
 ### 1. 정식 Auth 는 아니다
@@ -65,6 +75,7 @@
 - 현재 계정은 로컬 JSON 저장소 기반이다.
 - 다른 브라우저/기기 로그인은 해결됐지만, 운영 환경용 인증 시스템이라고 보기는 어렵다.
 - 장기적으로는 Supabase Auth 같은 외부 인증으로 교체해야 한다.
+- 다만 route/page 레이어는 이미 gateway 경계 뒤로 모였기 때문에, 이전보다 교체 범위는 좁아졌다.
 
 ### 2. 대상 작업자 찾기 UX 가 약하다
 
@@ -73,9 +84,10 @@
 
 ## 다음 우선순위
 
-1. 로컬 계정 레이어를 Supabase Auth 치환 가능 구조로 정리
-2. 대상 작업자 찾기 UX 보강
-3. 협업자 모델 준비
+1. `@supabase/supabase-js` 도입과 `maker auth gateway` 의 Supabase adapter 구현
+2. `profiles` 와 현재 `ownerId` / 로컬 account record 간 마이그레이션 정책 확정
+3. 대상 작업자 찾기 UX 보강
+4. 협업자 모델 준비
 
 ## 참고 문서
 

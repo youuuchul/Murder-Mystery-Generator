@@ -65,7 +65,7 @@ export async function POST(req: Request, { params }: Params) {
     cardId?: string;         // transfer용
   };
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const game = await getGame(session.gameId);
@@ -196,7 +196,7 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_received",
     });
 
-    updateSession(session);
+    await updateSession(session);
     broadcast(sessionId, "session_update", { sharedState: session.sharedState });
     broadcast(sessionId, `inventory_${token}`, {
       inventory: pState.inventory,
@@ -238,7 +238,7 @@ export async function POST(req: Request, { params }: Params) {
       type: "clue_revealed",
     });
 
-    updateSession(session);
+    await updateSession(session);
     broadcast(sessionId, "session_update", { sharedState: session.sharedState });
     broadcast(sessionId, `inventory_${pState.token}`, { inventory: pState.inventory });
     return NextResponse.json({ card });
@@ -283,7 +283,7 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_transferred",
     });
 
-    updateSession(session);
+    await updateSession(session);
     broadcast(sessionId, "session_update", { sharedState: session.sharedState });
     broadcast(sessionId, `inventory_${token}`, { inventory: from.inventory });
     broadcast(sessionId, `inventory_${to.token}`, { inventory: to.inventory });

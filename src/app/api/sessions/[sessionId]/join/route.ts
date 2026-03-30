@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const slot = session.sharedState.characterSlots.find((s) => s.playerId === playerId);
@@ -73,7 +73,7 @@ export async function POST(req: Request, { params }: Params) {
     type: "player_joined",
   });
 
-  updateSession(session);
+  await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   return NextResponse.json({

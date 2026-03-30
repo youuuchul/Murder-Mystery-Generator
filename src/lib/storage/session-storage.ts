@@ -5,8 +5,9 @@
 
 import fs from "fs";
 import path from "path";
-import type { GameSession, CharacterSlot } from "@/types/session";
+import type { GameSession } from "@/types/session";
 import type { GamePackage } from "@/types/game";
+import { buildInitialSession } from "@/lib/session-factory";
 
 const SESSIONS_DIR = path.join(process.cwd(), "data", "sessions");
 
@@ -20,54 +21,11 @@ function sessionPath(id: string): string {
   return path.join(SESSIONS_DIR, `${id}.json`);
 }
 
-/** 헷갈리기 쉬운 문자 제외한 코드 생성 */
-function generateCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 export function createSession(game: GamePackage): GameSession {
   ensureDir();
-  const id = crypto.randomUUID();
-  const sessionCode = generateCode();
+  const session = buildInitialSession(game);
 
-  const slots: CharacterSlot[] = game.players.map((p) => ({
-    playerId: p.id,
-    playerName: null,
-    token: null,
-    isLocked: false,
-  }));
-
-  const session: GameSession = {
-    id,
-    gameId: game.id,
-    sessionCode,
-    createdAt: new Date().toISOString(),
-    sharedState: {
-      phase: "lobby",
-      currentRound: 0,
-      publicClueIds: [],
-      acquiredClueIds: [],
-      eventLog: [
-        {
-          id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-          message: "세션이 생성됐습니다.",
-          type: "system",
-        },
-      ],
-      characterSlots: slots,
-      voteCount: 0,
-    },
-    playerStates: [],
-    votes: {},
-  };
-
-  fs.writeFileSync(sessionPath(id), JSON.stringify(session, null, 2), "utf-8");
+  fs.writeFileSync(sessionPath(session.id), JSON.stringify(session, null, 2), "utf-8");
   return session;
 }
 

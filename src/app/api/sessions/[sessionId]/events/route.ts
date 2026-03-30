@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: { sessionId: string } }
 ) {
   const { sessionId } = params;
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return new Response("Session not found", { status: 404 });
 
   let ctrl: ReadableStreamDefaultController<Uint8Array>;

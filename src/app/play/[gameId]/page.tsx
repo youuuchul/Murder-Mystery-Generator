@@ -69,7 +69,7 @@ export default async function PlayPage({
     }
   }
 
-  const activeSessions = listActiveSessions(params.gameId);
+  const activeSessions = await listActiveSessions(params.gameId);
   const requestedSessionId = searchParams?.session;
   const currentSession = activeSessions.find((item) => item.id === requestedSessionId)
     ?? activeSessions[0]

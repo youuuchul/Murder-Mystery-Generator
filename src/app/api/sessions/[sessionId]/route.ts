@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: Params) {
   const { sessionId } = params;
   const token = new URL(req.url).searchParams.get("token");
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   // 플레이어 개인 상태 — token으로 필터링
@@ -58,7 +58,7 @@ export async function PATCH(req: Request, { params }: Params) {
     playerId?: string;
   };
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const game = await getGame(session.gameId);
@@ -172,7 +172,7 @@ export async function PATCH(req: Request, { params }: Params) {
     });
   }
 
-  updateSession(session);
+  await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   return NextResponse.json({ session: { id: session.id, sharedState: session.sharedState } });
@@ -181,11 +181,11 @@ export async function PATCH(req: Request, { params }: Params) {
 /** DELETE /api/sessions/[sessionId] — 세션 파일 삭제 */
 export async function DELETE(_req: Request, { params }: Params) {
   const { sessionId } = params;
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (session) {
     broadcast(sessionId, "session_deleted", {});
   }
-  const deleted = deleteSession(sessionId);
+  const deleted = await deleteSession(sessionId);
   if (!deleted) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

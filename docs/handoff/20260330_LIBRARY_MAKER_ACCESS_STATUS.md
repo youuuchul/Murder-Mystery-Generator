@@ -91,7 +91,7 @@
   - 실제 인증 상태는 Supabase 세션으로 판단하고
   - legacy `mm_maker_user` 쿠키는 recovery key 힌트용으로만 보조 사용한다.
 
-### 10. 게임 / 세션 저장소 경계와 Supabase 게임 adapter
+### 10. 게임 / 세션 저장소 경계와 Supabase adapter
 
 - route/page 계층이 `src/lib/storage/*` 구현을 직접 읽지 않도록
   - `src/lib/game-repository.ts`
@@ -112,42 +112,44 @@
 - `saveGame / deleteGame / getGame`
   - 는 `APP_PERSISTENCE_PROVIDER=supabase` 일 때 실제 Supabase DB를 사용한다.
 - `sessions`
-  - 는 아직 Supabase adapter 가 없어
-  - `APP_PERSISTENCE_PROVIDER=supabase` 여도 현재 단계에서는 local JSON fallback 을 유지한다.
+  - `src/lib/session-factory.ts`
+  - `supabase/migrations/20260330_000003_create_sessions.sql`
+  - 기준으로 실제 Supabase `sessions` adapter 가 추가됐다.
+  - canonical source 는 `session_json` 이고
+  - 목록/조인 조회용 메타 컬럼(`game_id`, `session_code`, `phase`, `locked_player_count` 등)을 함께 유지한다.
 
 ## 현재 한계
 
-### 1. 게임 migration 을 아직 Supabase에 적용하지 않았다
+### 1. 세션 migration 을 아직 Supabase에 적용하지 않았다
 
-- `profiles` migration 은 적용됐지만
-  - `public.games`
-  - `public.game_content`
-  - 는 아직 콘솔에 적용되지 않았다.
-- 현재 runtime smoke test 결과
+- `profiles`, `games`, `game_content` 는 이미 적용됐고
+  게임 생성/조회/삭제 smoke test 도 통과했다.
+- 반면 `public.sessions` 는 아직 콘솔에 적용되지 않았다.
+- 현재 direct DB check 결과
   - `APP_PERSISTENCE_PROVIDER=supabase`
-  - `GET /api/games`
-  - 호출 시 `Could not find the table 'public.games' in the schema cache`
+  - `public.sessions` 조회 시 `Could not find the table 'public.sessions' in the schema cache`
   - 로 실패한다.
 - 즉 코드 준비는 끝났고, 다음 콘솔 작업은
-  - `supabase/migrations/20260330_000002_create_games_and_game_content.sql`
+  - `supabase/migrations/20260330_000003_create_sessions.sql`
   - 실행이다.
 
-### 2. 세션 저장은 아직 로컬 JSON fallback 이다
-
-- 게임은 Supabase DB 를 쓰도록 adapter 가 들어갔지만,
-  세션은 아직 `data/sessions` 로컬 JSON 저장을 유지한다.
-- 따라서 배포 기준 최종 형태인 `Vercel + Supabase DB/Storage` 전환은 아직 남아 있다.
-
-### 3. 대상 작업자 찾기 UX 가 약하다
+### 2. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
+### 3. 세션 런타임 재검증이 한 번 더 필요하다
+
+- `npm run build` 는 통과했다.
+- 다만 local dev 재기동 중 Next chunk 캐시가 흔들린 적이 있어,
+  `public.sessions` 적용 후에는 `POST /api/sessions`, `GET /api/sessions?gameId=...`,
+  `/join/[sessionCode]` 를 Supabase provider 기준으로 한 번 더 확인하는 게 안전하다.
+
 ## 다음 우선순위
 
-1. `supabase/migrations/20260330_000002_create_games_and_game_content.sql` 콘솔 적용
-2. `APP_PERSISTENCE_PROVIDER=supabase` 상태로 `GET/POST /api/games` 재검증
-3. `session repository` Supabase adapter 추가
+1. `supabase/migrations/20260330_000003_create_sessions.sql` 콘솔 적용
+2. `APP_PERSISTENCE_PROVIDER=supabase` 상태로 `POST/GET /api/sessions` 재검증
+3. `/join/[sessionCode]`, `/api/sessions/[sessionId]/*` 세션 흐름 smoke test
 4. 대상 작업자 찾기 UX 보강
 5. `profiles` 기반 협업자 모델 준비
 6. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입

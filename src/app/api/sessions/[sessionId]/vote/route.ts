@@ -6,7 +6,7 @@ import type { VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 type LoadedGame = NonNullable<Awaited<ReturnType<typeof getGame>>>;
-type LoadedSession = NonNullable<ReturnType<typeof getSession>>;
+type LoadedSession = NonNullable<Awaited<ReturnType<typeof getSession>>>;
 
 /**
  * 현재 검거 대상과 설정된 엔딩 분기 목록을 바탕으로 적용할 분기 ID를 찾는다.
@@ -86,7 +86,7 @@ async function revealVotes(
       type: "system",
     });
 
-    updateSession(session);
+    await updateSession(session);
     broadcast(sessionId, "session_update", { sharedState: session.sharedState });
     return { requiresTieBreak: true, pendingArrestOptions: tiedCandidates };
   }
@@ -125,7 +125,7 @@ async function revealVotes(
     type: "vote_revealed",
   });
 
-  updateSession(session);
+  await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
   return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
 }
@@ -142,7 +142,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "token, targetPlayerId 필수" }, { status: 400 });
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   if (session.sharedState.phase !== "vote") {
@@ -178,7 +178,7 @@ export async function POST(req: Request, { params }: Params) {
   const totalPlayers = session.sharedState.characterSlots.filter((s) => s.isLocked).length;
   const allVoted = session.sharedState.voteCount >= totalPlayers;
 
-  updateSession(session);
+  await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   // 전원 투표 완료 시 자동 공개
@@ -200,7 +200,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const { arrestedPlayerId } = await req.json().catch(() => ({})) as {
     arrestedPlayerId?: string;
   };
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   if (session.sharedState.phase !== "vote") {

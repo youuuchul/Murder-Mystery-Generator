@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
@@ -75,7 +75,7 @@ export async function POST(req: Request, { params }: Params) {
     type: "system",
   });
 
-  updateSession(session);
+  await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
   return NextResponse.json({

@@ -8,7 +8,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { sessionCode: string } }
 ) {
-  const session = getSessionByCode(params.sessionCode);
+  const session = await getSessionByCode(params.sessionCode);
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }

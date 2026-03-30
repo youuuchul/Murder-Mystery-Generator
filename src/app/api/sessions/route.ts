@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "플레이어를 먼저 등록해주세요." }, { status: 422 });
   }
 
-  const session = createSession(sessionGame);
+  const session = await createSession(sessionGame);
   return NextResponse.json({ session }, { status: 201 });
 }
 
@@ -75,6 +75,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const sessions = listActiveSessions(gameId).map(toSessionSummary);
+  const sessions = (await listActiveSessions(gameId)).map(toSessionSummary);
   return NextResponse.json({ sessions });
 }

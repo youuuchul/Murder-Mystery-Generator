@@ -14,7 +14,7 @@ const makerAuthGateway = getMakerAuthGateway();
  * 로그인 ID 또는 작업자 키로 소유권 이전 대상 작업자를 찾는다.
  * displayName 은 중복 가능하므로 일부러 허용하지 않는다.
  */
-export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarget | null {
+export async function resolveMakerIdentityTarget(rawValue: string): Promise<MakerIdentityTarget | null> {
   const value = rawValue.trim();
 
   if (!value) {
@@ -22,7 +22,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
   }
 
   if (isValidMakerLoginId(value)) {
-    const account = makerAuthGateway.findAccountByLoginId(normalizeMakerLoginId(value));
+    const account = await makerAuthGateway.findAccountByLoginId(normalizeMakerLoginId(value));
     if (!account) {
       return null;
     }
@@ -36,7 +36,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
 
   if (isValidMakerUserId(value)) {
     const normalizedUserId = normalizeMakerUserId(value);
-    const account = makerAuthGateway.getAccountById(normalizedUserId);
+    const account = await makerAuthGateway.getAccountById(normalizedUserId);
     if (account) {
       return {
         id: account.id,
@@ -45,7 +45,7 @@ export function resolveMakerIdentityTarget(rawValue: string): MakerIdentityTarge
       };
     }
 
-    const makerUser = makerAuthGateway.getUserById(normalizedUserId);
+    const makerUser = await makerAuthGateway.getUserById(normalizedUserId);
     if (!makerUser) {
       return null;
     }

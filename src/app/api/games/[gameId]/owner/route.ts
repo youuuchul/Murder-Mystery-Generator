@@ -84,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
-  const targetIdentity = resolveMakerIdentityTarget(parsed.data.target);
+  const targetIdentity = await resolveMakerIdentityTarget(parsed.data.target);
   if (!targetIdentity) {
     return NextResponse.json(
       { error: "로그인 ID 또는 작업자 키를 다시 확인하세요." },

@@ -17,13 +17,19 @@ export interface MakerUserRecord extends AppUser {
 }
 
 /**
- * 로컬 JSON 기반 메이커 계정 레코드.
- * ownerId 와 1:1로 연결되어 다른 브라우저/기기에서도 같은 작업자로 로그인할 수 있게 한다.
+ * provider 구현과 무관하게 메이커 계정 식별에 공통으로 쓰는 최소 정보다.
  */
-export interface MakerAccountRecord extends AppUser {
+export interface MakerAccountIdentity extends AppUser {
   loginId: string;
-  passwordSalt: string;
-  passwordHash: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * 로컬 JSON 기반 메이커 계정 레코드.
+ * Supabase 전환 전까지는 비밀번호 해시 필드가 로컬 저장소에만 남아 있다.
+ */
+export interface MakerAccountRecord extends MakerAccountIdentity {
+  passwordSalt: string;
+  passwordHash: string;
 }

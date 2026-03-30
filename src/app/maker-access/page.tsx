@@ -9,6 +9,7 @@ import {
   getMakerUserFromCookieStore,
   normalizeMakerNextPath,
 } from "@/lib/maker-user";
+import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 
 type MakerAccessMode = "login" | "signup" | "temporary";
@@ -35,11 +36,17 @@ type Props = {
 export default async function MakerAccessPage({ searchParams }: Props) {
   const { next, error, mode: rawMode } = await searchParams;
   const nextPath = normalizeMakerNextPath(next, "/library/manage");
-  const mode = normalizeMakerAccessMode(rawMode);
+  const authProvider = getMakerAuthProviderConfig().provider;
+  const supportsTemporaryAccess = authProvider === "local";
+  const mode = supportsTemporaryAccess
+    ? normalizeMakerAccessMode(rawMode)
+    : rawMode === "signup"
+      ? "signup"
+      : "login";
 
   const cookieStore = cookies();
   const currentUser = getMakerUserFromCookieStore(cookieStore);
-  const currentAccount = currentUser ? makerAuthGateway.getAccountById(currentUser.id) : null;
+  const currentAccount = currentUser ? await makerAuthGateway.getAccountById(currentUser.id) : null;
   const granted = await isValidMakerAccessToken(
     cookieStore.get(MAKER_ACCESS_COOKIE_NAME)?.value
   );
@@ -59,7 +66,9 @@ export default async function MakerAccessPage({ searchParams }: Props) {
           <h1 className="mt-3 text-2xl font-semibold">제작자 로그인</h1>
           <p className="mt-2 text-sm leading-6 text-dark-400">
             계정 로그인은 다른 브라우저와 다른 기기에서도 같은 작업자로 이어집니다.
-            아직 계정이 없으면 현재 작업자 세션에 로그인 ID를 연결할 수 있습니다.
+            {supportsTemporaryAccess
+              ? " 아직 계정이 없으면 현재 작업자 세션에 로그인 ID를 연결할 수 있습니다."
+              : " 현재 provider 는 Supabase 계정 기반으로 동작합니다."}
           </p>
         </div>
 
@@ -91,6 +100,11 @@ export default async function MakerAccessPage({ searchParams }: Props) {
         {error === "invalid_account_credentials" ? (
           <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             로그인 ID 또는 계정 비밀번호가 올바르지 않습니다.
+          </div>
+        ) : null}
+        {error === "temporary_login_disabled" ? (
+          <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            Supabase 계정 모드에서는 임시 작업자 로그인을 지원하지 않습니다. 계정 로그인 또는 계정 만들기를 사용하세요.
           </div>
         ) : null}
         {error === "duplicate_login_id" ? (
@@ -132,17 +146,19 @@ export default async function MakerAccessPage({ searchParams }: Props) {
           >
             계정 만들기
           </a>
-          <a
-            href={`/maker-access?mode=temporary&next=${encodeURIComponent(nextPath)}`}
-            className={[
-              "rounded-full border px-3 py-1 transition-colors",
-              mode === "temporary"
-                ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
-                : "border-dark-700 bg-dark-950 text-dark-400 hover:border-dark-500 hover:text-dark-100",
-            ].join(" ")}
-          >
-            임시 작업자
-          </a>
+          {supportsTemporaryAccess ? (
+            <a
+              href={`/maker-access?mode=temporary&next=${encodeURIComponent(nextPath)}`}
+              className={[
+                "rounded-full border px-3 py-1 transition-colors",
+                mode === "temporary"
+                  ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
+                  : "border-dark-700 bg-dark-950 text-dark-400 hover:border-dark-500 hover:text-dark-100",
+              ].join(" ")}
+            >
+              임시 작업자
+            </a>
+          ) : null}
         </div>
 
         {mode === "login" ? (
@@ -280,7 +296,7 @@ export default async function MakerAccessPage({ searchParams }: Props) {
                   type="text"
                   name="recoveryKey"
                   className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 font-mono text-xs text-dark-50 outline-none transition focus:border-mystery-500"
-                  placeholder="기존 ownerId 와 연결할 때만 입력"
+                  placeholder="기존 ownerId 를 새 계정으로 옮길 때만 입력"
                 />
               </label>
             ) : (
@@ -316,7 +332,7 @@ export default async function MakerAccessPage({ searchParams }: Props) {
           </form>
         ) : null}
 
-        {mode === "temporary" ? (
+        {supportsTemporaryAccess && mode === "temporary" ? (
           <form action="/api/maker-access" method="post" className="space-y-4">
             <input type="hidden" name="intent" value="temporary_login" />
             <input type="hidden" name="next" value={nextPath} />

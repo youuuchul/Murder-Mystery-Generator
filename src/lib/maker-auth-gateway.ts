@@ -1,4 +1,9 @@
-import type { AppUser, MakerAccountRecord, MakerUserRecord } from "@/types/auth";
+import type {
+  AppUser,
+  MakerAccountIdentity,
+  MakerAccountRecord,
+  MakerUserRecord,
+} from "@/types/auth";
 import {
   hashMakerAccountPassword,
   normalizeMakerLoginId,
@@ -9,6 +14,7 @@ import {
   getMakerAuthProviderConfig,
   getMissingSupabaseMakerAuthEnv,
 } from "@/lib/maker-auth-config";
+import { createSupabaseMakerAuthGateway } from "@/lib/maker-auth-gateway-supabase";
 import {
   createMakerAccount as createLocalMakerAccount,
   findMakerAccountByLoginId as findLocalMakerAccountByLoginId,
@@ -22,22 +28,33 @@ import {
 } from "@/lib/storage/maker-user-storage";
 
 export interface CreateMakerAccountInput {
-  id: string;
   displayName: string;
   loginId: string;
   password: string;
   now?: string;
+  preferredUserId?: string;
+  migrateOwnerIdFrom?: string;
 }
 
 export interface MakerAuthGateway {
-  listUsers(): MakerUserRecord[];
-  findUserByDisplayName(displayName: string): MakerUserRecord | null;
-  getUserById(userId: string): MakerUserRecord | null;
-  upsertUser(user: AppUser, now?: string): MakerUserRecord;
-  getAccountById(userId: string): MakerAccountRecord | null;
-  findAccountByLoginId(loginId: string): MakerAccountRecord | null;
-  authenticateAccount(loginId: string, password: string): MakerAccountRecord | null;
-  createAccount(input: CreateMakerAccountInput): MakerAccountRecord;
+  listUsers(): Promise<MakerUserRecord[]>;
+  findUserByDisplayName(displayName: string): Promise<MakerUserRecord | null>;
+  getUserById(userId: string): Promise<MakerUserRecord | null>;
+  upsertUser(user: AppUser, now?: string): Promise<MakerUserRecord>;
+  getAccountById(userId: string): Promise<MakerAccountIdentity | null>;
+  findAccountByLoginId(loginId: string): Promise<MakerAccountIdentity | null>;
+  authenticateAccount(loginId: string, password: string): Promise<MakerAccountIdentity | null>;
+  createAccount(input: CreateMakerAccountInput): Promise<MakerAccountIdentity>;
+}
+
+function toMakerAccountIdentity(account: MakerAccountRecord): MakerAccountIdentity {
+  return {
+    id: account.id,
+    displayName: account.displayName,
+    loginId: account.loginId,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+  };
 }
 
 /**
@@ -45,63 +62,54 @@ export interface MakerAuthGateway {
  * route/page 계층은 이 구현 세부사항을 직접 알지 않도록 유지한다.
  */
 const localMakerAuthGateway: MakerAuthGateway = {
-  listUsers() {
+  async listUsers() {
     return listLocalMakerUsers();
   },
-  findUserByDisplayName(displayName) {
+  async findUserByDisplayName(displayName) {
     return findLocalMakerUserByDisplayName(displayName);
   },
-  getUserById(userId) {
+  async getUserById(userId) {
     return getLocalMakerUserById(userId);
   },
-  upsertUser(user, now) {
+  async upsertUser(user, now) {
     return upsertLocalMakerUser(user, now);
   },
-  getAccountById(userId) {
-    return getLocalMakerAccountById(userId);
+  async getAccountById(userId) {
+    const account = getLocalMakerAccountById(userId);
+    return account ? toMakerAccountIdentity(account) : null;
   },
-  findAccountByLoginId(loginId) {
-    return findLocalMakerAccountByLoginId(loginId);
+  async findAccountByLoginId(loginId) {
+    const account = findLocalMakerAccountByLoginId(loginId);
+    return account ? toMakerAccountIdentity(account) : null;
   },
-  authenticateAccount(loginId, password) {
+  async authenticateAccount(loginId, password) {
     const account = findLocalMakerAccountByLoginId(normalizeMakerLoginId(loginId));
     if (!account || !verifyMakerAccountPassword(password, account)) {
       return null;
     }
 
-    return account;
+    return toMakerAccountIdentity(account);
   },
-  createAccount({ id, displayName, loginId, password, now = new Date().toISOString() }) {
+  async createAccount({
+    displayName,
+    loginId,
+    password,
+    now = new Date().toISOString(),
+    preferredUserId,
+  }) {
     const passwordFields = hashMakerAccountPassword(password);
-
-    return createLocalMakerAccount({
-      id,
+    const account = createLocalMakerAccount({
+      id: preferredUserId?.trim() || crypto.randomUUID(),
       displayName,
       loginId,
       ...passwordFields,
       createdAt: now,
       updatedAt: now,
     });
+
+    return toMakerAccountIdentity(account);
   },
 };
-
-/**
- * Supabase provider 가 선택됐지만 어댑터가 아직 구현되지 않았을 때
- * 어디서 막혔는지 즉시 파악할 수 있도록 명시적으로 실패시킨다.
- */
-function createSupabaseMakerAuthGateway(config: MakerAuthProviderConfig): MakerAuthGateway {
-  const missingEnv = getMissingSupabaseMakerAuthEnv(config);
-
-  if (missingEnv.length > 0) {
-    throw new Error(
-      `MAKER_AUTH_PROVIDER=supabase requires env vars: ${missingEnv.join(", ")}`
-    );
-  }
-
-  throw new Error(
-    "MAKER_AUTH_PROVIDER=supabase is selected, but the Supabase maker auth gateway is not implemented yet."
-  );
-}
 
 let cachedProvider: MakerAuthProviderConfig["provider"] | null = null;
 let cachedGateway: MakerAuthGateway | null = null;
@@ -118,10 +126,19 @@ export function getMakerAuthGateway(): MakerAuthGateway {
   }
 
   cachedProvider = config.provider;
-  cachedGateway =
-    config.provider === "supabase"
-      ? createSupabaseMakerAuthGateway(config)
-      : localMakerAuthGateway;
+  if (config.provider === "supabase") {
+    const missingEnv = getMissingSupabaseMakerAuthEnv(config);
+    if (missingEnv.length > 0) {
+      throw new Error(
+        `MAKER_AUTH_PROVIDER=supabase requires env vars: ${missingEnv.join(", ")}`
+      );
+    }
+
+    cachedGateway = createSupabaseMakerAuthGateway(config);
+    return cachedGateway;
+  }
+
+  cachedGateway = localMakerAuthGateway;
 
   return cachedGateway;
 }

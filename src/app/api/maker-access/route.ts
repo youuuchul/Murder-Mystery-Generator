@@ -22,6 +22,7 @@ import {
   isValidMakerLoginId,
   normalizeMakerLoginId,
 } from "@/lib/maker-account";
+import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 
 type MakerAccessIntent =
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
 
   const gatePassword = String(formData.get("gatePassword") ?? "");
   const currentSessionUser = getMakerUserFromCookieStore(request.cookies);
+  const authProvider = getMakerAuthProviderConfig().provider;
 
   if (intent === "account_login") {
     const gateError = await validateMakerGate(request, next, "login", gatePassword);
@@ -147,13 +149,13 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_login_id", "login");
     }
 
-    const account = makerAuthGateway.authenticateAccount(loginId, accountPassword);
+    const account = await makerAuthGateway.authenticateAccount(loginId, accountPassword);
     if (!account) {
       return redirectToMakerAccess(request, next, "invalid_account_credentials", "login");
     }
 
     const user = createMakerUser(account.displayName, account.id);
-    makerAuthGateway.upsertUser(user);
+    await makerAuthGateway.upsertUser(user);
     return buildLoginSuccessResponse(request, next, user, gatePassword);
   }
 
@@ -189,25 +191,30 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_recovery_key", "signup");
     }
 
-    if (makerAuthGateway.findAccountByLoginId(loginId)) {
+    if (await makerAuthGateway.findAccountByLoginId(loginId)) {
       return redirectToMakerAccess(request, next, "duplicate_login_id", "signup");
     }
 
     const linkedUserId = recoveryKey || currentSessionUser?.id;
-    if (linkedUserId && makerAuthGateway.getAccountById(linkedUserId)) {
+    if (linkedUserId && await makerAuthGateway.getAccountById(linkedUserId)) {
       return redirectToMakerAccess(request, next, "account_already_linked", "signup");
     }
 
-    const user = createMakerUser(displayName, linkedUserId);
-    makerAuthGateway.createAccount({
-      id: user.id,
-      displayName: user.displayName,
+    const account = await makerAuthGateway.createAccount({
+      displayName,
       loginId,
       password: accountPassword,
+      preferredUserId: linkedUserId,
+      migrateOwnerIdFrom: linkedUserId,
     });
-    makerAuthGateway.upsertUser(user);
+    const user = createMakerUser(account.displayName, account.id);
+    await makerAuthGateway.upsertUser(user);
 
     return buildLoginSuccessResponse(request, next, user, gatePassword);
+  }
+
+  if (authProvider === "supabase") {
+    return redirectToMakerAccess(request, next, "temporary_login_disabled", "login");
   }
 
   const displayName = String(formData.get("displayName") ?? "");
@@ -227,11 +234,11 @@ export async function POST(request: NextRequest) {
   }
 
   const matchedMaker = !currentSessionUser && !recoveryKey
-    ? makerAuthGateway.findUserByDisplayName(displayName)
+    ? await makerAuthGateway.findUserByDisplayName(displayName)
     : null;
   const nextUserId = recoveryKey || currentSessionUser?.id || matchedMaker?.id;
   const user = createMakerUser(displayName, nextUserId);
-  makerAuthGateway.upsertUser(user);
+  await makerAuthGateway.upsertUser(user);
 
   return buildLoginSuccessResponse(request, next, user, gatePassword);
 }

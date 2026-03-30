@@ -20,9 +20,9 @@ type ManageLibraryPageProps = {
 export default async function ManageLibraryPage({ searchParams }: ManageLibraryPageProps) {
   const resolvedSearchParams = await searchParams;
   const currentUser = requireCurrentMakerUser("/library/manage");
-  const currentAccount = makerAuthGateway.getAccountById(currentUser.id);
+  const currentAccount = await makerAuthGateway.getAccountById(currentUser.id);
   const includeReadonly = resolvedSearchParams?.scope === "all";
-  const makerUsers = makerAuthGateway.listUsers();
+  const makerUsers = await makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
   const managedGames = listGames()
     .map((game) => {

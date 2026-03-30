@@ -65,17 +65,22 @@
   - `local`
   - `supabase`
   - 두 provider 선택 지점이 추가됐다.
-- 현재 기본값은 `local` 이고, `supabase` 를 켜면 필요한 env 또는 어댑터 구현이 없을 때 즉시 실패하도록 해뒀다.
-- 즉, 아직 Supabase 구현은 아니지만 교체 경계와 실패 지점은 코드에 명시됐다.
+- `@supabase/supabase-js` 와 Supabase adapter 뼈대가 추가됐다.
+- `supabase` provider 에서는
+  - `auth.users`
+  - `profiles`
+  - 기반 계정 로그인/생성을 gateway 뒤에서 처리할 수 있다.
+- Supabase 계정 생성 시 기존 로컬 `ownerId` 는 새 auth user id 로 로컬 게임 JSON에서 자동 이관된다.
+- 다만 현재 세션 자체는 아직 Supabase SSR 쿠키가 아니라 기존 `mm_maker_user` 쿠키를 유지하는 과도기 구조다.
+- `temporary` 작업자 로그인 탭은 `local` provider 에서만 허용된다.
 
 ## 현재 한계
 
 ### 1. 정식 Auth 는 아니다
 
-- 현재 계정은 로컬 JSON 저장소 기반이다.
-- 다른 브라우저/기기 로그인은 해결됐지만, 운영 환경용 인증 시스템이라고 보기는 어렵다.
-- 장기적으로는 Supabase Auth 같은 외부 인증으로 교체해야 한다.
-- 다만 route/page 레이어는 이미 gateway 경계 뒤로 모였기 때문에, 이전보다 교체 범위는 좁아졌다.
+- `supabase` provider adapter 는 추가됐지만, 세션 판별은 아직 커스텀 작업자 쿠키를 사용한다.
+- 즉 계정 원본은 Supabase 로 옮길 수 있어도, 앱 전체가 Supabase SSR 세션으로 통일된 상태는 아니다.
+- route/page 레이어는 이미 gateway 경계 뒤로 모였기 때문에, 남은 전환 범위는 이전보다 좁아졌다.
 
 ### 2. 대상 작업자 찾기 UX 가 약하다
 
@@ -84,8 +89,8 @@
 
 ## 다음 우선순위
 
-1. `@supabase/supabase-js` 도입과 `maker auth gateway` 의 Supabase adapter 구현
-2. `profiles` 와 현재 `ownerId` / 로컬 account record 간 마이그레이션 정책 확정
+1. 실제 Supabase `profiles.login_id` 스키마와 환경변수를 맞춘 뒤 `MAKER_AUTH_PROVIDER=supabase` 검증
+2. 커스텀 작업자 쿠키 대신 Supabase SSR 세션으로 current user resolver 통합
 3. 대상 작업자 찾기 UX 보강
 4. 협업자 모델 준비
 

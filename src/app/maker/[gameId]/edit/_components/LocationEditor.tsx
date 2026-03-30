@@ -259,7 +259,7 @@ function LocationBlock({
 
   /**
    * 장소 대표 이미지를 업로드하고, 응답으로 받은 내부 자산 URL을 장소 데이터에 연결한다.
-   * 파일 자체는 `data/games/{gameId}/assets/locations` 아래에 저장된다.
+   * 실제 저장 위치는 provider 설정에 따라 local 또는 Supabase Storage로 갈린다.
    */
   async function handleLocationImageUpload(file: File) {
     const formData = new FormData();
@@ -519,7 +519,7 @@ function ClueForm({
 
   /**
    * 단서 이미지를 업로드하고 인벤토리/상세 카드에서 사용할 내부 에셋 URL을 기록한다.
-   * 파일은 `data/games/{gameId}/assets/clues` 아래에 저장된다.
+   * 실제 저장 backend는 provider 설정을 따르며, 게임 JSON에는 내부 URL만 유지한다.
    */
   async function handleClueImageUpload(file: File) {
     const formData = new FormData();

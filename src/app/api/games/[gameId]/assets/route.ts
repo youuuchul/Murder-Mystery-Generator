@@ -1,14 +1,16 @@
-import fs from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveEditableGameForUser } from "@/lib/game-access";
+import {
+  GAME_ASSET_MAX_FILE_SIZE_BYTES,
+  type GameAssetScope,
+  isGameAssetScope,
+  uploadGameAsset,
+} from "@/lib/game-asset-storage";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 
 type Params = { params: Promise<{ gameId: string }> };
-type AssetScope = "covers" | "locations" | "story" | "players" | "clues" | "rounds";
 
-const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
 const MIME_EXTENSION_MAP: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -16,28 +18,9 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   "image/gif": "gif",
 };
 
-/**
- * 특정 게임의 에셋 업로드 디렉토리를 만든 뒤 절대 경로를 반환한다.
- * 표지, 플레이어, 사건 개요, 장소, 단서 이미지를 같은 API에서 다루되 저장 경로만 분리한다.
- */
-function ensureAssetDir(gameId: string, scope: AssetScope): string {
-  const dir = path.join(process.cwd(), "data", "games", gameId, "assets", scope);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
 /** 폼데이터의 에셋 분류를 읽어 안전한 저장 경로 이름으로 정규화한다. */
-function normalizeAssetScope(value: FormDataEntryValue | null): AssetScope {
-  if (
-    value === "covers"
-    || value === "locations"
-    || value === "story"
-    || value === "players"
-    || value === "clues"
-    || value === "rounds"
-  ) {
+function normalizeAssetScope(value: FormDataEntryValue | null): GameAssetScope {
+  if (typeof value === "string" && isGameAssetScope(value)) {
     return value;
   }
 
@@ -91,7 +74,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "업로드할 이미지 파일이 필요합니다." }, { status: 400 });
     }
 
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    if (file.size > GAME_ASSET_MAX_FILE_SIZE_BYTES) {
       return NextResponse.json({ error: "이미지는 15MB 이하만 업로드할 수 있습니다." }, { status: 400 });
     }
 
@@ -105,15 +88,15 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const filename = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
-    const dir = ensureAssetDir(gameId, scope);
-    const absolutePath = path.join(dir, filename);
-
-    fs.writeFileSync(absolutePath, buffer);
-
-    return NextResponse.json({
-      url: `/api/games/${gameId}/assets/${scope}/${filename}`,
+    const uploadedAsset = await uploadGameAsset({
+      gameId,
+      scope,
       filename,
+      contentType: file.type,
+      buffer,
     });
+
+    return NextResponse.json(uploadedAsset);
   } catch (error) {
     console.error(`[POST /api/games/${gameId}/assets]`, error);
     return NextResponse.json({ error: "이미지 업로드에 실패했습니다." }, { status: 500 });

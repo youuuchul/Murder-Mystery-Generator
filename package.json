@@ -11,7 +11,9 @@
     "backup:local-data": "node scripts/backup-local-data.mjs",
     "archive:orphan-sessions": "node scripts/archive-orphan-sessions.mjs",
     "migrate:local-data:dry-run": "node scripts/migrate-local-data-to-supabase.mjs --dry-run",
-    "migrate:local-data": "node scripts/migrate-local-data-to-supabase.mjs --apply"
+    "migrate:local-data": "node scripts/migrate-local-data-to-supabase.mjs --apply",
+    "migrate:local-assets:dry-run": "node scripts/migrate-local-assets-to-supabase.mjs --dry-run",
+    "migrate:local-assets": "node scripts/migrate-local-assets-to-supabase.mjs --apply"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

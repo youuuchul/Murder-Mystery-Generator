@@ -182,31 +182,75 @@
   - `/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/backups/local-data/20260330_201500-orphan-sessions`
   - 로 이동했다.
 
+### 14. 자산 저장소 경계와 Supabase Storage 이관
+
+- `src/lib/game-asset-storage.ts`
+  - 게임 asset 저장 backend를 `local / supabase` 로 분기한다.
+  - game JSON 에는 계속 `/api/games/[gameId]/assets/...` 내부 URL만 기록한다.
+- `src/app/api/games/[gameId]/assets/route.ts`
+  - 업로드 시 provider 기준으로 local file 또는 Supabase Storage에 저장한다.
+- `src/app/api/games/[gameId]/assets/[...assetPath]/route.ts`
+  - asset 조회 시 provider 기준으로 local file 또는 Supabase Storage에서 읽는다.
+  - Supabase 모드에서도 아직 이관되지 않은 local file이 있으면 dev 환경에서 local fallback을 허용한다.
+- `src/lib/game-repository.ts`
+  - Supabase game delete 성공 후 asset cleanup 을 best-effort 로 수행한다.
+- `scripts/migrate-local-assets-to-supabase.mjs`
+  - 기존 local asset 파일을 Supabase Storage로 복사한다.
+  - 기본은 dry-run 이고 `--apply` 일 때만 실제 upload를 수행한다.
+- `SUPABASE_ASSETS_BUCKET`
+  - 미설정 시 기본 bucket 이름은 `game-assets` 다.
+
+### 15. 로컬 asset migration 결과
+
+- local asset dry-run
+  - games with assets `3`
+  - asset files `15`
+  - total bytes `39154177`
+- actual apply 결과
+  - bucket `game-assets`
+  - uploadedCount `15`
+  - totalBytes `39154177`
+- runtime smoke test
+  - `APP_PERSISTENCE_PROVIDER=supabase`
+  - `npm run start`
+  - `/api/games/db277ab2-93b1-4984-be70-d1ea2579b5a0/assets/covers/1773908629069-4c718629-304d-4161-8f23-a6955e7072e4.webp`
+  - `200`, `content-type=image/webp`, `cache-control=public, max-age=31536000, immutable` 확인
+
 ## 현재 한계
 
 ### 1. 로컬 -> Supabase 데이터 동기화는 일회성 import 상태다
 
 - 기존 로컬 게임/세션은 Supabase 로 옮겼다.
+- 기존 local asset 파일도 Supabase Storage로 1회 복사했다.
 - 다만 이후 양쪽을 동시에 쓰는 동기화 경로는 없으므로,
-  운영 기준으로는 `APP_PERSISTENCE_PROVIDER=supabase` 를 유지하고
-  로컬 JSON 은 backup/reference 용으로만 다루는 쪽이 맞다.
+  운영 기준으로는
+  - `APP_PERSISTENCE_PROVIDER=supabase`
+  - `MAKER_AUTH_PROVIDER=supabase`
+  - 를 유지하고,
+  로컬 JSON / local assets 는 backup/reference 용으로만 다루는 쪽이 맞다.
 
 ### 2. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
-### 3. ESLint/lint 경로가 아직 비어 있다
+### 3. Vercel 프로젝트 연결과 preview 검증은 아직 안 했다
+
+- `.vercel` 링크 파일은 아직 없다.
+- Vercel env 동기화, preview deploy, 모바일/공개 세션 검증은 다음 단계다.
+
+### 4. ESLint/lint 경로가 아직 비어 있다
 
 - `npm run build` 는 통과한다.
 - `npm run lint` 는 아직 ESLint 초기 설정이 없어 interactive setup 프롬프트에서 멈춘다.
 
 ## 다음 우선순위
 
-1. `APP_PERSISTENCE_PROVIDER=supabase` 운영 고정 기준으로 library/manage 실사용 점검
-2. 대상 작업자 찾기 UX 보강
-3. `profiles` 기반 협업자 모델 준비
-4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
+1. Vercel project link + env 동기화
+2. Preview deploy 후 maker / public library / join flow 실사용 점검
+3. 대상 작업자 찾기 UX 보강
+4. `profiles` 기반 협업자 모델 준비
+5. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

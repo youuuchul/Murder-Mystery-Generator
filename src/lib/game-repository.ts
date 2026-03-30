@@ -1,4 +1,5 @@
 import type { GameMetadata, GamePackage } from "@/types/game";
+import { deleteGameAssets } from "@/lib/game-asset-storage";
 import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { getGamePublishReadiness } from "@/lib/game-publish";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
@@ -322,7 +323,16 @@ const supabaseGameRepository: GameRepository = {
       throw new Error(`Failed to delete Supabase game: ${error.message}`);
     }
 
-    return (data?.length ?? 0) > 0;
+    const deleted = (data?.length ?? 0) > 0;
+    if (deleted) {
+      try {
+        await deleteGameAssets(normalizedGameId);
+      } catch (assetError) {
+        console.error(`[game-repository] asset cleanup failed for ${normalizedGameId}`, assetError);
+      }
+    }
+
+    return deleted;
   },
 };
 

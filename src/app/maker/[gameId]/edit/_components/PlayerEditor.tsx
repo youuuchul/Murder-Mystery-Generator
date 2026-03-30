@@ -209,7 +209,7 @@ function PlayerForm({
 
   /**
    * 플레이어 대표 이미지를 업로드하고 참가 선택/투표 화면에 사용할 URL을 캐릭터 데이터에 기록한다.
-   * 파일은 `data/games/{gameId}/assets/players` 아래에 저장된다.
+   * 저장 backend는 provider 설정을 따르며, 캐릭터 데이터에는 내부 에셋 URL만 남긴다.
    */
   async function handleCardImageUpload(file: File) {
     const formData = new FormData();

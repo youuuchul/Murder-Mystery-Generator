@@ -23,12 +23,13 @@
 
 - [game-storage.ts](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/src/lib/storage/game-storage.ts) 는 `data/games/{id}/game.json`, `metadata.json` 에 직접 기록한다.
 - [session-storage.ts](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/src/lib/storage/session-storage.ts) 는 `data/sessions/{sessionId}.json` 에 직접 기록한다.
+- 메이커 작업자/계정 정보도 현재는 `data/makers/index.json`, `data/makers/accounts.json` 로컬 JSON 에 저장된다.
 - 업로드된 이미지도 현재는 `data/games/{gameId}/assets/*` 아래 로컬 파일로 저장된다.
 
-### 2. 이 데이터는 Git에 포함되지 않는다
+### 2. 이 데이터는 Git에 포함되지 않게 관리해야 한다
 
-- [.gitignore](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/.gitignore) 에서 `data/games/*/`, `data/sessions/` 를 무시하고 있다.
-- 즉 로컬에서 만든 게임/세션/업로드 자산은 배포 저장소에 자동으로 올라가지 않는다.
+- [.gitignore](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/.gitignore) 에서 `data/games/*/`, `data/sessions/`, `data/makers/*.json` 를 무시한다.
+- 즉 로컬에서 만든 게임/세션/업로드 자산과 메이커 로그인 정보는 배포 저장소에 자동으로 올라가지 않는다.
 
 ### 3. 현재 배포 타깃 스택은 아직 붙지 않았다
 
@@ -69,7 +70,9 @@ Vercel 공식 문서도 런타임 파일 저장이 필요할 때는 Blob 같은 
 다만 아래 경우는 주의가 필요하다.
 
 - 다른 브랜치 작업 중 `data/` 정리
+- 다른 브랜치 작업 중 `data/makers/` 정리
 - 실수로 세션/게임 폴더 삭제
+- 실수로 작업자/계정 JSON 삭제
 - PC 교체/포맷
 - 배포 전환 시 별도 백업 없이 “나중에 옮기면 되겠지” 하고 넘어감
 
@@ -98,6 +101,7 @@ Vercel 공식 문서도 런타임 파일 저장이 필요할 때는 Blob 같은 
 필수 전환 대상:
 - 게임 JSON -> Supabase Postgres
 - 세션 JSON -> Supabase Postgres
+- 메이커 로컬 계정 JSON -> Supabase Auth / profiles
 - 업로드 파일 -> Supabase Storage
 
 ## 판단

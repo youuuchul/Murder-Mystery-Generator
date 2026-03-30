@@ -23,6 +23,7 @@ build/
 # Runtime data (user-generated game packages & sessions)
 data/games/*/
 data/sessions/
+data/makers/*.json
 !data/README.md
 
 # Cloudflare tunnel temp file

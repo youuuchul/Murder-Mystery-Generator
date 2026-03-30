@@ -138,30 +138,66 @@
   - 전부 정상 응답 확인
 - smoke test 중 생성한 임시 Supabase user / game / session 은 검증 직후 정리했다.
 
+### 12. 로컬 데이터 backup / import tooling
+
+- `scripts/backup-local-data.mjs`
+  - `data/games`, `data/sessions` 를 timestamp 백업으로 복사한다.
+- `scripts/migrate-local-data-to-supabase.mjs`
+  - 기본은 dry-run 이고
+  - `--apply` 가 있을 때만 실제 upsert 를 수행한다.
+  - 실제 apply 직전에는 자동으로 로컬 백업을 한 번 더 만든다.
+- package scripts
+  - `npm run backup:local-data`
+  - `npm run migrate:local-data:dry-run`
+  - `npm run migrate:local-data -- --fallback-owner-id=<profile-id>`
+- dry-run 결과
+  - local games `6`
+  - local sessions `22`
+  - 즉시 import 가능한 games `4`
+  - 즉시 import 가능한 sessions `13`
+  - owner 없는 games `2`
+  - owner 미해결 또는 orphan 때문에 skip 되는 sessions `9`
+  - 기존 remote collision 은 현재 `0`
+
 ## 현재 한계
 
-### 1. 기존 로컬 JSON 데이터 migration 은 아직 자동화되지 않았다
+### 1. owner 없는 로컬 게임 2개 때문에 전체 import 는 아직 막혀 있다
 
-- 현재 코드는 `APP_PERSISTENCE_PROVIDER=supabase` 일 때 새 게임/세션을 Supabase에 저장한다.
-- 하지만 `data/games`, `data/sessions` 에 남아 있는 기존 로컬 데이터는 자동으로 옮기지 않는다.
-- 즉 배포 전에는 import script 또는 one-off migration 경로가 추가로 필요하다.
+- 현재 dry-run 기준 미해결 게임
+  - `919abd27-e7c0-4487-95ba-af47f4c7d69e` `에덴의 조각들`
+  - `d07c0a1c-179e-43a9-8b35-eee099255e1a` `마지막 페이지`
+- 이 두 게임은 `access.ownerId` 가 비어 있어서
+  Supabase `games.owner_id` foreign key 를 만족하지 못한다.
+- 따라서 실제 import 는 fallback owner id 를 정한 뒤
+  `npm run migrate:local-data -- --fallback-owner-id=<profile-id>`
+  로 실행해야 한다.
 
-### 2. 대상 작업자 찾기 UX 가 약하다
+### 2. orphan session 1개가 있다
+
+- `data/sessions` 안에
+  - `1c00bdd5-1f63-4c85-a876-f38bdcf78c42`
+  - 가 `eda4ba32-9159-414c-8001-5fa3cbf8d1c0`
+  - 게임을 가리키지만, 해당 local game 폴더는 없다.
+- 현재 tool 은 이 세션을 자동 skip 한다.
+
+### 3. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
-### 3. ESLint/lint 경로가 아직 비어 있다
+### 4. ESLint/lint 경로가 아직 비어 있다
 
 - `npm run build` 는 통과한다.
 - `npm run lint` 는 아직 ESLint 초기 설정이 없어 interactive setup 프롬프트에서 멈춘다.
 
 ## 다음 우선순위
 
-1. `data/games`, `data/sessions` -> Supabase import/migration 경로 추가
-2. 대상 작업자 찾기 UX 보강
-3. `profiles` 기반 협업자 모델 준비
-4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
+1. fallback owner 로 쓸 `profiles.id` 확정
+2. `npm run migrate:local-data -- --fallback-owner-id=<profile-id>` 실행
+3. import 뒤 library/session count 재검증
+4. 대상 작업자 찾기 UX 보강
+5. `profiles` 기반 협업자 모델 준비
+6. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

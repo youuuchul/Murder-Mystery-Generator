@@ -24,6 +24,7 @@ build/
 data/games/*/
 data/sessions/
 data/makers/*.json
+backups/local-data/
 !data/README.md
 
 # Cloudflare tunnel temp file

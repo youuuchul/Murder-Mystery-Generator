@@ -118,41 +118,50 @@
   - canonical source 는 `session_json` 이고
   - 목록/조인 조회용 메타 컬럼(`game_id`, `session_code`, `phase`, `locked_player_count` 등)을 함께 유지한다.
 
+### 11. Supabase runtime 검증 상태
+
+- `profiles`, `games`, `game_content`, `sessions` migration 이 모두 적용됐다.
+- direct DB check
+  - `public.sessions` 조회 성공
+  - 현재 count `0` 확인
+- `APP_PERSISTENCE_PROVIDER=supabase` 기준 smoke test
+  - `account_signup`
+  - `POST /api/games`
+  - `PUT /api/games/[gameId]` 로 플레이어 2명 추가
+  - `POST /api/sessions`
+  - `GET /api/sessions?gameId=...`
+  - `GET /api/join/[sessionCode]`
+  - `POST /api/sessions/[sessionId]/join`
+  - `GET /api/sessions/[sessionId]?token=...`
+  - `DELETE /api/sessions/[sessionId]`
+  - `DELETE /api/games/[gameId]`
+  - 전부 정상 응답 확인
+- smoke test 중 생성한 임시 Supabase user / game / session 은 검증 직후 정리했다.
+
 ## 현재 한계
 
-### 1. 세션 migration 을 아직 Supabase에 적용하지 않았다
+### 1. 기존 로컬 JSON 데이터 migration 은 아직 자동화되지 않았다
 
-- `profiles`, `games`, `game_content` 는 이미 적용됐고
-  게임 생성/조회/삭제 smoke test 도 통과했다.
-- 반면 `public.sessions` 는 아직 콘솔에 적용되지 않았다.
-- 현재 direct DB check 결과
-  - `APP_PERSISTENCE_PROVIDER=supabase`
-  - `public.sessions` 조회 시 `Could not find the table 'public.sessions' in the schema cache`
-  - 로 실패한다.
-- 즉 코드 준비는 끝났고, 다음 콘솔 작업은
-  - `supabase/migrations/20260330_000003_create_sessions.sql`
-  - 실행이다.
+- 현재 코드는 `APP_PERSISTENCE_PROVIDER=supabase` 일 때 새 게임/세션을 Supabase에 저장한다.
+- 하지만 `data/games`, `data/sessions` 에 남아 있는 기존 로컬 데이터는 자동으로 옮기지 않는다.
+- 즉 배포 전에는 import script 또는 one-off migration 경로가 추가로 필요하다.
 
 ### 2. 대상 작업자 찾기 UX 가 약하다
 
 - 이관 자체는 가능하지만, 대상 로그인 ID 또는 작업자 키를 사용자가 알고 있어야 한다.
 - 이름 기반 검색이나 작업자 디렉토리 같은 보조 UX 는 아직 없다.
 
-### 3. 세션 런타임 재검증이 한 번 더 필요하다
+### 3. ESLint/lint 경로가 아직 비어 있다
 
-- `npm run build` 는 통과했다.
-- 다만 local dev 재기동 중 Next chunk 캐시가 흔들린 적이 있어,
-  `public.sessions` 적용 후에는 `POST /api/sessions`, `GET /api/sessions?gameId=...`,
-  `/join/[sessionCode]` 를 Supabase provider 기준으로 한 번 더 확인하는 게 안전하다.
+- `npm run build` 는 통과한다.
+- `npm run lint` 는 아직 ESLint 초기 설정이 없어 interactive setup 프롬프트에서 멈춘다.
 
 ## 다음 우선순위
 
-1. `supabase/migrations/20260330_000003_create_sessions.sql` 콘솔 적용
-2. `APP_PERSISTENCE_PROVIDER=supabase` 상태로 `POST/GET /api/sessions` 재검증
-3. `/join/[sessionCode]`, `/api/sessions/[sessionId]/*` 세션 흐름 smoke test
-4. 대상 작업자 찾기 UX 보강
-5. `profiles` 기반 협업자 모델 준비
-6. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
+1. `data/games`, `data/sessions` -> Supabase import/migration 경로 추가
+2. 대상 작업자 찾기 UX 보강
+3. `profiles` 기반 협업자 모델 준비
+4. ESLint 설정 추가 후 lint 를 실제 검증 루틴에 편입
 
 ## 참고 문서
 

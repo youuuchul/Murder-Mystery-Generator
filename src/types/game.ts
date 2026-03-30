@@ -1,3 +1,11 @@
+export type GameVisibility = "draft" | "private" | "public";
+
+export interface GameAccessMeta {
+  ownerId: string;
+  visibility: GameVisibility;
+  publishedAt?: string;
+}
+
 // ─── 게임 패키지 최상위 ──────────────────────────────────────
 
 export interface GamePackage {
@@ -5,6 +13,7 @@ export interface GamePackage {
   title: string;
   createdAt: string; // ISO 8601
   updatedAt: string;
+  access: GameAccessMeta;
 
   settings: GameSettings;
   rules: GameRules;
@@ -313,13 +322,27 @@ export interface EndingConfig {
 
 // ─── 메타데이터 ──────────────────────────────────────────────
 
+export interface GamePublishChecklistItem {
+  id: "title" | "summary" | "players" | "opening" | "ending";
+  label: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface GamePublishReadiness {
+  ready: boolean;
+  checklist: GamePublishChecklistItem[];
+}
+
 export interface GameMetadata {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
+  access: GameAccessMeta;
   settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration" | "coverImageUrl" | "summary">;
   playerCount: number;
   clueCount: number;
   locationCount: number;
+  publishReadiness: GamePublishReadiness;
 }

@@ -6,8 +6,9 @@
 
 - [SPEC.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/SPEC.md) 는 초기 설계 문서 성격이 강하다.
 - 현재 구현 기준 상태는 루트 [README.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/README.md), handoff, backlog 문서를 함께 보는 편이 정확하다.
-- 메이커 접근 제어 관련 현재 구현은 `게임별 권한` 이 아니라 `메이커 전체 공통 비밀번호` 수준이다.
-- 장기 목표인 `내 게임만 편집` 정책은 [20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md) 와 [20260319_LIBRARY_MAKER_ACCESS_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md) 를 기준으로 본다.
+- 메이커 접근 제어는 이제 `메이커 전체 공통 비밀번호 + 로컬 계정/작업자 세션 + ownerId/visibility 기반 권한 분리` 까지 진행돼 있다.
+- 다만 이 계정 레이어는 정식 Auth 가 아니라 로컬 JSON 기반 임시 운영 해법이다.
+- 현재 상태와 다음 우선순위는 [20260330_LIBRARY_MAKER_ACCESS_STATUS.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260330_LIBRARY_MAKER_ACCESS_STATUS.md), 백로그/계획은 [20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md) 와 [20260319_LIBRARY_MAKER_ACCESS_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md) 를 기준으로 본다.
 
 ## 핵심 문서
 
@@ -40,3 +41,4 @@
 
 - [20260317_HANDOFF.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260317_HANDOFF.md)
 - [20260318_HANDOFF.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260318_HANDOFF.md)
+- [20260330_LIBRARY_MAKER_ACCESS_STATUS.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260330_LIBRARY_MAKER_ACCESS_STATUS.md)

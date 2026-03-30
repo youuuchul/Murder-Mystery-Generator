@@ -1,8 +1,17 @@
 import type { GameMetadata } from "@/types/game";
+import type { GameOwnershipState } from "@/lib/game-access";
 import GameCard from "./GameCard";
 
+export interface GameGridItem {
+  game: GameMetadata;
+  canEdit: boolean;
+  canPlay: boolean;
+  ownershipState: GameOwnershipState;
+  ownerDisplayName?: string;
+}
+
 interface GameGridProps {
-  games: GameMetadata[];
+  games: GameGridItem[];
 }
 
 export default function GameGrid({ games }: GameGridProps) {
@@ -21,8 +30,15 @@ export default function GameGrid({ games }: GameGridProps) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {games.map((game) => (
-        <GameCard key={game.id} game={game} />
+      {games.map((item) => (
+        <GameCard
+          key={item.game.id}
+          game={item.game}
+          canEdit={item.canEdit}
+          canPlay={item.canPlay}
+          ownershipState={item.ownershipState}
+          ownerDisplayName={item.ownerDisplayName}
+        />
       ))}
     </div>
   );

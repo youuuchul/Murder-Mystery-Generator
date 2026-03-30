@@ -1,16 +1,19 @@
 import Link from "next/link";
+import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import StepWizard from "./_components/StepWizard";
 import SettingsForm from "./_components/SettingsForm";
 
 export default function NewGamePage() {
+  requireCurrentMakerUser("/maker/new");
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))]">
       {/* 헤더 */}
       <header className="sticky top-0 z-10 border-b border-dark-700 bg-[rgba(15,9,12,0.88)] backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/library" className="text-dark-400 hover:text-dark-200 transition-colors">
-              ← 라이브러리
+            <Link href="/library/manage" className="text-dark-400 hover:text-dark-200 transition-colors">
+              ← 내 게임 관리
             </Link>
             <span className="text-dark-700">|</span>
             <span className="text-dark-200 font-medium">새 게임 만들기</span>

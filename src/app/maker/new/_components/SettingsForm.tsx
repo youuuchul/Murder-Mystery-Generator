@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import Button from "@/components/ui/Button";
+import { buildMakerAccessPath } from "@/lib/maker-user";
 import type { GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
 const SettingsSchema = z.object({
@@ -71,6 +72,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof SettingsFormData, string>>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [form, setForm] = useState<SettingsFormData>({
     title: "",
@@ -132,6 +134,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
     }
 
     setLoading(true);
+    setSubmitError(null);
     try {
       const { title, summary, playerCount, difficulty, tags, estimatedDuration } = result.data;
       const settings: GameSettings = {
@@ -148,11 +151,23 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
         body: JSON.stringify({ title, settings, rules }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "게임 생성에 실패했습니다." }));
+
+        if (res.status === 401) {
+          router.push(buildMakerAccessPath("/maker/new"));
+          return;
+        }
+
+        setSubmitError(data.error ?? "게임 생성에 실패했습니다.");
+        return;
+      }
+
       const { game } = await res.json();
       onNext ? onNext(game.id) : router.push(`/maker/${game.id}/edit`);
     } catch (err) {
       console.error("요청 오류:", err);
+      setSubmitError("게임 생성 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -164,6 +179,11 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">
+      {submitError ? (
+        <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {submitError}
+        </div>
+      ) : null}
 
       {/* ── 제목 ── */}
       <div>

@@ -21,10 +21,10 @@ export default function CreateGuidePage() {
             새 게임 만들기
           </Link>
           <Link
-            href="/library"
+            href="/library/manage"
             className="rounded-xl border border-dark-700 px-4 py-2 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
           >
-            라이브러리 보기
+            내 게임 관리
           </Link>
         </div>
       </section>
@@ -34,10 +34,10 @@ export default function CreateGuidePage() {
           <p className="text-xs uppercase tracking-[0.24em] text-mystery-300/70">01</p>
           <h3 className="mt-3 text-xl font-semibold text-dark-50">기본 제작 흐름</h3>
           <ol className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
-            <li>1. 라이브러리에서 `+ 새 게임 만들기`를 눌러 기본 정보를 만든다.</li>
+            <li>1. `내 게임 관리`에서 `+ 새 게임 만들기`를 눌러 기본 정보를 만든다.</li>
             <li>2. 편집 화면에서 Step 1~6을 순서대로 채운다.</li>
             <li>3. 각 단계의 내용은 하단 저장 바에서 저장 상태를 확인한다.</li>
-            <li>4. 이후에는 라이브러리 카드의 `편집` 버튼으로 다시 들어와 이어서 작업한다.</li>
+            <li>4. 이후에는 관리 카드의 `편집` 버튼으로 다시 들어와 이어서 작업한다.</li>
           </ol>
         </article>
 
@@ -65,9 +65,9 @@ export default function CreateGuidePage() {
           <p className="text-xs uppercase tracking-[0.24em] text-mystery-300/70">04</p>
           <h3 className="mt-3 text-xl font-semibold text-dark-50">외부 제작 테스트</h3>
           <div className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
-            <p>외부 테스트는 서버를 켠 뒤 `/library` 주소를 공유하면 됩니다.</p>
-            <p>`MAKER_ACCESS_PASSWORD`를 설정하면 라이브러리와 메이커 편집 경로에 비밀번호 게이트가 걸립니다.</p>
-            <p>이 비밀번호는 “제작자 전체 보호용”이며, 아직 게임별 권한 분리나 소유자 전용 편집은 지원하지 않습니다.</p>
+            <p>공개 플레이 테스트는 `/library` 주소를, 제작자 테스트는 `/library/manage` 주소를 공유하면 됩니다.</p>
+            <p>`MAKER_ACCESS_PASSWORD`를 설정하면 제작/관리 경로에만 비밀번호 게이트가 걸립니다.</p>
+            <p>메이커 전체 공통 비밀번호와 작업자 세션을 함께 써서 편집 권한을 구분합니다.</p>
           </div>
         </article>
       </section>
@@ -76,8 +76,8 @@ export default function CreateGuidePage() {
         <p className="text-xs uppercase tracking-[0.24em] text-amber-300/80">현재 상태</p>
         <h3 className="mt-3 text-xl font-semibold text-dark-50">공개/비공개, 게임별 비밀번호</h3>
         <p className="mt-4 text-sm leading-relaxed text-dark-300">
-          이 기능들은 아직 정식 구현 전입니다. 지금은 `공개 라이브러리 / 내 게임 / 게임별 비밀번호`가 분리되지 않았고,
-          대신 메이커 전체 경로를 잠그는 임시 비밀번호 게이트만 있습니다.
+          지금은 `공개 라이브러리`와 `내 게임 관리`가 분리돼 있고,
+          공개 상태 전환은 관리 화면에서 조정할 수 있습니다. 다만 협업자 초대나 게임별 비밀번호 같은 세부 권한 모델은 아직 구현 전입니다.
         </p>
       </section>
     </div>

@@ -65,7 +65,7 @@ export function getMakerAccessCookieOptions() {
 
 /** 현재 pathname이 임시 메이커 게이트 보호 대상인지 판별한다. */
 export function isProtectedMakerPath(pathname: string): boolean {
-  if (pathname === "/library" || pathname.startsWith("/library/")) {
+  if (pathname === "/library/manage" || pathname.startsWith("/library/manage/")) {
     return true;
   }
 

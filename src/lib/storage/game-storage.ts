@@ -52,6 +52,11 @@ export function listGames(): GameMetadata[] {
   );
 }
 
+/** 공개 라이브러리에 노출할 게임 메타데이터만 반환한다. */
+export function listPublicGames(): GameMetadata[] {
+  return listGames().filter((game) => game.access.visibility === "public");
+}
+
 /**
  * 단일 게임 패키지 로드.
  * 없으면 null 반환.

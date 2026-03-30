@@ -23,6 +23,7 @@ import type {
   TimelineEvent,
   TimelineSlot,
 } from "@/types/game";
+import { getGamePublishReadiness } from "@/lib/game-publish";
 
 const LEGACY_TAG_MAP: Record<string, string> = {
   "gothic-mansion": "고딕 저택",
@@ -42,6 +43,23 @@ function asTrimmedString(value: unknown): string {
 function asOptionalString(value: unknown): string | undefined {
   const normalized = asTrimmedString(value);
   return normalized || undefined;
+}
+
+function normalizeGameVisibility(value: unknown): GamePackage["access"]["visibility"] {
+  return value === "draft"
+    || value === "private"
+    || value === "public"
+    ? value
+    : "private";
+}
+
+/** 구형 게임 데이터에도 접근 메타 기본값을 채운다. */
+function normalizeGameAccess(access: GamePackage["access"] | undefined): GamePackage["access"] {
+  return {
+    ownerId: asTrimmedString(access?.ownerId),
+    visibility: normalizeGameVisibility(access?.visibility),
+    publishedAt: asOptionalString(access?.publishedAt),
+  };
 }
 
 function normalizeVictoryCondition(value: unknown): Player["victoryCondition"] {
@@ -521,6 +539,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
 
   return {
     ...game,
+    access: normalizeGameAccess(game.access),
     settings,
     rules,
     story,
@@ -546,6 +565,11 @@ export function buildMetadataFromGame(game: GamePackage): GameMetadata {
     title: game.title,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
+    access: {
+      ownerId: game.access.ownerId,
+      visibility: game.access.visibility,
+      publishedAt: game.access.publishedAt,
+    },
     settings: {
       playerCount: game.settings.playerCount,
       difficulty: game.settings.difficulty,
@@ -557,5 +581,6 @@ export function buildMetadataFromGame(game: GamePackage): GameMetadata {
     playerCount: game.players?.length ?? 0,
     clueCount: game.clues.length,
     locationCount: game.locations?.length ?? 0,
+    publishReadiness: getGamePublishReadiness(game),
   };
 }

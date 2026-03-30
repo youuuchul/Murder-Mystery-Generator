@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getMakerUserFromCookieStore } from "@/lib/maker-user";
 import { listGames, saveGame } from "@/lib/storage/game-storage";
 import type { GamePackage, GameRules } from "@/types/game";
 
@@ -52,6 +53,15 @@ export async function GET() {
 /** POST /api/games — 새 게임 생성 */
 export async function POST(request: NextRequest) {
   try {
+    const currentUser = getMakerUserFromCookieStore(request.cookies);
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "제작자 로그인이 필요합니다." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const parsed = CreateGameSchema.safeParse(body);
 
@@ -71,6 +81,11 @@ export async function POST(request: NextRequest) {
       title,
       createdAt: now,
       updatedAt: now,
+      access: {
+        ownerId: currentUser.id,
+        visibility: "private",
+        publishedAt: undefined,
+      },
       settings,
       rules: incomingRules ?? buildDefaultRules(settings.playerCount),
       story: {

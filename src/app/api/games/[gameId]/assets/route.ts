@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getGame } from "@/lib/storage/game-storage";
+import { resolveEditableGameForUser } from "@/lib/game-access";
+import { getMakerUserFromCookieStore } from "@/lib/maker-user";
+import { getGame, saveGame } from "@/lib/storage/game-storage";
 
 type Params = { params: Promise<{ gameId: string }> };
 type AssetScope = "covers" | "locations" | "story" | "players" | "clues" | "rounds";
@@ -53,10 +55,31 @@ function extensionFromMimeType(mimeType: string): string {
 /** POST /api/games/[gameId]/assets — 게임 이미지 업로드 */
 export async function POST(request: NextRequest, { params }: Params) {
   const { gameId } = await params;
+  const currentUser = getMakerUserFromCookieStore(request.cookies);
+
+  if (!currentUser) {
+    return NextResponse.json(
+      { error: "제작자 로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
   const game = getGame(gameId);
 
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  const editableGame = resolveEditableGameForUser(game, currentUser.id);
+  if (!editableGame) {
+    return NextResponse.json(
+      { error: "이 게임에는 현재 작업자가 이미지를 업로드할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
+  if (editableGame.claimed) {
+    saveGame(editableGame.game);
   }
 
   try {

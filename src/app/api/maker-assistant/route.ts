@@ -4,6 +4,7 @@ import type {
   ResponseCreateParamsNonStreaming,
 } from "openai/resources/responses/responses";
 import { ZodError } from "zod";
+import { getMakerUserFromCookieStore } from "@/lib/maker-user";
 import {
   getMakerAssistantModel,
   getMakerAssistantReasoningEffort,
@@ -40,6 +41,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const currentUser = getMakerUserFromCookieStore(request.cookies);
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "제작자 로그인이 필요합니다." },
+        { status: 401 }
+      );
+    }
+
     const payload = makerAssistantRequestSchema.parse(await request.json());
 
     if (payload.task === "chat" && !payload.message?.trim()) {

@@ -70,6 +70,10 @@ function sanitizeEnding(game: GamePackage, viewerPlayerId?: string): GamePackage
 function sanitizeGame(game: GamePackage, viewerPlayerId?: string): GamePackage {
   return {
     ...game,
+    access: {
+      ...game.access,
+      ownerId: "",
+    },
     story: {
       ...game.story,
       synopsis: "",

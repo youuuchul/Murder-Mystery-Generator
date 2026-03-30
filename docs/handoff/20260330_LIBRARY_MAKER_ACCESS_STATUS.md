@@ -256,4 +256,5 @@
 
 - [접근 분리 백로그](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md)
 - [접근 분리 구현 계획](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md)
+- [Vercel 배포 handoff](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260330_VERCEL_DEPLOY_HANDOFF.md)
 - [작업 로그](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/ai_history/20260330_0924_MakerUserSessionAndAccessMeta_Report.md)

@@ -23,6 +23,7 @@
 - [20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_LIBRARY_MAKER_ACCESS_BACKLOG.md)
 - [20260319_HOME_ENTRY_GUIDE_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_HOME_ENTRY_GUIDE_BACKLOG.md)
 - [20260319_CREATOR_TEST_NOTES_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260319_CREATOR_TEST_NOTES_BACKLOG.md)
+- [20260406_POST_DEPLOY_PRODUCT_BACKLOG.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/backlog/20260406_POST_DEPLOY_PRODUCT_BACKLOG.md)
 
 ## Plans
 
@@ -31,6 +32,7 @@
 - [20260319_LIBRARY_MAKER_ACCESS_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LIBRARY_MAKER_ACCESS_PLAN.md)
 - [20260319_LOCAL_CREATOR_USER_TEST_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_LOCAL_CREATOR_USER_TEST_PLAN.md)
 - [20260319_SUPABASE_SCHEMA_DRAFT.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_SUPABASE_SCHEMA_DRAFT.md)
+- [20260406_POST_DEPLOY_PRODUCT_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260406_POST_DEPLOY_PRODUCT_PLAN.md)
 
 ## Research
 

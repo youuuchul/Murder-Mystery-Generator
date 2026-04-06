@@ -126,7 +126,6 @@ async function revealVotes(
       latestSession.sharedState.voteReveal = reveal;
       latestSession.sharedState.phase = "ending";
       latestSession.sharedState.endingStage = "branch";
-      latestSession.endedAt = new Date().toISOString();
 
       latestSession.sharedState.eventLog.push({
         id: crypto.randomUUID(),

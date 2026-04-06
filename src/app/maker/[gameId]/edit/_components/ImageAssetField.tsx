@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type ChangeEvent } from "react";
-import { optimizeImageForUpload } from "./image-upload-processing";
+import { optimizeImageForUpload, type OptimizedImageUploadReport } from "./image-upload-processing";
 import { getImageAssetProfileConfig, type ImageAssetProfile } from "./image-upload-profiles";
 
 interface ImageAssetFieldProps {
@@ -18,6 +18,35 @@ interface ImageAssetFieldProps {
 }
 
 const FILE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+
+/** 바이트 단위를 사람이 읽기 쉬운 KB/MB 표기로 바꾼다. */
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  }
+
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+
+  return `${bytes}B`;
+}
+
+/**
+ * 업로드 직전 최적화 결과를 짧은 한 줄 설명으로 바꾼다.
+ * 사용자가 실제로 얼마나 줄었는지 확인할 수 있게 한다.
+ */
+function buildOptimizationSummary(report: OptimizedImageUploadReport): string {
+  const originalSize = formatFileSize(report.originalBytes);
+  const outputSize = formatFileSize(report.outputBytes);
+  const outputFormatLabel = report.outputMimeType === "image/webp" ? " WEBP" : "";
+
+  if (!report.transformed) {
+    return `업로드 준비 완료: ${report.outputWidth}×${report.outputHeight} · ${outputSize}${outputFormatLabel}`;
+  }
+
+  return `업로드 전 최적화: ${report.originalWidth}×${report.originalHeight} · ${originalSize} → ${report.outputWidth}×${report.outputHeight} · ${outputSize}${outputFormatLabel}`;
+}
 
 /**
  * 업로드 기반 이미지 필드.
@@ -36,6 +65,7 @@ export default function ImageAssetField({
   emptyStateLabel = "아직 연결된 이미지가 없습니다.",
 }: ImageAssetFieldProps) {
   const [showPreview, setShowPreview] = useState(false);
+  const [optimizationSummary, setOptimizationSummary] = useState<string | null>(null);
   const fileInputId = useId();
   const hasValue = Boolean(value?.trim());
   const profileConfig = getImageAssetProfileConfig(profile);
@@ -54,8 +84,17 @@ export default function ImageAssetField({
       return;
     }
 
-    const optimizedFile = await optimizeImageForUpload(file, profile);
-    await onUpload(optimizedFile);
+    try {
+      const optimized = await optimizeImageForUpload(file, profile);
+      const summary = buildOptimizationSummary(optimized.report);
+      setOptimizationSummary(
+        optimized.report.note ? `${summary} · ${optimized.report.note}` : summary
+      );
+      await onUpload(optimized.file);
+    } catch (error) {
+      console.error("이미지 준비 실패:", error);
+      alert(error instanceof Error ? error.message : "이미지 준비 중 오류가 발생했습니다.");
+    }
   }
 
   return (
@@ -82,6 +121,15 @@ export default function ImageAssetField({
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
+          <span className="inline-flex items-center justify-center rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] leading-none text-dark-300">
+            {profileConfig.recommendedRatioLabel}
+          </span>
+          <span className="inline-flex items-center justify-center rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] leading-none text-dark-300">
+            {profileConfig.recommendedDimensionsLabel}
+          </span>
+          <span className="inline-flex items-center justify-center rounded-full border border-dark-700 bg-dark-950/70 px-2.5 py-1 text-[11px] leading-none text-dark-300">
+            {profileConfig.outputHintLabel}
+          </span>
           <span
             className={[
               "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] leading-none",
@@ -102,6 +150,16 @@ export default function ImageAssetField({
             </button>
           )}
         </div>
+
+        {profileConfig.cropHint ? (
+          <p className="mt-3 text-xs leading-relaxed text-dark-500">{profileConfig.cropHint}</p>
+        ) : null}
+
+        {optimizationSummary ? (
+          <div className="mt-3 rounded-lg border border-sage-900/60 bg-sage-950/20 px-3 py-2 text-xs leading-relaxed text-sage-200">
+            {optimizationSummary}
+          </div>
+        ) : null}
 
         {hasValue && (
           <button

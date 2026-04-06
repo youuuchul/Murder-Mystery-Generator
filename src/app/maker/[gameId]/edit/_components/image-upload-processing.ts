@@ -2,18 +2,64 @@
 
 import { getImageAssetProfileConfig, type ImageAssetProfile } from "./image-upload-profiles";
 
+export interface OptimizedImageUploadReport {
+  originalWidth: number;
+  originalHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  originalBytes: number;
+  outputBytes: number;
+  outputMimeType: string;
+  transformed: boolean;
+  note?: string;
+}
+
+export interface OptimizedImageUploadResult {
+  file: File;
+  report: OptimizedImageUploadReport;
+}
+
 /**
  * 업로드 직전 이미지를 용도별 최대 크기에 맞춰 축소/압축한다.
  * 현재는 원본 보존보다 편집 UX와 디스크 사용량 절감을 우선해 브라우저에서 1차 최적화를 수행한다.
  */
-export async function optimizeImageForUpload(file: File, profile: ImageAssetProfile): Promise<File> {
+export async function optimizeImageForUpload(
+  file: File,
+  profile: ImageAssetProfile
+): Promise<OptimizedImageUploadResult> {
   if (!file.type.startsWith("image/")) {
-    return file;
+    return {
+      file,
+      report: {
+        originalWidth: 0,
+        originalHeight: 0,
+        outputWidth: 0,
+        outputHeight: 0,
+        originalBytes: file.size,
+        outputBytes: file.size,
+        outputMimeType: file.type || "application/octet-stream",
+        transformed: false,
+      },
+    };
   }
 
   // 애니메이션 GIF는 캔버스로 다시 인코딩하면 깨지므로 그대로 유지한다.
   if (file.type === "image/gif") {
-    return file;
+    const image = await loadImageElement(file);
+    return {
+      file,
+      report: {
+        originalWidth: image.naturalWidth,
+        originalHeight: image.naturalHeight,
+        outputWidth: image.naturalWidth,
+        outputHeight: image.naturalHeight,
+        originalBytes: file.size,
+        outputBytes: file.size,
+        outputMimeType: file.type,
+        transformed: false,
+        note: "애니메이션 GIF는 원본을 유지합니다.",
+      },
+    };
   }
 
   const config = getImageAssetProfileConfig(profile);
@@ -27,7 +73,19 @@ export async function optimizeImageForUpload(file: File, profile: ImageAssetProf
     && file.size <= config.targetBytes
     && (file.type === "image/webp" || file.type === "image/jpeg")
   ) {
-    return file;
+    return {
+      file,
+      report: {
+        originalWidth: image.naturalWidth,
+        originalHeight: image.naturalHeight,
+        outputWidth: image.naturalWidth,
+        outputHeight: image.naturalHeight,
+        originalBytes: file.size,
+        outputBytes: file.size,
+        outputMimeType: file.type,
+        transformed: false,
+      },
+    };
   }
 
   const canvas = document.createElement("canvas");
@@ -36,9 +94,23 @@ export async function optimizeImageForUpload(file: File, profile: ImageAssetProf
 
   const context = canvas.getContext("2d");
   if (!context) {
-    return file;
+    return {
+      file,
+      report: {
+        originalWidth: image.naturalWidth,
+        originalHeight: image.naturalHeight,
+        outputWidth: image.naturalWidth,
+        outputHeight: image.naturalHeight,
+        originalBytes: file.size,
+        outputBytes: file.size,
+        outputMimeType: file.type,
+        transformed: false,
+      },
+    };
   }
 
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
   const qualitySteps = buildQualitySteps(config.initialQuality, config.minQuality);
@@ -50,15 +122,45 @@ export async function optimizeImageForUpload(file: File, profile: ImageAssetProf
     }
 
     if (blob.size <= config.targetBytes || quality === qualitySteps[qualitySteps.length - 1]) {
-      return new File(
+      const optimizedFile = new File(
         [blob],
         replaceFileExtension(file.name, "webp"),
         { type: "image/webp", lastModified: Date.now() }
       );
+
+      return {
+        file: optimizedFile,
+        report: {
+          originalWidth: image.naturalWidth,
+          originalHeight: image.naturalHeight,
+          outputWidth: targetWidth,
+          outputHeight: targetHeight,
+          originalBytes: file.size,
+          outputBytes: blob.size,
+          outputMimeType: "image/webp",
+          transformed:
+            blob.size !== file.size
+            || targetWidth !== image.naturalWidth
+            || targetHeight !== image.naturalHeight
+            || file.type !== "image/webp",
+        },
+      };
     }
   }
 
-  return file;
+  return {
+    file,
+    report: {
+      originalWidth: image.naturalWidth,
+      originalHeight: image.naturalHeight,
+      outputWidth: image.naturalWidth,
+      outputHeight: image.naturalHeight,
+      originalBytes: file.size,
+      outputBytes: file.size,
+      outputMimeType: file.type,
+      transformed: false,
+    },
+  };
 }
 
 /** 파일을 브라우저 Image 객체로 읽어 natural width/height를 확인한다. */
@@ -113,4 +215,3 @@ function replaceFileExtension(filename: string, extension: string): string {
   const stem = dotIndex >= 0 ? filename.slice(0, dotIndex) : filename;
   return `${stem}.${extension}`;
 }
-

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface LibraryCoverProps {
   title: string;
   imageUrl?: string;
@@ -14,9 +16,11 @@ export default function LibraryCover({ title, imageUrl }: LibraryCoverProps) {
     <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(145,84,108,0.28),transparent_34%),linear-gradient(160deg,rgba(16,16,20,1),rgba(10,10,14,1))]">
       {imageUrl ? (
         <>
-          <img
+          <Image
             src={imageUrl}
             alt={title}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             className="absolute inset-0 h-full w-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />

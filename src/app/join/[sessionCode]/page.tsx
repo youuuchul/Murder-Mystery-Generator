@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import type { GamePackage } from "@/types/game";
 import type { GameSession } from "@/types/session";
@@ -163,10 +164,12 @@ export default function JoinPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       {player.cardImage ? (
-                        <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
-                          <img
+                        <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
+                          <Image
                             src={player.cardImage}
                             alt={player.name}
+                            fill
+                            sizes="48px"
                             className="h-full w-full object-cover object-center"
                           />
                         </div>

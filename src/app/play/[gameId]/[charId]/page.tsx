@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import {
@@ -123,7 +124,7 @@ function ImageFrame({
   return (
     <div
       className={[
-        "overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40 shrink-0",
+        "relative overflow-hidden rounded-xl border border-dark-700 bg-dark-950/40 shrink-0",
         compact
           ? "w-16 h-16"
           : variant === "portrait"
@@ -133,9 +134,19 @@ function ImageFrame({
               : "w-full aspect-[4/3]",
       ].join(" ")}
     >
-      <img
+      <Image
         src={src}
         alt={alt}
+        fill
+        sizes={
+          compact
+            ? "64px"
+            : variant === "portrait"
+              ? "(max-width: 768px) 100vw, 420px"
+              : variant === "document"
+                ? "(max-width: 768px) 100vw, 560px"
+                : "(max-width: 768px) 100vw, 640px"
+        }
         className={[
           "w-full h-full",
           variant === "document" ? "object-contain" : "object-cover object-center",

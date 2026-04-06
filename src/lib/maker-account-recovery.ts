@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { Resend } from "resend";
 import {
   isValidMakerAccountPassword,
   isValidMakerRecoveryEmail,
@@ -162,6 +163,11 @@ function resolveMakerRecoveryEmailConfig(
     fromEmail,
     baseUrl,
   };
+}
+
+/** 현재 환경 설정으로 Resend SDK 클라이언트를 만든다. */
+function createMakerRecoveryEmailClient(config: MakerRecoveryEmailConfig): Resend {
+  return new Resend(config.apiKey);
 }
 
 /** 비밀번호 재설정 메일을 보낼 수 있는 최소 설정이 갖춰졌는지 검사한다. */
@@ -378,6 +384,7 @@ async function sendMakerPasswordResetEmail(options: {
   const safeDisplayName = escapeMakerRecoveryHtml(options.displayName);
   const safeLoginId = escapeMakerRecoveryHtml(options.loginId);
   const safeResetUrl = escapeMakerRecoveryHtml(options.resetUrl);
+  const resend = createMakerRecoveryEmailClient(config);
 
   const html = [
     `<div style="background:#0b0b0f;color:#f5efe8;padding:32px;font-family:Inter,Arial,sans-serif;">`,
@@ -398,25 +405,16 @@ async function sendMakerPasswordResetEmail(options: {
     options.resetUrl,
   ].join("\n\n");
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-      "User-Agent": "murder-mystery-generator/1.0",
-    },
-    body: JSON.stringify({
-      from: config.fromEmail,
-      to: [options.recoveryEmail],
-      subject: "비밀번호 재설정 안내",
-      html,
-      text,
-    }),
+  const { error } = await resend.emails.send({
+    from: config.fromEmail,
+    to: [options.recoveryEmail],
+    subject: "비밀번호 재설정 안내",
+    html,
+    text,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to send password reset email: ${response.status} ${errorText}`);
+  if (error) {
+    throw new Error(`Failed to send password reset email: ${error.message}`);
   }
 }
 

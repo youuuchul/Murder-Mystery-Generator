@@ -19,6 +19,67 @@ import {
 } from "@/lib/supabase/maker-auth";
 import type { AppUser, MakerAccountIdentity, MakerUserRecord } from "@/types/auth";
 
+/** 아직 migration 이 반영되지 않은 환경에서 recovery_email 컬럼 누락 오류를 감지한다. */
+function isMissingSupabaseRecoveryEmailColumn(errorMessage: string): boolean {
+  return errorMessage.includes("recovery_email")
+    && (
+      errorMessage.includes("schema cache")
+      || errorMessage.includes("column")
+    );
+}
+
+/** profiles upsert/update 시 recovery_email 컬럼이 없으면 기본 필드만 다시 저장한다. */
+async function writeSupabaseMakerProfile(
+  config: MakerAuthProviderConfig,
+  values: {
+    id: string;
+    display_name: string;
+    login_id: string;
+    role?: string | null;
+    updated_at: string;
+    recovery_email?: string | null;
+  }
+): Promise<SupabaseMakerProfileRow> {
+  const adminClient = createSupabaseMakerAuthAdminClient(config);
+  const primaryPayload = {
+    ...values,
+    recovery_email: values.recovery_email ?? null,
+  };
+  const fallbackPayload = {
+    id: values.id,
+    display_name: values.display_name,
+    login_id: values.login_id,
+    role: values.role ?? "creator",
+    updated_at: values.updated_at,
+  };
+
+  const primaryAttempt = await adminClient
+    .from("profiles")
+    .upsert(primaryPayload)
+    .select(getSupabaseMakerProfileColumns())
+    .single();
+
+  if (!primaryAttempt.error) {
+    return primaryAttempt.data as unknown as SupabaseMakerProfileRow;
+  }
+
+  if (!isMissingSupabaseRecoveryEmailColumn(primaryAttempt.error.message)) {
+    throw new Error(`Failed to upsert Supabase maker profile: ${primaryAttempt.error.message}`);
+  }
+
+  const fallbackAttempt = await adminClient
+    .from("profiles")
+    .upsert(fallbackPayload)
+    .select(getSupabaseMakerProfileColumns())
+    .single();
+
+  if (fallbackAttempt.error) {
+    throw new Error(`Failed to upsert Supabase maker profile: ${fallbackAttempt.error.message}`);
+  }
+
+  return fallbackAttempt.data as unknown as SupabaseMakerProfileRow;
+}
+
 function toMakerUserRecord(profile: SupabaseMakerProfileRow): MakerUserRecord {
   return {
     id: profile.id,
@@ -33,7 +94,7 @@ function toMakerAccountIdentity(profile: SupabaseMakerProfileRow): MakerAccountI
     id: profile.id,
     displayName: profile.display_name,
     loginId: profile.login_id,
-    recoveryEmail: profile.recovery_email,
+    recoveryEmail: profile.recovery_email ?? null,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -215,28 +276,20 @@ export function createSupabaseMakerAuthGateway(
         throw new Error(`Failed to create Supabase maker account: ${error?.message ?? "unknown error"}`);
       }
 
-      const { data: profileData, error: profileError } = await adminClient
-        .from("profiles")
-        .upsert({
-          id: data.user.id,
-          display_name: normalizedDisplayName,
-          login_id: normalizedLoginId,
-          recovery_email: normalizedRecoveryEmail || null,
-          role: "creator",
-          updated_at: now,
-        })
-        .select(getSupabaseMakerProfileColumns())
-        .single();
-
-      if (profileError) {
-        throw new Error(`Failed to upsert Supabase maker profile: ${profileError.message}`);
-      }
+      const profileData = await writeSupabaseMakerProfile(config, {
+        id: data.user.id,
+        display_name: normalizedDisplayName,
+        login_id: normalizedLoginId,
+        recovery_email: normalizedRecoveryEmail || null,
+        role: "creator",
+        updated_at: now,
+      });
 
       if (migrateOwnerIdFrom && migrateOwnerIdFrom.trim() !== data.user.id) {
         await migrateLocalGameOwnership(migrateOwnerIdFrom, data.user.id, now);
       }
 
-      return toMakerAccountIdentity(profileData as unknown as SupabaseMakerProfileRow);
+      return toMakerAccountIdentity(profileData);
     },
 
     async updateAccountProfile({
@@ -249,22 +302,30 @@ export function createSupabaseMakerAuthGateway(
         return null;
       }
 
-      const adminClient = createSupabaseMakerAuthAdminClient(config);
-      const { data, error } = await adminClient
-        .from("profiles")
-        .update({
-          recovery_email: normalizeMakerRecoveryEmail(recoveryEmail ?? "") || null,
-          updated_at: now,
-        })
-        .eq("id", normalizedUserId)
-        .select(getSupabaseMakerProfileColumns())
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(`Failed to update Supabase maker profile: ${error.message}`);
+      const existingProfile = await getSupabaseProfileById(config, normalizedUserId);
+      if (!existingProfile) {
+        return null;
       }
 
-      return data ? toMakerAccountIdentity(data as unknown as SupabaseMakerProfileRow) : null;
+      try {
+        const profile = await writeSupabaseMakerProfile(config, {
+          id: existingProfile.id,
+          display_name: existingProfile.display_name,
+          login_id: existingProfile.login_id,
+          recovery_email: normalizeMakerRecoveryEmail(recoveryEmail ?? "") || null,
+          role: existingProfile.role ?? "creator",
+          updated_at: now,
+        });
+        return toMakerAccountIdentity(profile);
+      } catch (error) {
+        if (
+          error instanceof Error
+          && isMissingSupabaseRecoveryEmailColumn(error.message)
+        ) {
+          return toMakerAccountIdentity(existingProfile);
+        }
+        throw error;
+      }
     },
 
     async updateAccountPassword(userId, password) {

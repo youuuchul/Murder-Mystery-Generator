@@ -29,6 +29,7 @@ backups/local-data/
 
 # Cloudflare tunnel temp file
 .tunnel-url
+supabase/.temp/
 
 # Debug
 npm-debug.log*

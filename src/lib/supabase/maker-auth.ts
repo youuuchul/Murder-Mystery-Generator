@@ -13,16 +13,7 @@ export interface SupabaseMakerProfileRow {
   updated_at: string;
 }
 
-const SUPABASE_MAKER_PROFILE_COLUMNS = [
-  "id",
-  "display_name",
-  "login_id",
-  "recovery_email",
-  "role",
-  "avatar_url",
-  "created_at",
-  "updated_at",
-].join(",");
+const SUPABASE_MAKER_PROFILE_COLUMNS = "*";
 
 /**
  * 로그인 ID 를 Supabase email/password Auth 에 태우기 위한 내부 전용 이메일로 바꾼다.

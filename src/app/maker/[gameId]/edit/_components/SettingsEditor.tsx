@@ -156,7 +156,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
         <ImageAssetField
           title="표지 이미지"
-          description="라이브러리 카드 썸네일에 표시됩니다."
+          description="라이브러리 카드 썸네일에 표시됩니다. 업로드 후 아래에서 보이는 위치를 조정할 수 있습니다."
           value={settings.coverImageUrl}
           alt={game.title || "시나리오 표지 미리보기"}
           profile="cover"
@@ -166,6 +166,79 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           uploadLabel="표지 업로드"
           emptyStateLabel="아직 연결된 표지 이미지가 없습니다."
         />
+
+        {settings.coverImageUrl ? (
+          <div className="rounded-xl border border-dark-800 bg-dark-950/40 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-dark-200">표지 보이는 위치</p>
+                <p className="mt-1 text-xs text-dark-500">라이브러리 카드에서 잘리는 위치를 미세 조정합니다.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateSettings("coverImagePosition", { x: 50, y: 50 })}
+                className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+              >
+                가운데로 초기화
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
+                    <span>좌우 위치</span>
+                    <span>{settings.coverImagePosition?.x ?? 50}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={settings.coverImagePosition?.x ?? 50}
+                    onChange={(event) => updateSettings("coverImagePosition", {
+                      x: Number(event.target.value),
+                      y: settings.coverImagePosition?.y ?? 50,
+                    })}
+                    className="w-full accent-mystery-500"
+                  />
+                </label>
+
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
+                    <span>상하 위치</span>
+                    <span>{settings.coverImagePosition?.y ?? 50}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={settings.coverImagePosition?.y ?? 50}
+                    onChange={(event) => updateSettings("coverImagePosition", {
+                      x: settings.coverImagePosition?.x ?? 50,
+                      y: Number(event.target.value),
+                    })}
+                    className="w-full accent-mystery-500"
+                  />
+                </label>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/60">
+                <div className="relative aspect-[16/10]">
+                  <img
+                    src={settings.coverImageUrl}
+                    alt={game.title || "표지 위치 미리보기"}
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${settings.coverImagePosition?.x ?? 50}% ${settings.coverImagePosition?.y ?? 50}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div data-maker-anchor="step-1-tags">

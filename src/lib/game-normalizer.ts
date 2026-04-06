@@ -3,6 +3,7 @@ import type {
   Clue,
   ClueCard,
   ClueCondition,
+  CoverImagePosition,
   EndingBranch,
   EndingConfig,
   GameMetadata,
@@ -444,6 +445,26 @@ function defaultPhases(playerCount: number): PhaseConfig[] {
   ];
 }
 
+function clampCoverAxis(value: unknown): number {
+  if (typeof value !== "number" || Number.isFinite(value) === false) {
+    return 50;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function normalizeCoverImagePosition(value: unknown): CoverImagePosition | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const source = value as Partial<CoverImagePosition>;
+  return {
+    x: clampCoverAxis(source.x),
+    y: clampCoverAxis(source.y),
+  };
+}
+
 /** 기존/신규 게임 데이터 모두를 현재 편집기 구조에 맞춰 정규화한다. */
 export function normalizeGame(game: GamePackage): GamePackage {
   const settings: GameSettings = {
@@ -453,6 +474,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     tags: normalizeTags(game.settings ?? {}),
     summary: asOptionalString(game.settings?.summary),
     coverImageUrl: asOptionalString(game.settings?.coverImageUrl),
+    coverImagePosition: normalizeCoverImagePosition(game.settings?.coverImagePosition),
   };
 
   const fallbackPhases = defaultPhases(settings.playerCount);
@@ -577,6 +599,7 @@ export function buildMetadataFromGame(game: GamePackage): GameMetadata {
       estimatedDuration: game.settings.estimatedDuration,
       summary: game.settings.summary,
       coverImageUrl: game.settings.coverImageUrl,
+      coverImagePosition: game.settings.coverImagePosition,
     },
     playerCount: game.players?.length ?? 0,
     clueCount: game.clues.length,

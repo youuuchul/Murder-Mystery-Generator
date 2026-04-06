@@ -26,7 +26,11 @@ export default function PublicGameCard({ game }: PublicGameCardProps) {
 
   return (
     <div className="group overflow-hidden rounded-[24px] border border-dark-800 bg-[linear-gradient(180deg,rgba(18,18,22,0.96),rgba(12,12,16,0.98))] transition-all duration-200 hover:-translate-y-0.5 hover:border-mystery-700 hover:shadow-[0_18px_48px_rgba(52,24,44,0.32)]">
-      <LibraryCover title={game.title} imageUrl={game.settings.coverImageUrl} />
+      <LibraryCover
+        title={game.title}
+        imageUrl={game.settings.coverImageUrl}
+        imagePosition={game.settings.coverImagePosition}
+      />
 
       <div className="space-y-4 p-5">
         <div className="space-y-3">

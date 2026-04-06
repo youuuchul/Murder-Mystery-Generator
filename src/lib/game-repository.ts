@@ -141,6 +141,7 @@ function buildFallbackMetadataFromRow(row: SupabaseGameRow): GameMetadata {
       estimatedDuration: row.estimated_duration,
       summary: row.summary ?? undefined,
       coverImageUrl: undefined,
+      coverImagePosition: undefined,
     },
     playerCount: row.player_count,
     clueCount: row.clue_count,

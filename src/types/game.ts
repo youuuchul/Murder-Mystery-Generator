@@ -34,11 +34,17 @@ export interface GameSettings {
   tags: string[];
   summary?: string; // 라이브러리 카드에 노출할 소개글
   coverImageUrl?: string;
+  coverImagePosition?: CoverImagePosition;
   /** legacy field — 기존 데이터 호환용 */
   theme?: string;
   /** legacy field — 기존 데이터 호환용 */
   tone?: "serious" | "comedy" | "horror";
   estimatedDuration: number; // 분 단위
+}
+
+export interface CoverImagePosition {
+  x: number;
+  y: number;
 }
 
 export interface PhaseConfig {
@@ -340,7 +346,7 @@ export interface GameMetadata {
   createdAt: string;
   updatedAt: string;
   access: GameAccessMeta;
-  settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration" | "coverImageUrl" | "summary">;
+  settings: Pick<GameSettings, "playerCount" | "difficulty" | "tags" | "estimatedDuration" | "coverImageUrl" | "coverImagePosition" | "summary">;
   playerCount: number;
   clueCount: number;
   locationCount: number;

@@ -36,6 +36,10 @@ const CreateGameSchema = z.object({
     estimatedDuration: z.number().int().min(30).max(300),
     summary: z.string().max(220).optional(),
     coverImageUrl: z.string().url().optional(),
+    coverImagePosition: z.object({
+      x: z.number().min(0).max(100),
+      y: z.number().min(0).max(100),
+    }).optional(),
   }),
 });
 

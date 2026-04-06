@@ -639,8 +639,8 @@ function VoteScreen({
     );
   }
 
-  // 자신 제외 투표 가능 (자기 자신에게는 투표 못 함)
-  const votablePlayers = game.players.filter((p) => p.id !== myPlayerId);
+  // 현재는 자기 자신을 포함해 모든 참가 캐릭터에게 투표할 수 있다.
+  const votablePlayers = game.players;
 
   return (
     <div className="space-y-4">

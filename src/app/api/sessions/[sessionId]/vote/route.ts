@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGame } from "@/lib/game-repository";
-import { getSession, isSessionConflictError, updateSession } from "@/lib/session-repository";
+import { mutateSessionWithRetry } from "@/lib/session-mutation";
+import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { VoteTally, VoteReveal } from "@/types/session";
 
@@ -79,68 +80,74 @@ async function revealVotes(
     return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
   }
 
-  const game = await getGame(session.gameId);
-  const culpritPlayerId = game?.story.culpritPlayerId ?? "";
-  const tally = buildVoteTally(session);
-  const tiedCandidates = resolveTiedCandidates(tally);
+  const { session: persistedSession, result } = await mutateSessionWithRetry(
+    sessionId,
+    async (latestSession) => {
+      const game = await getGame(latestSession.gameId);
+      const culpritPlayerId = game?.story.culpritPlayerId ?? "";
+      const tally = buildVoteTally(latestSession as LoadedSession);
+      const tiedCandidates = resolveTiedCandidates(tally);
 
-  if (!forcedArrestedPlayerId && tiedCandidates.length > 1) {
-    session.pendingArrestOptions = tiedCandidates;
-    session.sharedState.eventLog.push({
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      message: "최다 득표 동률입니다. GM이 최종 검거 대상을 선택해야 합니다.",
-      type: "system",
-    });
+      if (!forcedArrestedPlayerId && tiedCandidates.length > 1) {
+        latestSession.pendingArrestOptions = tiedCandidates;
+        latestSession.sharedState.eventLog.push({
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          message: "최다 득표 동률입니다. GM이 최종 검거 대상을 선택해야 합니다.",
+          type: "system",
+        });
 
-    const persistedSession = await updateSession(session) as LoadedSession;
-    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-    return {
-      requiresTieBreak: true,
-      pendingArrestOptions: tiedCandidates,
-      session: persistedSession,
-    };
-  }
+        return {
+          requiresTieBreak: true,
+          pendingArrestOptions: tiedCandidates,
+        };
+      }
 
-  const totalVotes = Object.keys(session.votes).length;
-  const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
-  const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
-  const arrestedPlayerId = forcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
-  const resultType = arrestedPlayerId === culpritPlayerId
-    ? "culprit-captured"
-    : "wrong-arrest";
-  const resolvedBranchId = game && arrestedPlayerId
-    ? resolveEndingBranchId(game, arrestedPlayerId, resultType)
-    : undefined;
+      const totalVotes = Object.keys(latestSession.votes).length;
+      const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
+      const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
+      const arrestedPlayerId = forcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
+      const resultType = arrestedPlayerId === culpritPlayerId
+        ? "culprit-captured"
+        : "wrong-arrest";
+      const resolvedBranchId = game && arrestedPlayerId
+        ? resolveEndingBranchId(game, arrestedPlayerId, resultType)
+        : undefined;
 
-  const reveal: VoteReveal = {
-    tally,
-    culpritPlayerId,
-    arrestedPlayerId,
-    resultType,
-    resolvedBranchId,
-    majorityCorrect,
-  };
-  session.pendingArrestOptions = undefined;
-  session.sharedState.voteReveal = reveal;
-  session.sharedState.phase = "ending";
-  session.sharedState.endingStage = "branch";
-  session.endedAt = new Date().toISOString();
+      const reveal: VoteReveal = {
+        tally,
+        culpritPlayerId,
+        arrestedPlayerId,
+        resultType,
+        resolvedBranchId,
+        majorityCorrect,
+      };
+      latestSession.pendingArrestOptions = undefined;
+      latestSession.sharedState.voteReveal = reveal;
+      latestSession.sharedState.phase = "ending";
+      latestSession.sharedState.endingStage = "branch";
+      latestSession.endedAt = new Date().toISOString();
 
-  session.sharedState.eventLog.push({
-    id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
-    message: resultType === "culprit-captured"
-      ? "범인이 검거됐습니다."
-      : "검거된 인물은 있었지만 진범은 아니었습니다.",
-    type: "vote_revealed",
-  });
+      latestSession.sharedState.eventLog.push({
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: resultType === "culprit-captured"
+          ? "범인이 검거됐습니다."
+          : "검거된 인물은 있었지만 진범은 아니었습니다.",
+        type: "vote_revealed",
+      });
 
-  const persistedSession = await updateSession(session) as LoadedSession;
+      return {
+        requiresTieBreak: false,
+        pendingArrestOptions: [] as string[],
+      };
+    }
+  );
+
   broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
   return {
-    requiresTieBreak: false,
-    pendingArrestOptions: [] as string[],
+    requiresTieBreak: result.requiresTieBreak,
+    pendingArrestOptions: result.pendingArrestOptions,
     session: persistedSession,
   };
 }
@@ -157,75 +164,77 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "token, targetPlayerId 필수" }, { status: 400 });
   }
 
-  const session = await getSession(sessionId);
-  if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
-
-  if (session.sharedState.phase !== "vote") {
-    return NextResponse.json({ error: "투표 페이즈가 아닙니다" }, { status: 400 });
-  }
-
-  if ((session.pendingArrestOptions?.length ?? 0) > 0) {
-    return NextResponse.json({ error: "GM이 최종 검거 대상을 선택하는 중입니다." }, { status: 400 });
-  }
-
-  const voter = session.playerStates.find((p) => p.token === token);
-  if (!voter) return NextResponse.json({ error: "Invalid token" }, { status: 403 });
-
-  // 구형 세션 호환 (votes/voteCount 필드 없는 경우)
-  session.votes = session.votes ?? {};
-  session.sharedState.voteCount = session.sharedState.voteCount ?? 0;
-
-  // 이미 투표했으면 덮어쓰기 (마음 바꾸기 허용)
-  const alreadyVoted = token in session.votes;
-  session.votes[token] = targetPlayerId;
-
-  if (!alreadyVoted) {
-    session.sharedState.voteCount++;
-    session.sharedState.eventLog.push({
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      message: `${voter.playerName}님이 투표했습니다.`,
-      type: "vote_submitted",
-    });
-  }
-
-  // 참가한 전체 플레이어 수
-  const totalPlayers = session.sharedState.characterSlots.filter((s) => s.isLocked).length;
-  const allVoted = session.sharedState.voteCount >= totalPlayers;
-
-  let persistedSession: LoadedSession;
-
   try {
-    persistedSession = await updateSession(session) as LoadedSession;
+    const { session: persistedSession, result } = await mutateSessionWithRetry(
+      sessionId,
+      (latestSession) => {
+        if (latestSession.sharedState.phase !== "vote") {
+          throw new Error("투표 페이즈가 아닙니다");
+        }
+
+        if ((latestSession.pendingArrestOptions?.length ?? 0) > 0) {
+          throw new Error("GM이 최종 검거 대상을 선택하는 중입니다.");
+        }
+
+        const voter = latestSession.playerStates.find((player) => player.token === token);
+        if (!voter) {
+          throw new Error("Invalid token");
+        }
+
+        latestSession.votes = latestSession.votes ?? {};
+        latestSession.sharedState.voteCount = latestSession.sharedState.voteCount ?? 0;
+
+        const alreadyVoted = token in latestSession.votes;
+        latestSession.votes[token] = targetPlayerId;
+
+        if (!alreadyVoted) {
+          latestSession.sharedState.voteCount++;
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: `${voter.playerName}님이 투표했습니다.`,
+            type: "vote_submitted",
+          });
+        }
+
+        const totalPlayers = latestSession.sharedState.characterSlots.filter((slot) => slot.isLocked).length;
+        return {
+          allVoted: latestSession.sharedState.voteCount >= totalPlayers,
+        };
+      }
+    );
+
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+
+    let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
+    if (result.allVoted) {
+      revealState = await revealVotes(sessionId, persistedSession);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      allVoted: result.allVoted,
+      requiresTieBreak: revealState?.requiresTieBreak ?? false,
+    });
   } catch (error) {
+    if (error instanceof Error && error.message === "투표 페이즈가 아닙니다") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === "GM이 최종 검거 대상을 선택하는 중입니다.") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === "Invalid token") {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
     if (isSessionConflictError(error)) {
       return createSessionConflictResponse();
     }
 
     throw error;
   }
-
-  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-
-  // 전원 투표 완료 시 자동 공개
-  let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
-  if (allVoted) {
-    try {
-      revealState = await revealVotes(sessionId, persistedSession);
-    } catch (error) {
-      if (isSessionConflictError(error)) {
-        return createSessionConflictResponse();
-      }
-
-      throw error;
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    allVoted,
-    requiresTieBreak: revealState?.requiresTieBreak ?? false,
-  });
 }
 
 /** PATCH /api/sessions/[sessionId]/vote — GM 강제 공개 */

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGame } from "@/lib/game-repository";
-import { getSession, isSessionConflictError, updateSession } from "@/lib/session-repository";
+import { mutateSessionWithRetry } from "@/lib/session-mutation";
+import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { InventoryCard, PlayerState } from "@/types/session";
 import type { ClueCondition } from "@/types/game";
@@ -203,27 +204,129 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_received",
     });
 
-    let persistedSession;
-
     try {
-      persistedSession = await updateSession(session);
+      const { session: persistedSession } = await mutateSessionWithRetry(
+        sessionId,
+        (latestSession) => {
+          const latestPlayerState = latestSession.playerStates.find((player) => player.playerId === pState.playerId);
+          if (!latestPlayerState) {
+            throw new Error("참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.");
+          }
+
+          const latestLocation = game.locations?.find((item) => item.id === locationId);
+          const latestClue = game.clues.find((item) => item.id === clueId);
+          if (!latestClue || !latestLocation) {
+            throw new Error("단서/장소 없음");
+          }
+
+          if (latestPlayerState.inventory.some((item) => item.cardId === clueId)) {
+            throw new Error("이미 보유한 단서입니다.");
+          }
+
+          latestSession.sharedState.acquiredClueIds = latestSession.sharedState.acquiredClueIds ?? [];
+          if (latestSession.sharedState.acquiredClueIds.includes(clueId)) {
+            throw new Error("이미 다른 플레이어가 보유한 단서입니다.");
+          }
+
+          const latestRoundKey = String(latestSession.sharedState.currentRound);
+          const latestCluesPerRound = game.rules?.cluesPerRound ?? 0;
+          if (latestCluesPerRound > 0) {
+            latestPlayerState.roundAcquired = latestPlayerState.roundAcquired ?? {};
+            const acquiredThisRound = latestPlayerState.roundAcquired[latestRoundKey] ?? 0;
+            if (acquiredThisRound >= latestCluesPerRound) {
+              throw new Error(`이번 라운드 획득 한도(${latestCluesPerRound}개)에 도달했습니다.`);
+            }
+          }
+
+          const latestAllowRevisit = game.rules?.allowLocationRevisit ?? true;
+          if (!latestAllowRevisit) {
+            latestPlayerState.roundVisitedLocations = latestPlayerState.roundVisitedLocations ?? {};
+            const visited = latestPlayerState.roundVisitedLocations[latestRoundKey] ?? [];
+            if (visited.includes(locationId)) {
+              throw new Error("이번 라운드에 이미 방문한 장소입니다.");
+            }
+          }
+
+          latestPlayerState.inventory.push({
+            cardId: clueId,
+            cardType: "clue",
+            acquiredAt: new Date().toISOString(),
+          });
+
+          if (!latestSession.sharedState.acquiredClueIds.includes(clueId)) {
+            latestSession.sharedState.acquiredClueIds.push(clueId);
+          }
+
+          latestPlayerState.roundAcquired = latestPlayerState.roundAcquired ?? {};
+          latestPlayerState.roundAcquired[latestRoundKey] = (latestPlayerState.roundAcquired[latestRoundKey] ?? 0) + 1;
+
+          if (!latestAllowRevisit) {
+            latestPlayerState.roundVisitedLocations = latestPlayerState.roundVisitedLocations ?? {};
+            const visited = latestPlayerState.roundVisitedLocations[latestRoundKey] ?? [];
+            if (!visited.includes(locationId)) {
+              latestPlayerState.roundVisitedLocations[latestRoundKey] = [...visited, locationId];
+            }
+          }
+
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: `${latestPlayerState.playerName}님이 단서를 획득했습니다.`,
+            type: "card_received",
+          });
+
+          return null;
+        }
+      );
+
+      const persistedPlayerState = persistedSession.playerStates.find((player) => player.playerId === pState.playerId);
+      const persistedCard = persistedPlayerState?.inventory.find((item) => item.cardId === clueId);
+      if (!persistedPlayerState || !persistedCard) {
+        throw new Error("획득한 단서를 다시 불러오지 못했습니다.");
+      }
+
+      broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+      broadcast(sessionId, `inventory_${persistedPlayerState.token}`, {
+        inventory: persistedPlayerState.inventory,
+        roundAcquired: persistedPlayerState.roundAcquired,
+        roundVisitedLocations: persistedPlayerState.roundVisitedLocations,
+      });
+
+      return NextResponse.json({ card: persistedCard });
     } catch (error) {
+      if (error instanceof Error && error.message === "참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
+      if (error instanceof Error && error.message === "단서/장소 없음") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof Error && error.message === "이미 보유한 단서입니다.") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
+      if (error instanceof Error && error.message === "이미 다른 플레이어가 보유한 단서입니다.") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
+      if (error instanceof Error && error.message === "이번 라운드에 이미 방문한 장소입니다.") {
+        return NextResponse.json({ error: error.message }, { status: 403 });
+      }
+
+      if (
+        error instanceof Error
+        && error.message.startsWith("이번 라운드 획득 한도(")
+      ) {
+        return NextResponse.json({ error: error.message }, { status: 403 });
+      }
+
       if (isSessionConflictError(error)) {
         return createSessionConflictResponse();
       }
 
       throw error;
     }
-
-    const persistedPlayerState = persistedSession.playerStates.find((player) => player.token === token);
-
-    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-    broadcast(sessionId, `inventory_${token}`, {
-      inventory: persistedPlayerState?.inventory ?? pState.inventory,
-      roundAcquired: persistedPlayerState?.roundAcquired ?? pState.roundAcquired,
-      roundVisitedLocations: persistedPlayerState?.roundVisitedLocations ?? pState.roundVisitedLocations,
-    });
-    return NextResponse.json({ card });
   }
 
   // ── GM 단서 배포 ────────────────────────────────────────────
@@ -258,25 +361,72 @@ export async function POST(req: Request, { params }: Params) {
       type: "clue_revealed",
     });
 
-    let persistedSession;
-
     try {
-      persistedSession = await updateSession(session);
+      const { session: persistedSession } = await mutateSessionWithRetry(
+        sessionId,
+        (latestSession) => {
+          const latestPlayerState = latestSession.playerStates.find((player) => player.playerId === targetPlayerId);
+          if (!latestPlayerState) {
+            throw new Error("대상 플레이어 없음");
+          }
+
+          if (latestPlayerState.inventory.some((item) => item.cardId === clueId)) {
+            throw new Error("이미 보유한 단서");
+          }
+
+          latestPlayerState.inventory.push({
+            cardId: clueId,
+            cardType: "clue",
+            acquiredAt: new Date().toISOString(),
+          });
+
+          latestSession.sharedState.acquiredClueIds = latestSession.sharedState.acquiredClueIds ?? [];
+          if (!latestSession.sharedState.acquiredClueIds.includes(clueId)) {
+            latestSession.sharedState.acquiredClueIds.push(clueId);
+          }
+
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: `GM이 ${latestPlayerState.playerName}님에게 단서를 배포했습니다.`,
+            type: "clue_revealed",
+          });
+
+          return null;
+        }
+      );
+
+      const persistedPlayerState = persistedSession.playerStates.find((player) => player.playerId === targetPlayerId);
+      const persistedCard = persistedPlayerState?.inventory.find((item) => item.cardId === clueId);
+      if (!persistedPlayerState || !persistedCard) {
+        throw new Error("배포한 단서를 다시 불러오지 못했습니다.");
+      }
+
+      broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+      broadcast(sessionId, `inventory_${persistedPlayerState.token}`, {
+        inventory: persistedPlayerState.inventory,
+      });
+
+      return NextResponse.json({ card: persistedCard });
     } catch (error) {
+      if (error instanceof Error && error.message === "대상 플레이어 없음") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof Error && error.message === "이미 보유한 단서") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
+      if (error instanceof Error && error.message === "배포한 단서를 다시 불러오지 못했습니다.") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
       if (isSessionConflictError(error)) {
         return createSessionConflictResponse();
       }
 
       throw error;
     }
-
-    const persistedPlayerState = persistedSession.playerStates.find((player) => player.playerId === targetPlayerId);
-
-    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-    broadcast(sessionId, `inventory_${persistedPlayerState?.token ?? pState.token}`, {
-      inventory: persistedPlayerState?.inventory ?? pState.inventory,
-    });
-    return NextResponse.json({ card });
   }
 
   // ── 카드 이전 ───────────────────────────────────────────────
@@ -318,29 +468,79 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_transferred",
     });
 
-    let persistedSession;
-
     try {
-      persistedSession = await updateSession(session);
+      const { session: persistedSession } = await mutateSessionWithRetry(
+        sessionId,
+        (latestSession) => {
+          const latestFrom = latestSession.playerStates.find((player) => player.playerId === from.playerId);
+          const latestTo = latestSession.playerStates.find((player) => player.playerId === to.playerId);
+          if (!latestFrom || !latestTo) {
+            throw new Error("플레이어 없음");
+          }
+
+          const latestCardIndex = latestFrom.inventory.findIndex((item) => item.cardId === cardId);
+          if (latestCardIndex === -1) {
+            throw new Error("보유하지 않은 카드");
+          }
+
+          const [latestCard] = latestFrom.inventory.splice(latestCardIndex, 1);
+          latestTo.inventory.push({ ...latestCard, fromPlayerId: latestFrom.playerId });
+
+          const transferEntry = {
+            id: crypto.randomUUID(),
+            fromToken: latestFrom.token,
+            toToken: latestTo.token,
+            cardId,
+            timestamp: new Date().toISOString(),
+          };
+          latestFrom.transferLog.push(transferEntry);
+          latestTo.transferLog.push(transferEntry);
+
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: `${latestFrom.playerName}님이 ${latestTo.playerName}님에게 카드를 건넸습니다.`,
+            type: "card_transferred",
+          });
+
+          return null;
+        }
+      );
+
+      const persistedFrom = persistedSession.playerStates.find((player) => player.playerId === from.playerId);
+      const persistedTo = persistedSession.playerStates.find((player) => player.playerId === to.playerId);
+      if (!persistedFrom || !persistedTo) {
+        throw new Error("카드 이전 결과를 다시 불러오지 못했습니다.");
+      }
+
+      broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+      broadcast(sessionId, `inventory_${persistedFrom.token}`, {
+        inventory: persistedFrom.inventory,
+      });
+      broadcast(sessionId, `inventory_${persistedTo.token}`, {
+        inventory: persistedTo.inventory,
+      });
+
+      return NextResponse.json({ ok: true });
     } catch (error) {
+      if (error instanceof Error && error.message === "플레이어 없음") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof Error && error.message === "보유하지 않은 카드") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof Error && error.message === "카드 이전 결과를 다시 불러오지 못했습니다.") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+
       if (isSessionConflictError(error)) {
         return createSessionConflictResponse();
       }
 
       throw error;
     }
-
-    const persistedFrom = persistedSession.playerStates.find((player) => player.playerId === from.playerId);
-    const persistedTo = persistedSession.playerStates.find((player) => player.playerId === to.playerId);
-
-    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-    broadcast(sessionId, `inventory_${persistedFrom?.token ?? token}`, {
-      inventory: persistedFrom?.inventory ?? from.inventory,
-    });
-    broadcast(sessionId, `inventory_${persistedTo?.token ?? to.token}`, {
-      inventory: persistedTo?.inventory ?? to.inventory,
-    });
-    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

@@ -230,7 +230,8 @@ function buildSupabaseSessionRow(session: GameSession): SupabaseSessionRow {
 
 /**
  * Supabase row와 세션 JSON 사이에 빠진 기본 필드를 보정한다.
- * 과거 데이터에 `updatedAt`이 없더라도 row `updated_at`을 concurrency token으로 재사용한다.
+ * Supabase trigger가 row `updated_at`을 다시 쓰므로,
+ * concurrency token은 항상 row 컬럼 값을 진실로 사용한다.
  */
 function hydrateSupabaseSession(row: SupabaseSessionRow): GameSession {
   return withSessionDefaults(
@@ -238,8 +239,8 @@ function hydrateSupabaseSession(row: SupabaseSessionRow): GameSession {
       ...(row.session_json as GameSession),
       gameId: row.game_id,
       sessionCode: normalizeSessionCode(row.session_json.sessionCode ?? row.session_code),
-      createdAt: row.session_json.createdAt ?? row.created_at,
-      updatedAt: row.session_json.updatedAt ?? row.updated_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
       startedAt: row.session_json.startedAt ?? row.started_at ?? undefined,
       endedAt: row.session_json.endedAt ?? row.ended_at ?? undefined,
     },

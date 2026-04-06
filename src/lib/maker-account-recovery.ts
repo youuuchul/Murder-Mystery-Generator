@@ -403,6 +403,7 @@ async function sendMakerPasswordResetEmail(options: {
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
+      "User-Agent": "murder-mystery-generator/1.0",
     },
     body: JSON.stringify({
       from: config.fromEmail,

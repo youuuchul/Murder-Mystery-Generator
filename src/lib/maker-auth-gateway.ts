@@ -6,6 +6,7 @@ import type {
 } from "@/types/auth";
 import {
   hashMakerAccountPassword,
+  normalizeMakerRecoveryEmail,
   normalizeMakerLoginId,
   verifyMakerAccountPassword,
 } from "@/lib/maker-account";
@@ -19,6 +20,7 @@ import {
   createMakerAccount as createLocalMakerAccount,
   findMakerAccountByLoginId as findLocalMakerAccountByLoginId,
   getMakerAccountById as getLocalMakerAccountById,
+  updateMakerAccount as updateLocalMakerAccount,
 } from "@/lib/storage/maker-account-storage";
 import {
   findMakerUserByDisplayName as findLocalMakerUserByDisplayName,
@@ -31,9 +33,16 @@ export interface CreateMakerAccountInput {
   displayName: string;
   loginId: string;
   password: string;
+  recoveryEmail?: string;
   now?: string;
   preferredUserId?: string;
   migrateOwnerIdFrom?: string;
+}
+
+export interface UpdateMakerAccountProfileInput {
+  userId: string;
+  recoveryEmail?: string | null;
+  now?: string;
 }
 
 export interface MakerAuthGateway {
@@ -45,6 +54,8 @@ export interface MakerAuthGateway {
   findAccountByLoginId(loginId: string): Promise<MakerAccountIdentity | null>;
   authenticateAccount(loginId: string, password: string): Promise<MakerAccountIdentity | null>;
   createAccount(input: CreateMakerAccountInput): Promise<MakerAccountIdentity>;
+  updateAccountProfile(input: UpdateMakerAccountProfileInput): Promise<MakerAccountIdentity | null>;
+  updateAccountPassword(userId: string, password: string, now?: string): Promise<boolean>;
 }
 
 function toMakerAccountIdentity(account: MakerAccountRecord): MakerAccountIdentity {
@@ -52,6 +63,7 @@ function toMakerAccountIdentity(account: MakerAccountRecord): MakerAccountIdenti
     id: account.id,
     displayName: account.displayName,
     loginId: account.loginId,
+    recoveryEmail: account.recoveryEmail ?? null,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };
@@ -94,6 +106,7 @@ const localMakerAuthGateway: MakerAuthGateway = {
     displayName,
     loginId,
     password,
+    recoveryEmail,
     now = new Date().toISOString(),
     preferredUserId,
   }) {
@@ -102,12 +115,30 @@ const localMakerAuthGateway: MakerAuthGateway = {
       id: preferredUserId?.trim() || crypto.randomUUID(),
       displayName,
       loginId,
+      recoveryEmail: normalizeMakerRecoveryEmail(recoveryEmail ?? ""),
       ...passwordFields,
       createdAt: now,
       updatedAt: now,
     });
 
     return toMakerAccountIdentity(account);
+  },
+  async updateAccountProfile({ userId, recoveryEmail, now = new Date().toISOString() }) {
+    const updatedAccount = updateLocalMakerAccount(userId, {
+      recoveryEmail: normalizeMakerRecoveryEmail(recoveryEmail ?? ""),
+      updatedAt: now,
+    });
+
+    return updatedAccount ? toMakerAccountIdentity(updatedAccount) : null;
+  },
+  async updateAccountPassword(userId, password, now = new Date().toISOString()) {
+    const passwordFields = hashMakerAccountPassword(password);
+    const updatedAccount = updateLocalMakerAccount(userId, {
+      ...passwordFields,
+      updatedAt: now,
+    });
+
+    return Boolean(updatedAccount);
   },
 };
 

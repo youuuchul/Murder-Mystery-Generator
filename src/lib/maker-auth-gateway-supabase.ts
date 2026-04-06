@@ -1,7 +1,14 @@
-import { normalizeMakerLoginId } from "@/lib/maker-account";
+import {
+  normalizeMakerLoginId,
+  normalizeMakerRecoveryEmail,
+} from "@/lib/maker-account";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { migrateLocalGameOwnership } from "@/lib/game-ownership-migration";
-import type { CreateMakerAccountInput, MakerAuthGateway } from "@/lib/maker-auth-gateway";
+import type {
+  CreateMakerAccountInput,
+  MakerAuthGateway,
+  UpdateMakerAccountProfileInput,
+} from "@/lib/maker-auth-gateway";
 import { normalizeMakerDisplayName } from "@/lib/maker-user";
 import {
   buildSupabaseMakerEmail,
@@ -26,6 +33,7 @@ function toMakerAccountIdentity(profile: SupabaseMakerProfileRow): MakerAccountI
     id: profile.id,
     displayName: profile.display_name,
     loginId: profile.login_id,
+    recoveryEmail: profile.recovery_email,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -185,11 +193,13 @@ export function createSupabaseMakerAuthGateway(
       displayName,
       loginId,
       password,
+      recoveryEmail,
       now = new Date().toISOString(),
       migrateOwnerIdFrom,
     }: CreateMakerAccountInput) {
       const normalizedDisplayName = normalizeMakerDisplayName(displayName);
       const normalizedLoginId = normalizeMakerLoginId(loginId);
+      const normalizedRecoveryEmail = normalizeMakerRecoveryEmail(recoveryEmail ?? "");
       const adminClient = createSupabaseMakerAuthAdminClient(config);
       const { data, error } = await adminClient.auth.admin.createUser({
         email: buildSupabaseMakerEmail(normalizedLoginId),
@@ -211,6 +221,7 @@ export function createSupabaseMakerAuthGateway(
           id: data.user.id,
           display_name: normalizedDisplayName,
           login_id: normalizedLoginId,
+          recovery_email: normalizedRecoveryEmail || null,
           role: "creator",
           updated_at: now,
         })
@@ -226,6 +237,52 @@ export function createSupabaseMakerAuthGateway(
       }
 
       return toMakerAccountIdentity(profileData as unknown as SupabaseMakerProfileRow);
+    },
+
+    async updateAccountProfile({
+      userId,
+      recoveryEmail,
+      now = new Date().toISOString(),
+    }: UpdateMakerAccountProfileInput) {
+      const normalizedUserId = userId.trim();
+      if (!normalizedUserId) {
+        return null;
+      }
+
+      const adminClient = createSupabaseMakerAuthAdminClient(config);
+      const { data, error } = await adminClient
+        .from("profiles")
+        .update({
+          recovery_email: normalizeMakerRecoveryEmail(recoveryEmail ?? "") || null,
+          updated_at: now,
+        })
+        .eq("id", normalizedUserId)
+        .select(getSupabaseMakerProfileColumns())
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Failed to update Supabase maker profile: ${error.message}`);
+      }
+
+      return data ? toMakerAccountIdentity(data as unknown as SupabaseMakerProfileRow) : null;
+    },
+
+    async updateAccountPassword(userId, password) {
+      const normalizedUserId = userId.trim();
+      if (!normalizedUserId) {
+        return false;
+      }
+
+      const adminClient = createSupabaseMakerAuthAdminClient(config);
+      const { error } = await adminClient.auth.admin.updateUserById(normalizedUserId, {
+        password,
+      });
+
+      if (error) {
+        throw new Error(`Failed to update Supabase maker password: ${error.message}`);
+      }
+
+      return true;
     },
   };
 }

@@ -6,6 +6,7 @@ export interface SupabaseMakerProfileRow {
   id: string;
   display_name: string;
   login_id: string;
+  recovery_email: string | null;
   role: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -16,6 +17,7 @@ const SUPABASE_MAKER_PROFILE_COLUMNS = [
   "id",
   "display_name",
   "login_id",
+  "recovery_email",
   "role",
   "avatar_url",
   "created_at",

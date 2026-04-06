@@ -21,6 +21,7 @@ export interface MakerUserRecord extends AppUser {
  */
 export interface MakerAccountIdentity extends AppUser {
   loginId: string;
+  recoveryEmail?: string | null;
   createdAt: string;
   updatedAt: string;
 }

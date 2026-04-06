@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { describeMakerRecoveryEmail } from "@/lib/maker-account-recovery";
 import { canAccessGmPlay, getGameOwnershipState } from "@/lib/game-access";
 import { listGames } from "@/lib/game-repository";
 import { isMakerAccessEnabled } from "@/lib/maker-access";
@@ -14,8 +15,42 @@ const makerAuthGateway = getMakerAuthGateway();
 type ManageLibraryPageProps = {
   searchParams?: Promise<{
     scope?: string;
+    notice?: string;
+    error?: string;
   }>;
 };
+
+/** 계정 관리 영역에 띄울 오류 메시지를 query 값에서 고른다. */
+function getManageAccountErrorMessage(error: string | undefined): string | null {
+  switch (error) {
+    case "invalid_recovery_email":
+      return "복구 이메일 형식이 올바르지 않습니다.";
+    case "invalid_account_password":
+      return "새 비밀번호는 8자 이상이어야 합니다.";
+    case "password_mismatch":
+      return "비밀번호 확인이 일치하지 않습니다.";
+    case "invalid_current_password":
+      return "현재 비밀번호가 올바르지 않습니다.";
+    case "account_not_found":
+      return "계정을 다시 확인해주세요. 잠시 후 다시 시도하면 됩니다.";
+    default:
+      return null;
+  }
+}
+
+/** 계정 관리 영역에 띄울 성공 메시지를 query 값에서 고른다. */
+function getManageAccountNoticeMessage(notice: string | undefined): string | null {
+  switch (notice) {
+    case "recovery_email_saved":
+      return "복구 이메일이 저장되었습니다.";
+    case "recovery_email_removed":
+      return "복구 이메일을 지웠습니다. 이제 비밀번호를 찾을 수 없습니다.";
+    case "password_changed":
+      return "비밀번호가 변경되었습니다.";
+    default:
+      return null;
+  }
+}
 
 export default async function ManageLibraryPage({ searchParams }: ManageLibraryPageProps) {
   const resolvedSearchParams = await searchParams;
@@ -43,6 +78,8 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const privateCount = managedGames.filter((item) => item.game.access.visibility === "private").length;
   const draftCount = managedGames.filter((item) => item.game.access.visibility === "draft").length;
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
+  const accountErrorMessage = getManageAccountErrorMessage(resolvedSearchParams?.error);
+  const accountNoticeMessage = getManageAccountNoticeMessage(resolvedSearchParams?.notice);
 
   return (
     <div className="min-h-screen bg-dark-950">
@@ -144,14 +181,132 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
             <div className="rounded-2xl border border-dark-800 bg-dark-950/70 p-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Account</p>
               {currentAccount ? (
-                <>
-                  <p className="mt-2 text-sm leading-6 text-dark-300">
-                    이 작업자는 계정 로그인으로 이어집니다. 다른 기기에서는 아래 로그인 ID와 계정 비밀번호로 들어오면 됩니다.
-                  </p>
-                  <p className="mt-3 rounded-xl border border-dark-700 bg-dark-900 px-3 py-3 font-mono text-xs text-dark-100">
-                    {currentAccount.loginId}
-                  </p>
-                </>
+                <div className="space-y-4">
+                  {accountErrorMessage ? (
+                    <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                      {accountErrorMessage}
+                    </div>
+                  ) : null}
+                  {accountNoticeMessage ? (
+                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                      {accountNoticeMessage}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <p className="mt-2 text-sm leading-6 text-dark-300">
+                      다른 기기에서는 아래 로그인 ID와 계정 비밀번호로 들어오면 됩니다.
+                    </p>
+                    <p className="mt-3 rounded-xl border border-dark-700 bg-dark-900 px-3 py-3 font-mono text-xs text-dark-100">
+                      {currentAccount.loginId}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-dark-800 bg-dark-900/70 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-dark-100">복구 이메일</p>
+                        <p className="mt-1 text-xs text-dark-400">
+                          현재 {describeMakerRecoveryEmail(currentAccount.recoveryEmail)}
+                        </p>
+                      </div>
+                      {currentAccount.recoveryEmail ? (
+                        <span className="rounded-full border border-emerald-900 bg-emerald-950/50 px-3 py-1 text-[11px] text-emerald-300">
+                          복구 가능
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-amber-900 bg-amber-950/40 px-3 py-1 text-[11px] text-amber-300">
+                          미등록
+                        </span>
+                      )}
+                    </div>
+                    <form action="/api/maker-access" method="post" className="mt-4 space-y-3">
+                      <input type="hidden" name="intent" value="update_recovery_email" />
+                      <input type="hidden" name="next" value="/library/manage" />
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-dark-200">
+                          이메일 주소
+                        </span>
+                        <input
+                          type="email"
+                          name="recoveryEmail"
+                          defaultValue={currentAccount.recoveryEmail ?? ""}
+                          autoComplete="email"
+                          className="w-full rounded-xl border border-emerald-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-emerald-500"
+                          placeholder="name@example.com"
+                        />
+                      </label>
+                      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                        비워두면 비밀번호를 찾을 수 없습니다.
+                        <div className="mt-1 text-xs text-amber-200/80">
+                          저장 후에는 로그인 화면에서 메일로 재설정 링크를 받을 수 있습니다.
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition hover:bg-mystery-600"
+                      >
+                        복구 이메일 저장
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="rounded-2xl border border-dark-800 bg-dark-900/70 p-4">
+                    <p className="text-sm font-medium text-dark-100">비밀번호 변경</p>
+                    <p className="mt-1 text-xs text-dark-400">
+                      현재 비밀번호를 확인한 뒤 새 비밀번호로 바꿉니다.
+                    </p>
+                    <form action="/api/maker-access" method="post" className="mt-4 space-y-3">
+                      <input type="hidden" name="intent" value="change_password" />
+                      <input type="hidden" name="next" value="/library/manage" />
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-dark-200">
+                          현재 비밀번호
+                        </span>
+                        <input
+                          type="password"
+                          name="currentPassword"
+                          required
+                          autoComplete="current-password"
+                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
+                          placeholder="현재 비밀번호"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-dark-200">
+                          새 비밀번호
+                        </span>
+                        <input
+                          type="password"
+                          name="accountPassword"
+                          required
+                          autoComplete="new-password"
+                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
+                          placeholder="8자 이상"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-dark-200">
+                          새 비밀번호 확인
+                        </span>
+                        <input
+                          type="password"
+                          name="accountPasswordConfirm"
+                          required
+                          autoComplete="new-password"
+                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
+                          placeholder="한 번 더 입력"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="w-full rounded-xl border border-dark-700 bg-dark-800 px-4 py-3 text-sm font-medium text-dark-100 transition hover:border-dark-500 hover:bg-dark-700"
+                      >
+                        새 비밀번호 저장
+                      </button>
+                    </form>
+                  </div>
+                </div>
               ) : (
                 <>
                   <p className="mt-2 text-sm leading-6 text-dark-300">

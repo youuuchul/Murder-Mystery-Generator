@@ -20,8 +20,16 @@ import {
 import {
   isValidMakerAccountPassword,
   isValidMakerLoginId,
+  isValidMakerRecoveryEmail,
   normalizeMakerLoginId,
+  normalizeMakerRecoveryEmail,
 } from "@/lib/maker-account";
+import {
+  changeMakerPasswordForUser,
+  completeMakerPasswordReset,
+  requestMakerPasswordReset,
+  updateMakerRecoveryEmailForUser,
+} from "@/lib/maker-account-recovery";
 import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
@@ -32,6 +40,10 @@ type MakerAccessIntent =
   | "logout"
   | "account_login"
   | "account_signup"
+  | "request_password_reset"
+  | "complete_password_reset"
+  | "update_recovery_email"
+  | "change_password"
   | "temporary_login";
 
 const makerAuthGateway = getMakerAuthGateway();
@@ -60,13 +72,56 @@ function redirectToMakerAccess(
   request: NextRequest,
   next: string,
   error: string,
-  mode: "login" | "signup" | "temporary"
+  mode: "login" | "signup" | "temporary" | "recover" | "reset",
+  extraParams: Record<string, string> = {}
 ) {
   const failureUrl = buildRedirectUrl(request, "/maker-access");
   failureUrl.searchParams.set("error", error);
   failureUrl.searchParams.set("mode", mode);
   failureUrl.searchParams.set("next", next);
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (value) {
+      failureUrl.searchParams.set(key, value);
+    }
+  }
   return NextResponse.redirect(failureUrl, 303);
+}
+
+/** 성공/실패 메시지를 붙여 원하는 페이지로 되돌린다. */
+function redirectWithFeedback(
+  request: NextRequest,
+  next: string,
+  feedback: {
+    error?: string;
+    notice?: string;
+    mode?: string;
+    token?: string;
+    next?: string;
+  }
+) {
+  const redirectUrl = buildRedirectUrl(request, next);
+
+  if (feedback.error) {
+    redirectUrl.searchParams.set("error", feedback.error);
+  }
+
+  if (feedback.notice) {
+    redirectUrl.searchParams.set("notice", feedback.notice);
+  }
+
+  if (feedback.mode) {
+    redirectUrl.searchParams.set("mode", feedback.mode);
+  }
+
+  if (feedback.token) {
+    redirectUrl.searchParams.set("token", feedback.token);
+  }
+
+  if (feedback.next) {
+    redirectUrl.searchParams.set("next", feedback.next);
+  }
+
+  return NextResponse.redirect(redirectUrl, 303);
 }
 
 /**
@@ -76,7 +131,7 @@ function redirectToMakerAccess(
 async function validateMakerGate(
   request: NextRequest,
   next: string,
-  mode: "login" | "signup" | "temporary",
+  mode: "login" | "signup" | "temporary" | "recover",
   gatePassword: string
 ) {
   if (!isMakerAccessEnabled()) {
@@ -168,6 +223,101 @@ export async function POST(request: NextRequest) {
   const authenticatedUser = await getRequestMakerUser(request);
   const currentSessionUser = authenticatedUser ?? getMakerUserFromCookieStore(request.cookies);
 
+  if (intent === "request_password_reset") {
+    const gateError = await validateMakerGate(request, next, "recover", gatePassword);
+    if (gateError) {
+      return gateError;
+    }
+
+    const loginId = normalizeMakerLoginId(String(formData.get("loginId") ?? ""));
+    if (!isValidMakerLoginId(loginId)) {
+      return redirectToMakerAccess(request, next, "invalid_login_id", "recover");
+    }
+
+    const result = await requestMakerPasswordReset({
+      loginId,
+      requestOrigin: getRequestOrigin(request),
+    });
+
+    if (result.status === "sent") {
+      return redirectWithFeedback(request, "/maker-access", {
+        notice: "password_reset_sent",
+        mode: "login",
+        next,
+      });
+    }
+
+    if (result.status === "missing_recovery_email") {
+      return redirectToMakerAccess(
+        request,
+        next,
+        "missing_recovery_email",
+        "recover"
+      );
+    }
+
+    if (result.status === "delivery_unavailable") {
+      return redirectToMakerAccess(
+        request,
+        next,
+        "recovery_delivery_unavailable",
+        "recover"
+      );
+    }
+
+    return redirectToMakerAccess(request, next, "unknown_login_id", "recover");
+  }
+
+  if (intent === "complete_password_reset") {
+    const token = String(formData.get("token") ?? "").trim();
+    const accountPassword = String(formData.get("accountPassword") ?? "");
+    const accountPasswordConfirm = String(formData.get("accountPasswordConfirm") ?? "");
+
+    if (!token) {
+      return redirectToMakerAccess(request, next, "invalid_reset_token", "recover");
+    }
+
+    if (!isValidMakerAccountPassword(accountPassword)) {
+      return redirectToMakerAccess(
+        request,
+        next,
+        "invalid_account_password",
+        "reset",
+        { token }
+      );
+    }
+
+    if (accountPassword !== accountPasswordConfirm) {
+      return redirectToMakerAccess(request, next, "password_mismatch", "reset", {
+        token,
+      });
+    }
+
+    const result = await completeMakerPasswordReset({
+      token,
+      nextPassword: accountPassword,
+    });
+
+    if (result === "ok") {
+      return redirectWithFeedback(request, "/maker-access", {
+        notice: "password_reset_completed",
+        mode: "login",
+        next,
+      });
+    }
+
+    return redirectToMakerAccess(
+      request,
+      next,
+      result === "expired"
+        ? "expired_reset_token"
+        : result === "used"
+          ? "used_reset_token"
+          : "invalid_reset_token",
+      "recover"
+    );
+  }
+
   if (intent === "account_login") {
     const gateError = await validateMakerGate(request, next, "login", gatePassword);
     if (gateError) {
@@ -219,6 +369,7 @@ export async function POST(request: NextRequest) {
     const loginId = normalizeMakerLoginId(String(formData.get("loginId") ?? ""));
     const accountPassword = String(formData.get("accountPassword") ?? "");
     const accountPasswordConfirm = String(formData.get("accountPasswordConfirm") ?? "");
+    const recoveryEmail = normalizeMakerRecoveryEmail(String(formData.get("recoveryEmail") ?? ""));
     const recoveryKey = normalizeMakerUserId(String(formData.get("recoveryKey") ?? ""));
 
     if (!isValidMakerDisplayName(displayName)) {
@@ -235,6 +386,10 @@ export async function POST(request: NextRequest) {
 
     if (accountPassword !== accountPasswordConfirm) {
       return redirectToMakerAccess(request, next, "password_mismatch", "signup");
+    }
+
+    if (!isValidMakerRecoveryEmail(recoveryEmail)) {
+      return redirectToMakerAccess(request, next, "invalid_recovery_email", "signup");
     }
 
     if (recoveryKey && !isValidMakerUserId(recoveryKey)) {
@@ -254,6 +409,7 @@ export async function POST(request: NextRequest) {
       displayName,
       loginId,
       password: accountPassword,
+      recoveryEmail,
       preferredUserId: linkedUserId,
       migrateOwnerIdFrom: linkedUserId,
     });
@@ -281,6 +437,88 @@ export async function POST(request: NextRequest) {
     const response = await buildLoginSuccessResponse(request, next, gatePassword);
     applyLocalMakerUserCookie(response, user);
     return response;
+  }
+
+  if (intent === "update_recovery_email") {
+    if (!currentSessionUser) {
+      return redirectWithFeedback(request, "/maker-access", {
+        error: "login_required",
+        mode: "login",
+        next,
+      });
+    }
+
+    const recoveryEmail = String(formData.get("recoveryEmail") ?? "");
+    const result = await updateMakerRecoveryEmailForUser({
+      userId: currentSessionUser.id,
+      recoveryEmail,
+    });
+
+    if (result.status === "invalid_email") {
+      return redirectWithFeedback(request, next, {
+        error: "invalid_recovery_email",
+      });
+    }
+
+    if (result.status !== "ok") {
+      return redirectWithFeedback(request, next, {
+        error: "account_not_found",
+      });
+    }
+
+    return redirectWithFeedback(request, next, {
+      notice: normalizeMakerRecoveryEmail(recoveryEmail)
+        ? "recovery_email_saved"
+        : "recovery_email_removed",
+    });
+  }
+
+  if (intent === "change_password") {
+    if (!currentSessionUser) {
+      return redirectWithFeedback(request, "/maker-access", {
+        error: "login_required",
+        mode: "login",
+        next,
+      });
+    }
+
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    const accountPassword = String(formData.get("accountPassword") ?? "");
+    const accountPasswordConfirm = String(formData.get("accountPasswordConfirm") ?? "");
+
+    if (!isValidMakerAccountPassword(accountPassword)) {
+      return redirectWithFeedback(request, next, {
+        error: "invalid_account_password",
+      });
+    }
+
+    if (accountPassword !== accountPasswordConfirm) {
+      return redirectWithFeedback(request, next, {
+        error: "password_mismatch",
+      });
+    }
+
+    const result = await changeMakerPasswordForUser({
+      userId: currentSessionUser.id,
+      currentPassword,
+      nextPassword: accountPassword,
+    });
+
+    if (result.status === "invalid_current_password") {
+      return redirectWithFeedback(request, next, {
+        error: "invalid_current_password",
+      });
+    }
+
+    if (result.status !== "ok") {
+      return redirectWithFeedback(request, next, {
+        error: "account_not_found",
+      });
+    }
+
+    return redirectWithFeedback(request, next, {
+      notice: "password_changed",
+    });
   }
 
   if (authProvider === "supabase") {

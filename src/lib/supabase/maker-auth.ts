@@ -51,13 +51,13 @@ export function createSupabaseMakerAuthClient(
 }
 
 /**
- * profiles 조회/생성 및 Auth admin 작업용 service-role client.
+ * profiles 조회/생성 및 Auth admin 작업용 서버 전용 secret key client.
  * 반드시 서버에서만 사용해야 한다.
  */
 export function createSupabaseMakerAuthAdminClient(
   config: MakerAuthProviderConfig
 ): SupabaseClient {
-  return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+  return createClient(config.supabaseUrl, config.supabaseSecretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

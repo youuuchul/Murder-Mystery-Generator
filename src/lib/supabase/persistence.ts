@@ -30,7 +30,7 @@ export function createSupabasePersistenceClient(
     );
   }
 
-  return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+  return createClient(config.supabaseUrl, config.supabaseSecretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

@@ -12,7 +12,7 @@ const SESSION_BATCH_SIZE = 50;
 
 /**
  * `.env` 파일을 단순 key/value 맵으로 읽는다.
- * 현재 마이그레이션 스크립트는 서버 시작 없이 직접 Supabase service-role에 연결하므로
+ * 현재 마이그레이션 스크립트는 서버 시작 없이 직접 Supabase secret key로 연결하므로
  * 실행 시점에 파일 기반 env 해석이 필요하다.
  *
  * @param {string} [envPath]
@@ -46,22 +46,22 @@ export function parseEnvFile(envPath = path.join(ROOT_DIR, ".env")) {
 }
 
 /**
- * 마이그레이션 전용 Supabase service-role client를 만든다.
+ * 마이그레이션 전용 Supabase server-side client를 만든다.
  *
  * @returns {import("@supabase/supabase-js").SupabaseClient}
  */
 export function createMigrationSupabaseClient() {
   const env = parseEnvFile();
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || "";
-  const supabaseServiceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || "";
+  const supabaseSecretKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
+  if (!supabaseUrl || !supabaseSecretKey) {
     throw new Error(
-      "Missing Supabase env. Set NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SECRET_KEY."
+      "Missing Supabase env. Set NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL and SUPABASE_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY."
     );
   }
 
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+  return createClient(supabaseUrl, supabaseSecretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

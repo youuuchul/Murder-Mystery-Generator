@@ -4,7 +4,7 @@ export interface MakerAuthProviderConfig {
   provider: MakerAuthProvider;
   supabaseUrl: string;
   supabasePublishableKey: string;
-  supabaseServiceRoleKey: string;
+  supabaseSecretKey: string;
 }
 
 /**
@@ -33,9 +33,9 @@ export function getMakerAuthProviderConfig(): MakerAuthProviderConfig {
       ?? process.env.SUPABASE_PUBLISHABLE_KEY
       ?? ""
     ).trim(),
-    supabaseServiceRoleKey: (
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-      ?? process.env.SUPABASE_SECRET_KEY
+    supabaseSecretKey: (
+      process.env.SUPABASE_SECRET_KEY
+      ?? process.env.SUPABASE_SERVICE_ROLE_KEY
       ?? ""
     ).trim(),
   };
@@ -61,8 +61,8 @@ export function getMissingSupabaseMakerAuthEnv(
     missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or SUPABASE_PUBLISHABLE_KEY");
   }
 
-  if (!config.supabaseServiceRoleKey) {
-    missing.push("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY");
+  if (!config.supabaseSecretKey) {
+    missing.push("SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY");
   }
 
   return missing;

@@ -133,7 +133,7 @@ export function formatLocalAssetMigrationPlan(plan) {
 }
 
 /**
- * service-role client로 game-assets bucket 존재를 보장한다.
+ * 서버 전용 secret key client로 game-assets bucket 존재를 보장한다.
  *
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
  * @param {string} bucketName

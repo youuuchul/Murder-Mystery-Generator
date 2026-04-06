@@ -145,7 +145,7 @@ function resolveLocalAssetPath(gameId: string, assetPath: string[]): string | nu
 }
 
 /**
- * service-role client로 game-assets bucket 존재를 보장한다.
+ * 서버 전용 secret key client로 game-assets bucket 존재를 보장한다.
  * 업로드 전 한 번만 확인해 Vercel cold start마다 중복 생성 요청을 줄인다.
  */
 async function ensureSupabaseAssetsBucket(): Promise<string> {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveEditableGameForUser } from "@/lib/game-access";
+import { getGameOwnershipState, resolveEditableGameForUser } from "@/lib/game-access";
 import { deleteGame, getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { buildPublicGame } from "@/lib/game-sanitizer";
@@ -8,12 +8,21 @@ import type { GamePackage } from "@/types/game";
 type Params = { params: Promise<{ gameId: string }> };
 
 /** GET /api/games/[gameId] — 단일 게임 조회 */
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   const { gameId } = await params;
 
   const game = await getGame(gameId);
   if (!game) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  const currentUser = await getRequestMakerUser(request);
+  if (currentUser && getGameOwnershipState(game, currentUser.id) !== "readonly") {
+    return NextResponse.json({ game });
+  }
+
+  if (game.access.visibility !== "public") {
+    return NextResponse.json({ error: "이 게임을 볼 수 없습니다." }, { status: 403 });
   }
 
   return NextResponse.json({ game: buildPublicGame(game) });

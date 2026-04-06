@@ -1,5 +1,9 @@
 import type { GameMetadata, GamePackage } from "@/types/game";
 import { deleteGameAssets } from "@/lib/game-asset-storage";
+import {
+  areGamePackagesEquivalent,
+  createGameContentBackupSnapshot,
+} from "@/lib/game-content-integrity";
 import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { getGamePublishReadiness } from "@/lib/game-publish";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
@@ -35,9 +39,26 @@ const localGameRepository: GameRepository = {
     return getLocalGame(gameId);
   },
   async saveGame(game) {
-    saveLocalGame(game);
+    const normalizedGame = normalizeSupabaseGameContent(game);
+    const existingGame = getLocalGame(normalizedGame.id);
+
+    if (existingGame && !areGamePackagesEquivalent(existingGame, normalizedGame)) {
+      await createGameContentBackupSnapshot(existingGame, {
+        provider: "local",
+        reason: "pre-save",
+      });
+    }
+
+    saveLocalGame(normalizedGame);
   },
   async deleteGame(gameId) {
+    const existingGame = getLocalGame(gameId);
+    if (existingGame) {
+      await createGameContentBackupSnapshot(existingGame, {
+        provider: "local",
+        reason: "pre-delete",
+      });
+    }
     return deleteLocalGame(gameId);
   },
 };
@@ -284,6 +305,26 @@ const supabaseGameRepository: GameRepository = {
     const supabase = createSupabasePersistenceClient();
     const normalizedGame = normalizeSupabaseGameContent(game);
     const metadataRow = buildSupabaseGameRow(normalizedGame);
+    const { data: existingContentRow, error: existingContentError } = await supabase
+      .from("game_content")
+      .select(SUPABASE_GAME_CONTENT_COLUMNS)
+      .eq("game_id", normalizedGame.id)
+      .maybeSingle();
+
+    if (existingContentError) {
+      throw new Error(`Failed to load current Supabase game content before save: ${existingContentError.message}`);
+    }
+
+    const existingGame = existingContentRow
+      ? normalizeSupabaseGameContent((existingContentRow as unknown as SupabaseGameContentRow).content_json)
+      : null;
+
+    if (existingGame && !areGamePackagesEquivalent(existingGame, normalizedGame)) {
+      await createGameContentBackupSnapshot(existingGame, {
+        provider: "supabase",
+        reason: "pre-save",
+      });
+    }
 
     const { error: gameError } = await supabase
       .from("games")
@@ -313,6 +354,26 @@ const supabaseGameRepository: GameRepository = {
     }
 
     const supabase = createSupabasePersistenceClient();
+    const { data: existingContentRow, error: existingContentError } = await supabase
+      .from("game_content")
+      .select(SUPABASE_GAME_CONTENT_COLUMNS)
+      .eq("game_id", normalizedGameId)
+      .maybeSingle();
+
+    if (existingContentError) {
+      throw new Error(`Failed to load current Supabase game content before delete: ${existingContentError.message}`);
+    }
+
+    if (existingContentRow) {
+      await createGameContentBackupSnapshot(
+        normalizeSupabaseGameContent((existingContentRow as unknown as SupabaseGameContentRow).content_json),
+        {
+          provider: "supabase",
+          reason: "pre-delete",
+        }
+      );
+    }
+
     const { data, error } = await supabase
       .from("games")
       .delete()

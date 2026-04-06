@@ -39,6 +39,7 @@ export function buildInitialSession(
     sessionName,
     sessionCode,
     createdAt: now,
+    updatedAt: now,
     sharedState: {
       phase: "lobby",
       currentRound: 0,

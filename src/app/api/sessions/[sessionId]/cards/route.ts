@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { getGame } from "@/lib/game-repository";
-import { getSession, updateSession } from "@/lib/session-repository";
+import { getSession, isSessionConflictError, updateSession } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { InventoryCard, PlayerState } from "@/types/session";
 import type { ClueCondition } from "@/types/game";
 
 type Params = { params: { sessionId: string } };
+
+function createSessionConflictResponse() {
+  return NextResponse.json(
+    { error: "다른 변경사항이 먼저 저장됐습니다. 화면을 새로고침한 뒤 다시 시도해주세요." },
+    { status: 409 }
+  );
+}
 
 /**
  * 단서/장소 조건 평가 — 현재 인벤토리 상태 기반 (동적 체크)
@@ -196,12 +203,25 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_received",
     });
 
-    await updateSession(session);
-    broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+    let persistedSession;
+
+    try {
+      persistedSession = await updateSession(session);
+    } catch (error) {
+      if (isSessionConflictError(error)) {
+        return createSessionConflictResponse();
+      }
+
+      throw error;
+    }
+
+    const persistedPlayerState = persistedSession.playerStates.find((player) => player.token === token);
+
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
     broadcast(sessionId, `inventory_${token}`, {
-      inventory: pState.inventory,
-      roundAcquired: pState.roundAcquired,
-      roundVisitedLocations: pState.roundVisitedLocations,
+      inventory: persistedPlayerState?.inventory ?? pState.inventory,
+      roundAcquired: persistedPlayerState?.roundAcquired ?? pState.roundAcquired,
+      roundVisitedLocations: persistedPlayerState?.roundVisitedLocations ?? pState.roundVisitedLocations,
     });
     return NextResponse.json({ card });
   }
@@ -238,9 +258,24 @@ export async function POST(req: Request, { params }: Params) {
       type: "clue_revealed",
     });
 
-    await updateSession(session);
-    broadcast(sessionId, "session_update", { sharedState: session.sharedState });
-    broadcast(sessionId, `inventory_${pState.token}`, { inventory: pState.inventory });
+    let persistedSession;
+
+    try {
+      persistedSession = await updateSession(session);
+    } catch (error) {
+      if (isSessionConflictError(error)) {
+        return createSessionConflictResponse();
+      }
+
+      throw error;
+    }
+
+    const persistedPlayerState = persistedSession.playerStates.find((player) => player.playerId === targetPlayerId);
+
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+    broadcast(sessionId, `inventory_${persistedPlayerState?.token ?? pState.token}`, {
+      inventory: persistedPlayerState?.inventory ?? pState.inventory,
+    });
     return NextResponse.json({ card });
   }
 
@@ -283,10 +318,28 @@ export async function POST(req: Request, { params }: Params) {
       type: "card_transferred",
     });
 
-    await updateSession(session);
-    broadcast(sessionId, "session_update", { sharedState: session.sharedState });
-    broadcast(sessionId, `inventory_${token}`, { inventory: from.inventory });
-    broadcast(sessionId, `inventory_${to.token}`, { inventory: to.inventory });
+    let persistedSession;
+
+    try {
+      persistedSession = await updateSession(session);
+    } catch (error) {
+      if (isSessionConflictError(error)) {
+        return createSessionConflictResponse();
+      }
+
+      throw error;
+    }
+
+    const persistedFrom = persistedSession.playerStates.find((player) => player.playerId === from.playerId);
+    const persistedTo = persistedSession.playerStates.find((player) => player.playerId === to.playerId);
+
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+    broadcast(sessionId, `inventory_${persistedFrom?.token ?? token}`, {
+      inventory: persistedFrom?.inventory ?? from.inventory,
+    });
+    broadcast(sessionId, `inventory_${persistedTo?.token ?? to.token}`, {
+      inventory: persistedTo?.inventory ?? to.inventory,
+    });
     return NextResponse.json({ ok: true });
   }
 

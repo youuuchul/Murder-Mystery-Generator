@@ -2,6 +2,7 @@ import type { GamePackage } from "@/types/game";
 import type { GameSession } from "@/types/session";
 import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { buildInitialSession } from "@/lib/session-factory";
+import { createSessionBackupSnapshot } from "@/lib/session-integrity";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
 import {
   createSession as createLocalSession,
@@ -16,9 +17,24 @@ export interface SessionRepository {
   createSession(game: GamePackage): Promise<GameSession>;
   getSession(sessionId: string): Promise<GameSession | null>;
   getSessionByCode(sessionCode: string): Promise<GameSession | null>;
-  updateSession(session: GameSession): Promise<void>;
+  updateSession(session: GameSession): Promise<GameSession>;
   deleteSession(sessionId: string): Promise<boolean>;
   listActiveSessions(gameId: string): Promise<GameSession[]>;
+}
+
+/**
+ * 오래된 세션 사본을 기준으로 덮어쓰려 할 때 던지는 충돌 오류다.
+ * 최근 저장본을 다시 읽은 뒤 재시도하도록 호출부에서 409로 노출한다.
+ */
+export class SessionConflictError extends Error {
+  constructor(message = "다른 변경사항이 먼저 저장돼 세션 갱신에 실패했습니다.") {
+    super(message);
+    this.name = "SessionConflictError";
+  }
+}
+
+export function isSessionConflictError(error: unknown): error is SessionConflictError {
+  return error instanceof SessionConflictError;
 }
 
 /**
@@ -28,24 +44,50 @@ export interface SessionRepository {
 const localSessionRepository: SessionRepository = {
   async createSession(game) {
     const sessionName = buildAutomaticSessionName(listLocalActiveSessions(game.id));
-    return withSessionName(createLocalSession(game, sessionName), sessionName);
+    return withSessionDefaults(createLocalSession(game, sessionName), { fallbackName: sessionName });
   },
   async getSession(sessionId) {
     const session = getLocalSession(sessionId);
-    return session ? withSessionName(session) : null;
+    return session ? withSessionDefaults(session) : null;
   },
   async getSessionByCode(sessionCode) {
     const session = getLocalSessionByCode(sessionCode);
-    return session ? withSessionName(session) : null;
+    return session ? withSessionDefaults(session) : null;
   },
   async updateSession(session) {
-    updateLocalSession(withSessionName(session));
+    const currentSession = getLocalSession(session.id);
+    if (!currentSession) {
+      throw new Error("Session not found");
+    }
+
+    const canonicalCurrentSession = withSessionDefaults(currentSession);
+    const canonicalNextSession = withSessionDefaults(session);
+
+    if (canonicalNextSession.updatedAt !== canonicalCurrentSession.updatedAt) {
+      throw new SessionConflictError();
+    }
+
+    const persistedSession = withSessionDefaults({
+      ...canonicalNextSession,
+      updatedAt: new Date().toISOString(),
+    });
+
+    updateLocalSession(persistedSession);
+    return persistedSession;
   },
   async deleteSession(sessionId) {
+    const currentSession = getLocalSession(sessionId);
+    if (currentSession) {
+      await createSessionBackupSnapshot(withSessionDefaults(currentSession), {
+        provider: "local",
+        reason: "pre-delete",
+      });
+    }
+
     return deleteLocalSession(sessionId);
   },
   async listActiveSessions(gameId) {
-    return sortSessionsForList(listLocalActiveSessions(gameId)).map((session) => withSessionName(session));
+    return sortSessionsForList(listLocalActiveSessions(gameId)).map((session) => withSessionDefaults(session));
   },
 };
 
@@ -136,38 +178,72 @@ function buildFallbackSessionName(createdAt: string): string {
 }
 
 /**
- * 세션 이름이 비어 있으면 화면에서 바로 쓸 수 있는 기본 이름을 채운다.
+ * 세션 이름과 갱신 시각이 비어 있으면 화면과 저장소 비교에 필요한 기본값을 채운다.
  */
-function withSessionName<T extends GameSession>(session: T, fallbackName?: string): T {
-  const normalizedSessionName = session.sessionName?.trim() || fallbackName || buildFallbackSessionName(session.createdAt);
+function withSessionDefaults<T extends GameSession>(
+  session: T,
+  options: {
+    fallbackName?: string;
+    fallbackUpdatedAt?: string;
+  } = {}
+): T {
+  const normalizedSessionName = session.sessionName?.trim()
+    || options.fallbackName
+    || buildFallbackSessionName(session.createdAt);
+  const normalizedUpdatedAt = session.updatedAt?.trim()
+    || options.fallbackUpdatedAt
+    || session.createdAt;
 
-  if (normalizedSessionName === session.sessionName) {
+  if (
+    normalizedSessionName === session.sessionName
+    && normalizedUpdatedAt === session.updatedAt
+  ) {
     return session;
   }
 
   return {
     ...session,
     sessionName: normalizedSessionName,
+    updatedAt: normalizedUpdatedAt,
   };
 }
 
 function buildSupabaseSessionRow(session: GameSession): SupabaseSessionRow {
+  const normalizedSession = withSessionDefaults(session);
   return {
-    id: session.id,
-    game_id: session.gameId,
-    session_code: normalizeSessionCode(session.sessionCode),
+    id: normalizedSession.id,
+    game_id: normalizedSession.gameId,
+    session_code: normalizeSessionCode(normalizedSession.sessionCode),
     host_user_id: null,
-    phase: session.sharedState.phase,
-    current_round: session.sharedState.currentRound,
-    current_sub_phase: session.sharedState.currentSubPhase ?? null,
-    locked_player_count: session.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
-    total_player_count: session.sharedState.characterSlots.length,
-    started_at: session.startedAt ?? null,
-    ended_at: session.endedAt ?? null,
-    created_at: session.createdAt,
-    updated_at: new Date().toISOString(),
-    session_json: session,
+    phase: normalizedSession.sharedState.phase,
+    current_round: normalizedSession.sharedState.currentRound,
+    current_sub_phase: normalizedSession.sharedState.currentSubPhase ?? null,
+    locked_player_count: normalizedSession.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
+    total_player_count: normalizedSession.sharedState.characterSlots.length,
+    started_at: normalizedSession.startedAt ?? null,
+    ended_at: normalizedSession.endedAt ?? null,
+    created_at: normalizedSession.createdAt,
+    updated_at: normalizedSession.updatedAt,
+    session_json: normalizedSession,
   };
+}
+
+/**
+ * Supabase row와 세션 JSON 사이에 빠진 기본 필드를 보정한다.
+ * 과거 데이터에 `updatedAt`이 없더라도 row `updated_at`을 concurrency token으로 재사용한다.
+ */
+function hydrateSupabaseSession(row: SupabaseSessionRow): GameSession {
+  return withSessionDefaults(
+    {
+      ...(row.session_json as GameSession),
+      gameId: row.game_id,
+      sessionCode: normalizeSessionCode(row.session_json.sessionCode ?? row.session_code),
+      createdAt: row.session_json.createdAt ?? row.created_at,
+      updatedAt: row.session_json.updatedAt ?? row.updated_at,
+      startedAt: row.session_json.startedAt ?? row.started_at ?? undefined,
+      endedAt: row.session_json.endedAt ?? row.ended_at ?? undefined,
+    },
+  );
 }
 
 async function loadSupabaseSessionBy(
@@ -193,7 +269,7 @@ async function loadSupabaseSessionBy(
   }
 
   return data
-    ? withSessionName((data as unknown as SupabaseSessionRow).session_json as GameSession)
+    ? hydrateSupabaseSession(data as unknown as SupabaseSessionRow)
     : null;
 }
 
@@ -217,7 +293,7 @@ async function loadSupabaseActiveSessions(gameId: string): Promise<GameSession[]
 
   return sortSessionsForList(
     ((data ?? []) as unknown as SupabaseSessionRow[])
-      .map((row) => withSessionName(row.session_json as GameSession))
+      .map((row) => hydrateSupabaseSession(row))
   );
 }
 
@@ -241,7 +317,10 @@ const supabaseSessionRepository: SessionRepository = {
         .single();
 
       if (!error && data) {
-        return withSessionName((data as unknown as SupabaseSessionRow).session_json as GameSession, sessionName);
+        return withSessionDefaults(
+          hydrateSupabaseSession(data as unknown as SupabaseSessionRow),
+          { fallbackName: sessionName }
+        );
       }
 
       if (error?.code !== "23505") {
@@ -262,13 +341,29 @@ const supabaseSessionRepository: SessionRepository = {
 
   async updateSession(session) {
     const supabase = createSupabasePersistenceClient();
-    const { error } = await supabase
+    const canonicalSession = withSessionDefaults(session);
+    const persistedSession = withSessionDefaults({
+      ...canonicalSession,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const { data, error } = await supabase
       .from("sessions")
-      .upsert(buildSupabaseSessionRow(withSessionName(session)), { onConflict: "id" });
+      .update(buildSupabaseSessionRow(persistedSession))
+      .eq("id", canonicalSession.id)
+      .eq("updated_at", canonicalSession.updatedAt)
+      .select(SUPABASE_SESSION_COLUMNS)
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Failed to update Supabase session: ${error.message}`);
     }
+
+    if (!data) {
+      throw new SessionConflictError();
+    }
+
+    return hydrateSupabaseSession(data as unknown as SupabaseSessionRow);
   },
 
   async deleteSession(sessionId) {
@@ -276,6 +371,16 @@ const supabaseSessionRepository: SessionRepository = {
     if (!normalizedSessionId) {
       return false;
     }
+
+    const existingSession = await loadSupabaseSessionBy("id", normalizedSessionId);
+    if (!existingSession) {
+      return false;
+    }
+
+    await createSessionBackupSnapshot(existingSession, {
+      provider: "supabase",
+      reason: "pre-delete",
+    });
 
     const supabase = createSupabasePersistenceClient();
     const { data, error } = await supabase
@@ -333,7 +438,7 @@ export function getSessionByCode(sessionCode: string): Promise<GameSession | nul
   return getSessionRepository().getSessionByCode(sessionCode);
 }
 
-export function updateSession(session: GameSession): Promise<void> {
+export function updateSession(session: GameSession): Promise<GameSession> {
   return getSessionRepository().updateSession(session);
 }
 

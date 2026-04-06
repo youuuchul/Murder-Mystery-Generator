@@ -104,6 +104,7 @@ export interface GameSession {
   sessionName: string;
   sessionCode: string;
   createdAt: string;
+  updatedAt: string;
   startedAt?: string;
   endedAt?: string;
   /** GM 전용 — 최다 득표 동률 시 최종 검거 대상을 선택해야 하는 후보 목록 */

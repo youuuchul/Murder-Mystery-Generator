@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { getGame } from "@/lib/game-repository";
-import { deleteSession, getSession, updateSession } from "@/lib/session-repository";
+import {
+  deleteSession,
+  getSession,
+  isSessionConflictError,
+  updateSession,
+} from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { GamePhase } from "@/types/session";
 
@@ -12,6 +17,13 @@ function normalizeSubPhase(subPhase?: string): "investigation" | "discussion" | 
   if (subPhase === "discussion" || subPhase === "briefing") return "discussion";
   if (subPhase === "investigation") return "investigation";
   return undefined;
+}
+
+function createSessionConflictResponse() {
+  return NextResponse.json(
+    { error: "다른 변경사항이 먼저 저장됐습니다. 화면을 새로고침한 뒤 다시 시도해주세요." },
+    { status: 409 }
+  );
 }
 
 /** GET /api/sessions/[sessionId] — 세션 상태 조회 */
@@ -180,14 +192,25 @@ export async function PATCH(req: Request, { params }: Params) {
     });
   }
 
-  await updateSession(session);
-  broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+  let persistedSession;
+
+  try {
+    persistedSession = await updateSession(session);
+  } catch (error) {
+    if (isSessionConflictError(error)) {
+      return createSessionConflictResponse();
+    }
+
+    throw error;
+  }
+
+  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
 
   return NextResponse.json({
     session: {
-      id: session.id,
-      sessionName: session.sessionName,
-      sharedState: session.sharedState,
+      id: persistedSession.id,
+      sessionName: persistedSession.sessionName,
+      sharedState: persistedSession.sharedState,
     },
   });
 }

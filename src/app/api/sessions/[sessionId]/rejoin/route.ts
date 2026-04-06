@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { broadcast } from "@/lib/sse/broadcaster";
-import { getSession, updateSession } from "@/lib/session-repository";
+import { getSession, isSessionConflictError, updateSession } from "@/lib/session-repository";
 
 type Params = { params: { sessionId: string } };
 
@@ -75,13 +75,27 @@ export async function POST(req: Request, { params }: Params) {
     type: "system",
   });
 
-  await updateSession(session);
-  broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+  let persistedSession;
+
+  try {
+    persistedSession = await updateSession(session);
+  } catch (error) {
+    if (isSessionConflictError(error)) {
+      return NextResponse.json(
+        { error: "다른 참가 변경이 먼저 반영됐습니다. 잠시 후 다시 시도해주세요." },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
+
+  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
 
   return NextResponse.json({
     token: nextToken,
     sessionId,
-    gameId: session.gameId,
+    gameId: persistedSession.gameId,
     playerId,
     playerName: normalizedPlayerName,
     mode: "rejoin",

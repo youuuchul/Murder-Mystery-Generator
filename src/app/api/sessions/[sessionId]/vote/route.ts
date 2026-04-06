@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { getGame } from "@/lib/game-repository";
-import { getSession, updateSession } from "@/lib/session-repository";
+import { getSession, isSessionConflictError, updateSession } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 type LoadedGame = NonNullable<Awaited<ReturnType<typeof getGame>>>;
 type LoadedSession = NonNullable<Awaited<ReturnType<typeof getSession>>>;
+
+function createSessionConflictResponse() {
+  return NextResponse.json(
+    { error: "다른 변경사항이 먼저 저장됐습니다. 화면을 새로고침한 뒤 다시 시도해주세요." },
+    { status: 409 }
+  );
+}
 
 /**
  * 현재 검거 대상과 설정된 엔딩 분기 목록을 바탕으로 적용할 분기 ID를 찾는다.
@@ -86,9 +93,13 @@ async function revealVotes(
       type: "system",
     });
 
-    await updateSession(session);
-    broadcast(sessionId, "session_update", { sharedState: session.sharedState });
-    return { requiresTieBreak: true, pendingArrestOptions: tiedCandidates };
+    const persistedSession = await updateSession(session) as LoadedSession;
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+    return {
+      requiresTieBreak: true,
+      pendingArrestOptions: tiedCandidates,
+      session: persistedSession,
+    };
   }
 
   const totalVotes = Object.keys(session.votes).length;
@@ -125,9 +136,13 @@ async function revealVotes(
     type: "vote_revealed",
   });
 
-  await updateSession(session);
-  broadcast(sessionId, "session_update", { sharedState: session.sharedState });
-  return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
+  const persistedSession = await updateSession(session) as LoadedSession;
+  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+  return {
+    requiresTieBreak: false,
+    pendingArrestOptions: [] as string[],
+    session: persistedSession,
+  };
 }
 
 /** POST /api/sessions/[sessionId]/vote — 투표 제출 */
@@ -178,13 +193,32 @@ export async function POST(req: Request, { params }: Params) {
   const totalPlayers = session.sharedState.characterSlots.filter((s) => s.isLocked).length;
   const allVoted = session.sharedState.voteCount >= totalPlayers;
 
-  await updateSession(session);
-  broadcast(sessionId, "session_update", { sharedState: session.sharedState });
+  let persistedSession: LoadedSession;
+
+  try {
+    persistedSession = await updateSession(session) as LoadedSession;
+  } catch (error) {
+    if (isSessionConflictError(error)) {
+      return createSessionConflictResponse();
+    }
+
+    throw error;
+  }
+
+  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
 
   // 전원 투표 완료 시 자동 공개
   let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
   if (allVoted) {
-    revealState = await revealVotes(sessionId, session);
+    try {
+      revealState = await revealVotes(sessionId, persistedSession);
+    } catch (error) {
+      if (isSessionConflictError(error)) {
+        return createSessionConflictResponse();
+      }
+
+      throw error;
+    }
   }
 
   return NextResponse.json({
@@ -217,13 +251,24 @@ export async function PATCH(req: Request, { params }: Params) {
     }
   }
 
-  const revealState = await revealVotes(sessionId, session, arrestedPlayerId);
+  let revealState;
+
+  try {
+    revealState = await revealVotes(sessionId, session, arrestedPlayerId);
+  } catch (error) {
+    if (isSessionConflictError(error)) {
+      return createSessionConflictResponse();
+    }
+
+    throw error;
+  }
+
   return NextResponse.json({
     ok: true,
     session: {
-      id: session.id,
-      sharedState: session.sharedState,
-      pendingArrestOptions: session.pendingArrestOptions ?? [],
+      id: revealState.session?.id ?? session.id,
+      sharedState: revealState.session?.sharedState ?? session.sharedState,
+      pendingArrestOptions: revealState.session?.pendingArrestOptions ?? [],
     },
     requiresTieBreak: revealState.requiresTieBreak,
     pendingArrestOptions: revealState.pendingArrestOptions,

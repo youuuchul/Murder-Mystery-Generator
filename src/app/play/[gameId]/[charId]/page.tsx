@@ -792,7 +792,7 @@ export default function PlayerView() {
   }, [token, sessionId]);
 
   useSSE(
-    sessionId && token ? `/api/sessions/${sessionId}/events` : null,
+    sessionId && token ? `/api/sessions/${sessionId}/events?token=${encodeURIComponent(token)}` : null,
     {
       session_update: (data: unknown) => {
         const d = data as { sharedState: SharedState };

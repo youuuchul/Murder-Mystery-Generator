@@ -974,6 +974,9 @@ export default function GMDashboard({
   const [deleting, setDeleting] = useState(false);
   const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
+  const [accessPromptSessionId, setAccessPromptSessionId] = useState<string | null>(null);
+  const [accessCodeDrafts, setAccessCodeDrafts] = useState<Record<string, string>>({});
+  const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     setSession(initialSession);
@@ -1077,6 +1080,55 @@ export default function GMDashboard({
       }
     } finally {
       setCreating(false);
+    }
+  }
+
+  function handleSessionCodeDraftChange(sessionId: string, value: string) {
+    setAccessCodeDrafts((prev) => ({
+      ...prev,
+      [sessionId]: value,
+    }));
+  }
+
+  async function openSessionFromList(item: GameSessionSummary) {
+    if (item.canResumeDirectly) {
+      router.push(buildSessionPath(item.id));
+      return;
+    }
+
+    setAccessPromptSessionId((prev) => prev === item.id ? null : item.id);
+  }
+
+  async function verifySessionAccess(sessionId: string) {
+    const sessionCode = accessCodeDrafts[sessionId]?.trim();
+    if (!sessionCode) {
+      alert("세션 코드를 입력해주세요.");
+      return;
+    }
+
+    setVerifyingSessionId(sessionId);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionCode }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        alert(errorBody.error ?? "세션 코드 확인 실패");
+        return;
+      }
+
+      setAccessPromptSessionId(null);
+      setAccessCodeDrafts((prev) => ({
+        ...prev,
+        [sessionId]: "",
+      }));
+      await refreshSessionSummaries(sessionId);
+      router.push(buildSessionPath(sessionId));
+    } finally {
+      setVerifyingSessionId(null);
     }
   }
 
@@ -1339,7 +1391,7 @@ export default function GMDashboard({
                   <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Select</p>
                   <h2 className="mt-2 text-2xl font-semibold text-dark-50">어떤 세션으로 진행할까요?</h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-dark-300">
-                    이미 열어둔 방이 있으면 이어서 열고, 새로 시작하려면 새 세션을 만들면 됩니다.
+                    내 방은 바로 이어서 열 수 있고, 다른 방은 세션 코드를 입력하면 들어갈 수 있습니다.
                   </p>
                 </div>
                 <button
@@ -1351,27 +1403,88 @@ export default function GMDashboard({
                 </button>
               </div>
               <div className="mt-6 grid gap-3 md:grid-cols-2">
-                {sessionSummaries.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      router.push(buildSessionPath(item.id));
-                    }}
-                    className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
-                  >
+                {sessionSummaries.map((item) => {
+                  const needsCode = !item.canResumeDirectly;
+                  const isAccessPromptOpen = accessPromptSessionId === item.id;
+                  const isVerifying = verifyingSessionId === item.id;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
+                    >
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-dark-50">{item.sessionName}</p>
-                      <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
-                        {getSessionBadgeLabel(item)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {needsCode ? (
+                          <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">
+                            코드 필요
+                          </span>
+                        ) : null}
+                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
+                          {getSessionBadgeLabel(item)}
+                        </span>
+                      </div>
                     </div>
                     <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
                     <p className="mt-3 text-sm text-dark-300">
                       {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
                     </p>
-                  </button>
-                ))}
+                    <div className="mt-4 space-y-3">
+                      {!needsCode ? (
+                        <button
+                          type="button"
+                          onClick={() => { void openSessionFromList(item); }}
+                          className="w-full rounded-xl border border-mystery-700 bg-mystery-900/30 px-4 py-2.5 text-sm font-medium text-mystery-100 transition-colors hover:bg-mystery-800/40"
+                        >
+                          이어서 열기
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { void openSessionFromList(item); }}
+                            className="w-full rounded-xl border border-dark-700 px-4 py-2.5 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                          >
+                            {isAccessPromptOpen ? "코드 입력 닫기" : "코드 입력"}
+                          </button>
+                          {isAccessPromptOpen ? (
+                            <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-3 space-y-2">
+                              <p className="text-xs leading-5 text-dark-400">
+                                세션 코드를 입력하면 이 방으로 들어갈 수 있습니다.
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={accessCodeDrafts[item.id] ?? ""}
+                                  onChange={(event) => handleSessionCodeDraftChange(item.id, event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      void verifySessionAccess(item.id);
+                                    }
+                                  }}
+                                  maxLength={6}
+                                  placeholder="세션 코드 입력"
+                                  className="flex-1 rounded-lg border border-dark-700 bg-dark-900 px-3 py-2 text-sm font-mono uppercase tracking-[0.2em] text-dark-100 outline-none transition focus:border-mystery-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => { void verifySessionAccess(item.id); }}
+                                  disabled={isVerifying}
+                                  className="rounded-lg border border-mystery-700 bg-mystery-900/30 px-3 py-2 text-xs font-medium text-mystery-100 transition-colors hover:bg-mystery-800/40 disabled:opacity-50"
+                                >
+                                  {isVerifying ? "확인 중…" : "입장"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  );
+                })}
               </div>
             </div>
           ) : (

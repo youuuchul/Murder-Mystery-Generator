@@ -1,3 +1,8 @@
+import { NextRequest } from "next/server";
+import { canAccessGmPlay } from "@/lib/game-access";
+import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
+import { getGame } from "@/lib/game-repository";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { subscribe, unsubscribe } from "@/lib/sse/broadcaster";
 import { getSession } from "@/lib/session-repository";
 
@@ -7,12 +12,35 @@ const encoder = new TextEncoder();
 
 /** GET /api/sessions/[sessionId]/events — SSE 스트림 */
 export async function GET(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { sessionId: string } }
 ) {
   const { sessionId } = params;
+  const token = new URL(req.url).searchParams.get("token");
   const session = await getSession(sessionId);
   if (!session) return new Response("Session not found", { status: 404 });
+
+  if (token) {
+    const playerState = session.playerStates.find((item) => item.token === token);
+    if (!playerState) {
+      return new Response("Invalid token", { status: 403 });
+    }
+  } else {
+    const game = await getGame(session.gameId);
+    const currentUser = await getRequestMakerUser(req);
+
+    if (!game || !canAccessGmPlay(game, currentUser?.id)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const canResume = canResumeGmSessionDirectly(session, {
+      currentUserId: currentUser?.id,
+      cookieStore: req.cookies,
+    });
+    if (!canResume) {
+      return new Response("Forbidden", { status: 403 });
+    }
+  }
 
   let ctrl: ReadableStreamDefaultController<Uint8Array>;
   let pingInterval: ReturnType<typeof setInterval>;

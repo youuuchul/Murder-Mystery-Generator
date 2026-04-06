@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { canAccessGmPlay } from "@/lib/game-access";
+import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
@@ -7,6 +10,28 @@ import type { InventoryCard, PlayerState } from "@/types/session";
 import type { ClueCondition } from "@/types/game";
 
 type Params = { params: { sessionId: string } };
+
+async function canAccessGmSession(request: NextRequest, sessionId: string): Promise<boolean> {
+  const session = await getSession(sessionId);
+  if (!session) {
+    return false;
+  }
+
+  const game = await getGame(session.gameId);
+  if (!game) {
+    return false;
+  }
+
+  const currentUser = await getRequestMakerUser(request);
+  if (!canAccessGmPlay(game, currentUser?.id)) {
+    return false;
+  }
+
+  return canResumeGmSessionDirectly(session, {
+    currentUserId: currentUser?.id,
+    cookieStore: request.cookies,
+  });
+}
 
 function createSessionConflictResponse() {
   return NextResponse.json(
@@ -62,7 +87,7 @@ function evaluateCondition(
  * action: "distribute" — legacy GM 단서 배포
  * action: "transfer"   — 플레이어 간 카드 이전
  */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const body = await req.json().catch(() => ({})) as {
     action?: string;
@@ -331,6 +356,10 @@ export async function POST(req: Request, { params }: Params) {
 
   // ── GM 단서 배포 ────────────────────────────────────────────
   if (body.action === "distribute") {
+    if (!(await canAccessGmSession(req, sessionId))) {
+      return NextResponse.json({ error: "이 세션에 단서를 배포할 권한이 없습니다." }, { status: 403 });
+    }
+
     const { clueId, targetPlayerId } = body;
     if (!clueId || !targetPlayerId) {
       return NextResponse.json({ error: "clueId, targetPlayerId 필수" }, { status: 400 });

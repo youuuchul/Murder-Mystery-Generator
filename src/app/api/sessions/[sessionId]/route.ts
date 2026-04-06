@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
+import { canAccessGmPlay } from "@/lib/game-access";
+import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
   deleteSession,
@@ -13,6 +16,23 @@ import { broadcast } from "@/lib/sse/broadcaster";
 import type { EndingStage, GamePhase, GameSession } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
+
+async function canAccessGmSession(request: NextRequest, session: GameSession): Promise<boolean> {
+  const game = await getGame(session.gameId);
+  if (!game) {
+    return false;
+  }
+
+  const currentUser = await getRequestMakerUser(request);
+  if (!canAccessGmPlay(game, currentUser?.id)) {
+    return false;
+  }
+
+  return canResumeGmSessionDirectly(session, {
+    currentUserId: currentUser?.id,
+    cookieStore: request.cookies,
+  });
+}
 
 function normalizeSubPhase(subPhase?: string): "investigation" | "discussion" | undefined {
   if (subPhase === "discussion" || subPhase === "briefing") return "discussion";
@@ -64,7 +84,7 @@ function canRetryActionOnLatestSession(
 }
 
 /** GET /api/sessions/[sessionId] — 세션 상태 조회 */
-export async function GET(req: Request, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const token = new URL(req.url).searchParams.get("token");
 
@@ -85,6 +105,10 @@ export async function GET(req: Request, { params }: Params) {
     });
   }
 
+  if (!(await canAccessGmSession(req, session))) {
+    return NextResponse.json({ error: "이 세션을 열 권한이 없습니다." }, { status: 403 });
+  }
+
   // GM: 전체 공개 상태 (playerState 개인 데이터 제외)
   return NextResponse.json({
     session: {
@@ -99,7 +123,7 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 /** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 */
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const body = await req.json().catch(() => ({})) as {
     action?: string;
@@ -110,6 +134,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+  if (!(await canAccessGmSession(req, session))) {
+    return NextResponse.json({ error: "이 세션을 수정할 권한이 없습니다." }, { status: 403 });
+  }
 
   const game = await getGame(session.gameId);
   const maxRound = game?.rules?.roundCount ?? 4;
@@ -276,12 +304,18 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 /** DELETE /api/sessions/[sessionId] — 세션 파일 삭제 */
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const session = await getSession(sessionId);
-  if (session) {
-    broadcast(sessionId, "session_deleted", {});
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
+
+  if (!(await canAccessGmSession(req, session))) {
+    return NextResponse.json({ error: "이 세션을 삭제할 권한이 없습니다." }, { status: 403 });
+  }
+
+  broadcast(sessionId, "session_deleted", {});
   const deleted = await deleteSession(sessionId);
   if (!deleted) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   return NextResponse.json({ ok: true });

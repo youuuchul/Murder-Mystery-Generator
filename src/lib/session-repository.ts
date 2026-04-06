@@ -13,8 +13,12 @@ import {
   updateSession as updateLocalSession,
 } from "@/lib/storage/session-storage";
 
+export interface CreateSessionOptions {
+  hostUserId?: string;
+}
+
 export interface SessionRepository {
-  createSession(game: GamePackage): Promise<GameSession>;
+  createSession(game: GamePackage, options?: CreateSessionOptions): Promise<GameSession>;
   getSession(sessionId: string): Promise<GameSession | null>;
   getSessionByCode(sessionCode: string): Promise<GameSession | null>;
   updateSession(session: GameSession): Promise<GameSession>;
@@ -42,9 +46,12 @@ export function isSessionConflictError(error: unknown): error is SessionConflict
  * 세션 변경이 잦아도 route/page 계층은 이 경계만 의존하게 유지한다.
  */
 const localSessionRepository: SessionRepository = {
-  async createSession(game) {
+  async createSession(game, options = {}) {
     const sessionName = buildAutomaticSessionName(listLocalActiveSessions(game.id));
-    return withSessionDefaults(createLocalSession(game, sessionName), { fallbackName: sessionName });
+    return withSessionDefaults(
+      createLocalSession(game, sessionName, options.hostUserId),
+      { fallbackName: sessionName }
+    );
   },
   async getSession(sessionId) {
     const session = getLocalSession(sessionId);
@@ -214,7 +221,7 @@ function buildSupabaseSessionRow(session: GameSession): SupabaseSessionRow {
     id: normalizedSession.id,
     game_id: normalizedSession.gameId,
     session_code: normalizeSessionCode(normalizedSession.sessionCode),
-    host_user_id: null,
+    host_user_id: normalizedSession.hostUserId?.trim() || null,
     phase: normalizedSession.sharedState.phase,
     current_round: normalizedSession.sharedState.currentRound,
     current_sub_phase: normalizedSession.sharedState.currentSubPhase ?? null,
@@ -239,6 +246,7 @@ function hydrateSupabaseSession(row: SupabaseSessionRow): GameSession {
       ...(row.session_json as GameSession),
       gameId: row.game_id,
       sessionCode: normalizeSessionCode(row.session_json.sessionCode ?? row.session_code),
+      hostUserId: row.session_json.hostUserId ?? row.host_user_id ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       startedAt: row.session_json.startedAt ?? row.started_at ?? undefined,
@@ -303,13 +311,20 @@ async function loadSupabaseActiveSessions(gameId: string): Promise<GameSession[]
  * 현재 세션 API는 raw token을 포함한 GameSession 전체를 한 번에 읽고 쓰므로 canonical source를 `session_json`으로 유지한다.
  */
 const supabaseSessionRepository: SessionRepository = {
-  async createSession(game) {
+  async createSession(game, options = {}) {
     const supabase = createSupabasePersistenceClient();
     const existingSessions = await loadSupabaseActiveSessions(game.id);
     const sessionName = buildAutomaticSessionName(existingSessions);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const session = buildInitialSession(game, undefined, undefined, undefined, sessionName);
+      const session = buildInitialSession(
+        game,
+        undefined,
+        undefined,
+        undefined,
+        sessionName,
+        options.hostUserId
+      );
       const row = buildSupabaseSessionRow(session);
       const { data, error } = await supabase
         .from("sessions")
@@ -427,8 +442,11 @@ export function getSessionRepository(): SessionRepository {
   return cachedRepository;
 }
 
-export function createSession(game: GamePackage): Promise<GameSession> {
-  return getSessionRepository().createSession(game);
+export function createSession(
+  game: GamePackage,
+  options?: CreateSessionOptions
+): Promise<GameSession> {
+  return getSessionRepository().createSession(game, options);
 }
 
 export function getSession(sessionId: string): Promise<GameSession | null> {

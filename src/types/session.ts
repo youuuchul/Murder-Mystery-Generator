@@ -103,6 +103,8 @@ export interface GameSession {
   gameId: string;
   sessionName: string;
   sessionCode: string;
+  /** 이 세션을 만든 GM 작업자 ID. 공개 게임의 익명 GM 세션은 비어 있을 수 있다. */
+  hostUserId?: string;
   createdAt: string;
   updatedAt: string;
   startedAt?: string;
@@ -118,7 +120,6 @@ export interface GameSession {
 export interface GameSessionSummary {
   id: string;
   sessionName: string;
-  sessionCode: string;
   createdAt: string;
   startedAt?: string;
   phase: GamePhase;
@@ -126,4 +127,6 @@ export interface GameSessionSummary {
   currentSubPhase?: SharedState["currentSubPhase"];
   lockedPlayerCount: number;
   totalPlayerCount: number;
+  /** 현재 브라우저/작업자 기준으로 코드 없이 바로 열 수 있는 세션인지 여부. */
+  canResumeDirectly: boolean;
 }

@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { canAccessGmPlay } from "@/lib/game-access";
+import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
@@ -8,6 +11,23 @@ import type { VoteTally, VoteReveal } from "@/types/session";
 type Params = { params: { sessionId: string } };
 type LoadedGame = NonNullable<Awaited<ReturnType<typeof getGame>>>;
 type LoadedSession = NonNullable<Awaited<ReturnType<typeof getSession>>>;
+
+async function canAccessGmSession(request: NextRequest, session: LoadedSession): Promise<boolean> {
+  const game = await getGame(session.gameId);
+  if (!game) {
+    return false;
+  }
+
+  const currentUser = await getRequestMakerUser(request);
+  if (!canAccessGmPlay(game, currentUser?.id)) {
+    return false;
+  }
+
+  return canResumeGmSessionDirectly(session, {
+    currentUserId: currentUser?.id,
+    cookieStore: request.cookies,
+  });
+}
 
 function createSessionConflictResponse() {
   return NextResponse.json(
@@ -152,7 +172,7 @@ async function revealVotes(
 }
 
 /** POST /api/sessions/[sessionId]/vote — 투표 제출 */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const { token, targetPlayerId } = await req.json().catch(() => ({})) as {
     token?: string;
@@ -237,13 +257,17 @@ export async function POST(req: Request, { params }: Params) {
 }
 
 /** PATCH /api/sessions/[sessionId]/vote — GM 강제 공개 */
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const { arrestedPlayerId } = await req.json().catch(() => ({})) as {
     arrestedPlayerId?: string;
   };
   const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+  if (!(await canAccessGmSession(req, session))) {
+    return NextResponse.json({ error: "이 세션 결과를 공개할 권한이 없습니다." }, { status: 403 });
+  }
 
   if (session.sharedState.phase !== "vote") {
     return NextResponse.json({ error: "투표 페이즈가 아닙니다" }, { status: 400 });

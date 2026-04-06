@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
+import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { listActiveSessions } from "@/lib/session-repository";
@@ -12,11 +14,15 @@ export const dynamic = "force-dynamic";
 /**
  * GM 진입 시 보여줄 세션 선택용 경량 요약 정보로 변환한다.
  */
-function toSessionSummary(session: GameSession): GameSessionSummary {
+function toSessionSummary(
+  session: GameSession,
+  options: {
+    canResumeDirectly: boolean;
+  }
+): GameSessionSummary {
   return {
     id: session.id,
     sessionName: session.sessionName,
-    sessionCode: session.sessionCode,
     createdAt: session.createdAt,
     startedAt: session.startedAt,
     phase: session.sharedState.phase,
@@ -24,6 +30,7 @@ function toSessionSummary(session: GameSession): GameSessionSummary {
     currentSubPhase: session.sharedState.currentSubPhase,
     lockedPlayerCount: session.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
     totalPlayerCount: session.sharedState.characterSlots.length,
+    canResumeDirectly: options.canResumeDirectly,
   };
 }
 
@@ -71,15 +78,29 @@ export default async function PlayPage({
   }
 
   const activeSessions = await listActiveSessions(params.gameId);
+  const cookieStore = cookies();
   const requestedSessionId = searchParams?.session;
   /**
    * 기본 진입에서는 세션 선택 화면을 먼저 보여준다.
    * 특정 세션을 명시적으로 고른 경우에만 해당 세션을 바로 연다.
    */
   const currentSession = requestedSessionId
-    ? activeSessions.find((item) => item.id === requestedSessionId) ?? null
+    ? activeSessions.find((item) => (
+      item.id === requestedSessionId
+      && canResumeGmSessionDirectly(item, {
+        currentUserId: currentUser?.id,
+        cookieStore,
+      })
+    )) ?? null
     : null;
-  const initialSessionSummaries = activeSessions.map(toSessionSummary);
+  const initialSessionSummaries = activeSessions.map((session) => (
+    toSessionSummary(session, {
+      canResumeDirectly: canResumeGmSessionDirectly(session, {
+        currentUserId: currentUser?.id,
+        cookieStore,
+      }),
+    })
+  ));
 
   return (
     <div className="min-h-screen bg-dark-950 text-dark-100">

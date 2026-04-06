@@ -24,7 +24,8 @@ export function buildInitialSession(
   sessionId = crypto.randomUUID(),
   sessionCode = generateSessionCode(),
   now = new Date().toISOString(),
-  sessionName = "새 방"
+  sessionName = "새 방",
+  hostUserId?: string
 ): GameSession {
   const slots: CharacterSlot[] = game.players.map((player) => ({
     playerId: player.id,
@@ -38,6 +39,7 @@ export function buildInitialSession(
     gameId: game.id,
     sessionName,
     sessionCode,
+    hostUserId,
     createdAt: now,
     updatedAt: now,
     sharedState: {

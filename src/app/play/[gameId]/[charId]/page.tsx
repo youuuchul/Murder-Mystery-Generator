@@ -903,7 +903,7 @@ export default function PlayerView() {
   ];
 
   return (
-    <div className="min-h-screen bg-dark-950 text-dark-100">
+    <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
       {/* 상단 상태 바 */}
       <div className="sticky top-0 z-10 bg-dark-950/95 backdrop-blur border-b border-dark-800 px-4 py-2.5 flex items-center justify-between">
         <div>
@@ -1197,27 +1197,31 @@ export default function PlayerView() {
                           ? "border-dark-700 opacity-60"
                           : "border-dark-800"
                       }`}>
-                        <div className="px-4 py-3 bg-dark-800/60 flex items-center gap-2 flex-wrap">
-                          <span className={`font-medium ${locationLocked ? "text-dark-400" : "text-dark-100"}`}>
-                            {loc.name}
-                          </span>
-                          {loc.accessCondition && (
-                            <span className={`text-xs border px-1.5 py-0.5 rounded-full ${
-                              locationLocked
-                                ? "text-red-400 border-red-800 bg-red-950/30"
-                                : locationCondMet === true
-                                ? "text-green-400 border-green-800 bg-green-950/20"
-                                : "text-yellow-400 border-yellow-800 bg-yellow-950/20"
-                            }`}>
-                              {locationLocked ? "입장 불가" : locationCondMet === true ? "조건 충족" : "조건 확인 중"}
+                        <div className="px-4 py-3 bg-dark-800/60 space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className={`min-w-0 break-words text-sm font-medium ${locationLocked ? "text-dark-400" : "text-dark-100"}`}>
+                              {loc.name}
                             </span>
-                          )}
-                          {!allowRevisit && visitedThisRound && !locationLocked && (
-                            <span className="text-xs text-dark-500 border border-dark-700 px-1.5 py-0.5 rounded-full">
-                              이번 라운드 방문 완료
-                            </span>
-                          )}
-                          <span className="text-xs text-dark-600 ml-auto">단서 {locClues.length}개</span>
+                            <span className="shrink-0 text-xs text-dark-600">단서 {locClues.length}개</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {loc.accessCondition && (
+                              <span className={`text-xs border px-1.5 py-0.5 rounded-full ${
+                                locationLocked
+                                  ? "text-red-400 border-red-800 bg-red-950/30"
+                                  : locationCondMet === true
+                                  ? "text-green-400 border-green-800 bg-green-950/20"
+                                  : "text-yellow-400 border-yellow-800 bg-yellow-950/20"
+                              }`}>
+                                {locationLocked ? "입장 불가" : locationCondMet === true ? "조건 충족" : "조건 확인 중"}
+                              </span>
+                            )}
+                            {!allowRevisit && visitedThisRound && !locationLocked && (
+                              <span className="text-xs text-dark-500 border border-dark-700 px-1.5 py-0.5 rounded-full">
+                                이번 라운드 방문 완료
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {/* 장소 조건 힌트 */}
                         {loc.accessCondition?.hint && (
@@ -1236,7 +1240,7 @@ export default function PlayerView() {
                           </div>
                         )}
                         {loc.description && (
-                          <p className="px-4 pt-3 text-xs text-dark-500">{loc.description}</p>
+                          <p className="px-4 pt-3 text-xs leading-relaxed break-words text-dark-500">{loc.description}</p>
                         )}
                         <div className="p-3 space-y-2">
                           {locClues.length === 0 ? (
@@ -1271,13 +1275,13 @@ export default function PlayerView() {
                                   <div className="min-w-0 flex-1">
                                     {isSceneClue ? (
                                       <>
-                                        <p className="text-sm text-sky-300 font-medium truncate">
+                                        <p className="text-sm font-medium break-words text-sky-300">
                                           {clue.title || `현장 단서 ${idx + 1}`}
                                         </p>
                                         <p className="text-xs text-dark-500 mt-0.5">공개 정보 · 획득되지 않음</p>
                                       </>
                                     ) : alreadyHas ? (
-                                      <p className="text-sm text-mystery-300 font-medium truncate">
+                                      <p className="text-sm font-medium break-words text-mystery-300">
                                         {clue.title || "(카드)"}
                                       </p>
                                     ) : takenByOther ? (
@@ -1291,7 +1295,7 @@ export default function PlayerView() {
                                           조건부 단서 #{idx + 1}
                                         </p>
                                         {clue.condition.hint && (
-                                          <p className="text-xs text-yellow-500/80 mt-0.5">{clue.condition.hint}</p>
+                                          <p className="text-xs mt-0.5 break-words text-yellow-500/80">{clue.condition.hint}</p>
                                         )}
                                       </>
                                     ) : (

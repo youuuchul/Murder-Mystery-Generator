@@ -38,6 +38,12 @@ const SUB_PHASE_LABELS: Record<ActiveSubPhase, string> = {
   discussion: "토론",
 };
 
+const DIFFICULTY_LABELS: Record<string, string> = {
+  easy: "쉬움",
+  normal: "보통",
+  hard: "어려움",
+};
+
 function normalizeSubPhase(subPhase?: string): ActiveSubPhase {
   return subPhase === "discussion" || subPhase === "briefing" ? "discussion" : "investigation";
 }
@@ -633,46 +639,80 @@ function PhaseTimer({
   );
 }
 
+function isLocalOnlyHost(hostname: string): boolean {
+  const normalizedHost = hostname.trim().toLowerCase();
+
+  if (
+    normalizedHost === "localhost"
+    || normalizedHost === "127.0.0.1"
+    || normalizedHost === "0.0.0.0"
+    || normalizedHost === "::1"
+    || normalizedHost.endsWith(".local")
+  ) {
+    return true;
+  }
+
+  return /^10\.\d+\.\d+\.\d+$/.test(normalizedHost)
+    || /^192\.168\.\d+\.\d+$/.test(normalizedHost)
+    || /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(normalizedHost);
+}
+
 // ── 세션 코드 표시 ─────────────────────────────────────────────
-function SessionCode({ code }: { code: string }) {
+function SessionCode({
+  sessionId,
+  sessionName,
+  code,
+  isLobby,
+  onSessionNameChange,
+}: {
+  sessionId: string;
+  sessionName: string;
+  code: string;
+  isLobby: boolean;
+  onSessionNameChange: (nextSessionName: string) => Promise<void>;
+}) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
-  const [serverIps, setServerIps] = useState<string[]>([]);
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
-  const [localPort, setLocalPort] = useState("3000");
+  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(isLobby);
+  const [draftSessionName, setDraftSessionName] = useState(sessionName);
+  const [savingSessionName, setSavingSessionName] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    const nextPort = window.location.port;
-    if (nextPort) {
-      setLocalPort(nextPort);
-      return;
-    }
-
-    setLocalPort(window.location.protocol === "https:" ? "443" : "80");
+    const { origin, hostname } = window.location;
+    setPublicOrigin(isLocalOnlyHost(hostname) ? null : origin);
   }, []);
+
+  useEffect(() => {
+    setIsExpanded(isLobby);
+  }, [isLobby]);
+
+  useEffect(() => {
+    setDraftSessionName(sessionName);
+  }, [sessionName]);
 
   const fetchServerInfo = useCallback(async () => {
     try {
       const res = await fetch("/api/server-info");
       if (!res.ok) return;
       const data = await res.json();
-      setServerIps(data.ips ?? []);
       setTunnelUrl(data.tunnelUrl ?? null);
     } catch {}
   }, []);
 
   useEffect(() => {
+    if (!isLobby || publicOrigin || tunnelUrl) return;
+
     void fetchServerInfo();
-    if (tunnelUrl) return;
 
     const id = setInterval(() => {
       void fetchServerInfo();
     }, 5000);
 
     return () => clearInterval(id);
-  }, [fetchServerInfo, tunnelUrl]);
+  }, [fetchServerInfo, isLobby, publicOrigin, tunnelUrl]);
 
   function copyCode() {
     navigator.clipboard.writeText(code);
@@ -686,12 +726,111 @@ function SessionCode({ code }: { code: string }) {
     setTimeout(() => setUrlCopied(false), 2000);
   }
 
-  const joinPath = "/join";
-  const portSuffix = localPort === "80" || localPort === "443" ? "" : `:${localPort}`;
+  async function saveSessionName() {
+    const normalizedSessionName = draftSessionName.trim().slice(0, 40);
+    if (!normalizedSessionName || normalizedSessionName === sessionName) {
+      return;
+    }
+
+    setSavingSessionName(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_session_name",
+          sessionName: normalizedSessionName,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "방 제목 저장 실패");
+        return;
+      }
+
+      const data = await res.json() as { session?: { sessionName?: string } };
+      const nextSessionName = data.session?.sessionName ?? normalizedSessionName;
+      setDraftSessionName(nextSessionName);
+      await onSessionNameChange(nextSessionName);
+    } finally {
+      setSavingSessionName(false);
+    }
+  }
+
+  const joinUrl = publicOrigin
+    ? `${publicOrigin}/join/${code}`
+    : tunnelUrl
+      ? `${tunnelUrl}/join/${code}`
+      : null;
+
+  if (!isLobby && !isExpanded) {
+    return (
+      <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-dark-500">현재 방</p>
+          <p className="text-sm font-medium text-dark-100">{sessionName}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+        >
+          코드 확인
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-dark-900 border border-mystery-800 rounded-2xl p-5 text-center space-y-3">
-      <p className="text-xs text-dark-500">플레이어 참가 코드</p>
+      <div className="flex items-start justify-between gap-3 text-left">
+        <div>
+          <p className="text-xs text-dark-500">플레이어 참가 코드</p>
+          {!isLobby ? (
+            <p className="mt-1 text-xs text-dark-600">진행 중에는 필요할 때만 다시 펼쳐 확인합니다.</p>
+          ) : null}
+        </div>
+        {!isLobby ? (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+          >
+            접기
+          </button>
+        ) : null}
+      </div>
+      <div className="space-y-2 text-left">
+        <label className="text-xs text-dark-500" htmlFor={`session-name-${sessionId}`}>
+          방 제목
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id={`session-name-${sessionId}`}
+            type="text"
+            value={draftSessionName}
+            onChange={(event) => setDraftSessionName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void saveSessionName();
+              }
+            }}
+            maxLength={40}
+            className="flex-1 rounded-lg border border-dark-700 bg-dark-950 px-3 py-2 text-sm text-dark-100 outline-none transition focus:border-mystery-500"
+            placeholder="방 제목 입력"
+          />
+          <button
+            type="button"
+            onClick={() => { void saveSessionName(); }}
+            disabled={savingSessionName || draftSessionName.trim().length === 0 || draftSessionName.trim() === sessionName}
+            className="rounded-lg border border-dark-700 px-3 py-2 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50 disabled:opacity-50"
+          >
+            {savingSessionName ? "저장 중…" : "이름 저장"}
+          </button>
+        </div>
+      </div>
       <p className="text-5xl font-mono font-black tracking-widest text-mystery-300">
         {code}
       </p>
@@ -702,48 +841,27 @@ function SessionCode({ code }: { code: string }) {
         {codeCopied ? "복사됨" : "코드 복사"}
       </button>
 
-      {/* 터널 URL (cloudflared) */}
-      {tunnelUrl ? (
+      {joinUrl ? (
         <div className="border-t border-dark-800 pt-3 space-y-2">
-          <p className="text-xs text-dark-500">외부 접속 URL (어떤 네트워크든 가능)</p>
-          <p className="text-xs text-emerald-400 font-mono break-all">{tunnelUrl}{joinPath}</p>
+          <p className="text-xs text-dark-500">참가 링크</p>
+          <p className="text-xs text-emerald-400 font-mono break-all">{joinUrl}</p>
           <button
-            onClick={() => copyUrl(`${tunnelUrl}${joinPath}`)}
+            onClick={() => copyUrl(joinUrl)}
             className="w-full text-sm px-4 py-2 rounded-lg bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800 transition-colors"
           >
-            {urlCopied ? "복사됨" : "URL 복사"}
+            {urlCopied ? "복사됨" : "링크 복사"}
           </button>
         </div>
       ) : (
         <div className="border-t border-dark-800 pt-3">
           <p className="text-xs text-dark-600 text-center">
-            외부 URL 없음 —{" "}
+            참가 링크 없음 —{" "}
             <span className="text-dark-500">
               <code>npm run dev:tunnel</code> 로 시작하면 활성화
             </span>
           </p>
         </div>
       )}
-
-      {/* LAN IP */}
-      <div className="border-t border-dark-800 pt-3 space-y-1">
-        <p className="text-xs text-dark-600 text-center">LAN 접속 주소 (같은 Wi-Fi 필요)</p>
-        {serverIps.length === 0 ? (
-          <p className="text-xs text-dark-700 text-center font-mono">[IP 확인 중…]</p>
-        ) : (
-          serverIps.map((ip) => (
-            <div key={ip} className="flex items-center justify-between px-2">
-              <p className="text-xs text-dark-400 font-mono">{ip}{portSuffix}{joinPath}</p>
-              <button
-                onClick={() => copyUrl(`http://${ip}${portSuffix}${joinPath}`)}
-                className="text-xs text-dark-600 hover:text-dark-300 transition-colors ml-2"
-              >
-                복사
-              </button>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }
@@ -844,13 +962,11 @@ export default function GMDashboard({
   const router = useRouter();
   const [session, setSession] = useState<GameSession | null>(initialSession);
   const [sessionSummaries, setSessionSummaries] = useState<GameSessionSummary[]>(initialSessionSummaries);
-  const [showSessionList, setShowSessionList] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [advancingEndingStage, setAdvancingEndingStage] = useState(false);
   const [revealingVote, setRevealingVote] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [endingSession, setEndingSession] = useState(false);
   const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
 
@@ -862,6 +978,13 @@ export default function GMDashboard({
     setSessionSummaries(initialSessionSummaries);
     void refreshSessionSummaries(initialSession?.id);
   }, [initialSession?.id, initialSessionSummaries]);
+
+  /**
+   * 현재 게임의 세션 선택 URL을 일관된 형태로 만든다.
+   */
+  function buildSessionPath(sessionId?: string): string {
+    return sessionId ? `/play/${game.id}?session=${sessionId}` : `/play/${game.id}`;
+  }
 
   /**
    * 현재 게임의 활성 세션 목록을 다시 읽고,
@@ -880,13 +1003,19 @@ export default function GMDashboard({
 
       if (preferredSessionId) {
         const preferred = nextSummaries.find((item) => item.id === preferredSessionId);
-        if (!preferred) {
+        if (preferred) {
           return;
         }
       }
 
-      if (nextSummaries.length === 0 && session?.endedAt) {
+      const currentSessionMissingFromList = session
+        ? !nextSummaries.some((item) => item.id === session.id)
+        : false;
+
+      if (currentSessionMissingFromList) {
         setSession(null);
+        router.replace(buildSessionPath());
+        return;
       }
     } catch {}
   }
@@ -919,7 +1048,8 @@ export default function GMDashboard({
       ),
       session_deleted: useCallback(() => {
         setSession(null);
-      }, []),
+        router.replace(`/play/${game.id}`);
+      }, [router, game.id]),
     }
   );
 
@@ -934,9 +1064,8 @@ export default function GMDashboard({
       if (res.ok) {
         const { session: created } = await res.json() as { session: GameSession };
         setSession(created);
-        setShowSessionList(false);
         await refreshSessionSummaries(created.id);
-        router.push(`/play/${game.id}?session=${created.id}`);
+        router.push(buildSessionPath(created.id));
       } else {
         const err = await res.json();
         alert(err.error ?? "세션 생성 실패");
@@ -1064,25 +1193,6 @@ export default function GMDashboard({
     }
   }
 
-  async function endSession() {
-    if (!session) return;
-    if (!confirm("세션을 강제 종료하시겠습니까? 플레이어들이 엔딩 화면으로 이동합니다.")) return;
-    setEndingSession(true);
-    try {
-      await fetch(`/api/sessions/${session.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "end_session" }),
-      });
-      setSession((prev) => (
-        prev ? { ...prev, endedAt: new Date().toISOString() } : prev
-      ));
-      await refreshSessionSummaries();
-    } finally {
-      setEndingSession(false);
-    }
-  }
-
   async function deleteSession() {
     if (!session) return;
     if (!confirm("세션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
@@ -1095,6 +1205,21 @@ export default function GMDashboard({
       setDeleting(false);
     }
     // session_deleted SSE 이벤트도 함께 전달됨
+  }
+
+  async function handleSessionNameChange(nextSessionName: string) {
+    if (!session) return;
+
+    setSession((prev) => (
+      prev
+        ? {
+            ...prev,
+            sessionName: nextSessionName,
+          }
+        : prev
+    ));
+
+    await refreshSessionSummaries(session.id);
   }
 
   async function unlockSlot(playerId: string) {
@@ -1180,7 +1305,7 @@ export default function GMDashboard({
           <p className="text-xs text-mystery-500 mb-1">GM 대시보드</p>
           <h1 className="text-2xl font-bold text-dark-50">{game.title}</h1>
           <p className="text-sm text-dark-500 mt-1">
-            {(game.players ?? []).length}명 · {game.settings.difficulty} · {game.settings.estimatedDuration}분
+            {(game.players ?? []).length}명 · {DIFFICULTY_LABELS[game.settings.difficulty] ?? game.settings.difficulty} · {game.settings.estimatedDuration}분
           </p>
         </div>
         {session && (
@@ -1203,163 +1328,75 @@ export default function GMDashboard({
       {!session ? (
         <div className="space-y-4">
           {sessionSummaries.length > 0 ? (
-            <div className="rounded-2xl border border-dark-800 bg-dark-900 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-[28px] border border-dark-800 bg-dark-900 p-6 sm:p-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-dark-600">Active Sessions</p>
-                  <h2 className="mt-1 text-lg font-semibold text-dark-50">활성 세션 {sessionSummaries.length}개</h2>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Select</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-dark-50">어떤 세션으로 진행할까요?</h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-dark-300">
+                    이미 열어둔 방이 있으면 이어서 열고, 새로 시작하려면 새 세션을 만들면 됩니다.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSessionList((prev) => !prev)}
-                    className="rounded-xl border border-dark-700 px-4 py-2 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
-                  >
-                    {showSessionList ? "세션 목록 닫기" : "세션 목록 보기"}
-                  </button>
-                  <button
-                    onClick={createSession}
-                    disabled={creating}
-                    className="rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
-                  >
-                    {creating ? "생성 중…" : "새 세션 시작"}
-                  </button>
-                </div>
+                <button
+                  onClick={createSession}
+                  disabled={creating}
+                  className="rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+                >
+                  {creating ? "생성 중…" : "새 세션 시작"}
+                </button>
               </div>
-              {showSessionList ? (
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {sessionSummaries.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setShowSessionList(false);
-                        router.push(`/play/${game.id}?session=${item.id}`);
-                      }}
-                      className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-dark-50">{item.sessionCode}</p>
-                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
-                          {getSessionBadgeLabel(item)}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
-                      <p className="mt-3 text-sm text-dark-300">
-                        {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="mt-6 grid gap-3 md:grid-cols-2">
+                {sessionSummaries.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      router.push(buildSessionPath(item.id));
+                    }}
+                    className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-dark-50">{item.sessionName}</p>
+                      <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
+                        {getSessionBadgeLabel(item)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
+                    <p className="mt-3 text-sm text-dark-300">
+                      {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : null}
-
-          <div className="text-center py-20 border-2 border-dashed border-dark-700 rounded-2xl">
-            <p className="text-dark-400 mb-6">아직 활성 세션이 없습니다.</p>
-            <button
-              onClick={createSession}
-              disabled={creating}
-              className="px-6 py-3 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
-            >
-              {creating ? "생성 중…" : "새 세션 시작"}
-            </button>
-          </div>
+          ) : (
+            <div className="rounded-[28px] border border-dark-800 bg-dark-900/70 px-6 py-16 text-center">
+              <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Start</p>
+              <h2 className="mt-3 text-2xl font-semibold text-dark-50">열린 세션이 아직 없습니다</h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-dark-300">
+                첫 번째 방을 만들면 참가 코드를 바로 공유하고 바로 플레이를 시작할 수 있습니다.
+              </p>
+              <button
+                onClick={createSession}
+                disabled={creating}
+                className="mt-8 px-6 py-3 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+              >
+                {creating ? "생성 중…" : "새 세션 시작"}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 왼쪽: 세션 코드 + 페이즈 제어 */}
           <div className="space-y-4">
-            <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-dark-500">활성 세션</p>
-                  <p className="text-sm font-semibold text-dark-100">
-                    현재 {session.sessionCode} · 총 {sessionSummaries.length}개
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {sessionSummaries.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowSessionList((prev) => !prev)}
-                      className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
-                    >
-                      {showSessionList ? "목록 닫기" : "세션 목록"}
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={createSession}
-                    disabled={creating}
-                    className="rounded-lg border border-mystery-600 bg-mystery-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
-                  >
-                    {creating ? "생성 중…" : "새 세션 시작"}
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-dark-100">현재 세션 상태</p>
-                  <span className="text-[11px] text-dark-500">{formatSessionCreatedAt(session.createdAt)}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="text-mystery-300">
-                    {getSessionBadgeLabel({
-                      id: session.id,
-                      sessionCode: session.sessionCode,
-                      createdAt: session.createdAt,
-                      startedAt: session.startedAt,
-                      phase: session.sharedState.phase,
-                      currentRound: session.sharedState.currentRound,
-                      currentSubPhase: session.sharedState.currentSubPhase,
-                      lockedPlayerCount: session.sharedState.characterSlots.filter((slot) => slot.isLocked).length,
-                      totalPlayerCount: session.sharedState.characterSlots.length,
-                    })}
-                  </span>
-                  <span className="text-dark-500">
-                    {session.sharedState.characterSlots.filter((slot) => slot.isLocked).length}/{session.sharedState.characterSlots.length}명
-                  </span>
-                </div>
-              </div>
-              {showSessionList ? (
-                <div className="space-y-2">
-                  {sessionSummaries.map((item) => {
-                    const isSelected = item.id === session.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setShowSessionList(false);
-                          router.push(`/play/${game.id}?session=${item.id}`);
-                        }}
-                        className={[
-                          "w-full rounded-xl border px-3 py-3 text-left transition-colors",
-                          isSelected
-                            ? "border-mystery-600 bg-mystery-950/25"
-                            : "border-dark-700 bg-dark-950/60 hover:border-dark-500",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-dark-100">{item.sessionCode}</p>
-                          <span className="text-[11px] text-dark-500">{formatSessionCreatedAt(item.createdAt)}</span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                          <span className={isSelected ? "text-mystery-300" : "text-dark-400"}>
-                            {getSessionBadgeLabel(item)}
-                          </span>
-                          <span className="text-dark-500">
-                            {item.lockedPlayerCount}/{item.totalPlayerCount}명
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-
-            <SessionCode code={session.sessionCode} />
+            <SessionCode
+              sessionId={session.id}
+              sessionName={session.sessionName}
+              code={session.sessionCode}
+              isLobby={phase === "lobby"}
+              onSessionNameChange={handleSessionNameChange}
+            />
 
             {/* 페이즈 제어 */}
             <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
@@ -1476,15 +1513,6 @@ export default function GMDashboard({
             <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
               <h3 className="text-sm font-medium text-dark-300">세션 관리</h3>
               <div className="flex flex-col gap-2">
-                {phase !== "ending" && (
-                  <button
-                    onClick={endSession}
-                    disabled={endingSession}
-                    className="w-full py-2 text-sm text-orange-300 border border-orange-900/50 rounded-lg hover:bg-orange-950/30 transition-colors disabled:opacity-50"
-                  >
-                    {endingSession ? "종료 중…" : "세션 강제 종료"}
-                  </button>
-                )}
                 <button
                   onClick={deleteSession}
                   disabled={deleting}

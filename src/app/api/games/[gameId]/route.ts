@@ -60,7 +60,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     await saveGame(updated);
 
-    return NextResponse.json({ game: updated });
+    /**
+     * 저장 직후 canonical source를 다시 읽어 반환한다.
+     * local/Supabase 구현 모두 normalize 과정을 거치므로,
+     * 클라이언트는 "저장 요청 payload"가 아니라 "실제 저장된 결과"를 기준으로 상태를 맞춘다.
+     */
+    const persisted = await getGame(gameId);
+    if (!persisted) {
+      return NextResponse.json({ error: "저장 후 게임을 다시 불러오지 못했습니다." }, { status: 500 });
+    }
+
+    return NextResponse.json({ game: persisted });
   } catch (error) {
     console.error(`[PUT /api/games/${gameId}]`, error);
     return NextResponse.json({ error: "게임 수정 실패" }, { status: 500 });

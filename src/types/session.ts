@@ -101,6 +101,7 @@ export interface PlayerState {
 export interface GameSession {
   id: string;
   gameId: string;
+  sessionName: string;
   sessionCode: string;
   createdAt: string;
   startedAt?: string;
@@ -115,6 +116,7 @@ export interface GameSession {
 /** 세션 목록/선택 UI에서 사용하는 경량 요약 정보 */
 export interface GameSessionSummary {
   id: string;
+  sessionName: string;
   sessionCode: string;
   createdAt: string;
   startedAt?: string;

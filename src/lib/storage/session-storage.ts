@@ -21,9 +21,9 @@ function sessionPath(id: string): string {
   return path.join(SESSIONS_DIR, `${id}.json`);
 }
 
-export function createSession(game: GamePackage): GameSession {
+export function createSession(game: GamePackage, sessionName?: string): GameSession {
   ensureDir();
-  const session = buildInitialSession(game);
+  const session = buildInitialSession(game, undefined, undefined, undefined, sessionName);
 
   fs.writeFileSync(sessionPath(session.id), JSON.stringify(session, null, 2), "utf-8");
   return session;

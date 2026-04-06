@@ -12,6 +12,7 @@ import type { GameSession, GameSessionSummary } from "@/types/session";
 function toSessionSummary(session: GameSession): GameSessionSummary {
   return {
     id: session.id,
+    sessionName: session.sessionName,
     sessionCode: session.sessionCode,
     createdAt: session.createdAt,
     startedAt: session.startedAt,

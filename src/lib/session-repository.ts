@@ -27,22 +27,25 @@ export interface SessionRepository {
  */
 const localSessionRepository: SessionRepository = {
   async createSession(game) {
-    return createLocalSession(game);
+    const sessionName = buildAutomaticSessionName(listLocalActiveSessions(game.id));
+    return withSessionName(createLocalSession(game, sessionName), sessionName);
   },
   async getSession(sessionId) {
-    return getLocalSession(sessionId);
+    const session = getLocalSession(sessionId);
+    return session ? withSessionName(session) : null;
   },
   async getSessionByCode(sessionCode) {
-    return getLocalSessionByCode(sessionCode);
+    const session = getLocalSessionByCode(sessionCode);
+    return session ? withSessionName(session) : null;
   },
   async updateSession(session) {
-    updateLocalSession(session);
+    updateLocalSession(withSessionName(session));
   },
   async deleteSession(sessionId) {
     return deleteLocalSession(sessionId);
   },
   async listActiveSessions(gameId) {
-    return listLocalActiveSessions(gameId);
+    return sortSessionsForList(listLocalActiveSessions(gameId)).map((session) => withSessionName(session));
   },
 };
 
@@ -80,8 +83,72 @@ const SUPABASE_SESSION_COLUMNS = [
   "session_json",
 ].join(",");
 
+/**
+ * GM 세션 목록에서 실제 진행 중인 세션이 빈 lobby보다 먼저 보이도록 정렬한다.
+ * 같은 우선순위 안에서는 최신 생성 세션을 먼저 유지한다.
+ */
+function sortSessionsForList<T extends GameSession>(sessions: T[]): T[] {
+  function getPriority(session: GameSession): number {
+    const lockedPlayerCount = session.sharedState.characterSlots.filter((slot) => slot.isLocked).length;
+
+    if (session.sharedState.phase !== "lobby") {
+      return 0;
+    }
+
+    if (lockedPlayerCount > 0) {
+      return 1;
+    }
+
+    return 2;
+  }
+
+  return [...sessions].sort((a, b) => {
+    const priorityDiff = getPriority(a) - getPriority(b);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
 function normalizeSessionCode(sessionCode: string): string {
   return sessionCode.trim().toUpperCase();
+}
+
+/**
+ * 생성 시점 기준으로 사람이 구분하기 쉬운 기본 방 제목을 만든다.
+ */
+function buildAutomaticSessionName(existingSessions: GameSession[]): string {
+  return `${existingSessions.length + 1}번 방`;
+}
+
+/**
+ * 예전 세션에 이름이 없을 때 목록과 현재 화면에서 쓸 임시 방 제목을 만든다.
+ */
+function buildFallbackSessionName(createdAt: string): string {
+  const date = new Date(createdAt);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${month}.${day} ${hour}:${minute} 방`;
+}
+
+/**
+ * 세션 이름이 비어 있으면 화면에서 바로 쓸 수 있는 기본 이름을 채운다.
+ */
+function withSessionName<T extends GameSession>(session: T, fallbackName?: string): T {
+  const normalizedSessionName = session.sessionName?.trim() || fallbackName || buildFallbackSessionName(session.createdAt);
+
+  if (normalizedSessionName === session.sessionName) {
+    return session;
+  }
+
+  return {
+    ...session,
+    sessionName: normalizedSessionName,
+  };
 }
 
 function buildSupabaseSessionRow(session: GameSession): SupabaseSessionRow {
@@ -126,8 +193,32 @@ async function loadSupabaseSessionBy(
   }
 
   return data
-    ? ((data as unknown as SupabaseSessionRow).session_json as GameSession)
+    ? withSessionName((data as unknown as SupabaseSessionRow).session_json as GameSession)
     : null;
+}
+
+async function loadSupabaseActiveSessions(gameId: string): Promise<GameSession[]> {
+  const normalizedGameId = gameId.trim();
+  if (!normalizedGameId) {
+    return [];
+  }
+
+  const supabase = createSupabasePersistenceClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(SUPABASE_SESSION_COLUMNS)
+    .eq("game_id", normalizedGameId)
+    .is("ended_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list Supabase sessions: ${error.message}`);
+  }
+
+  return sortSessionsForList(
+    ((data ?? []) as unknown as SupabaseSessionRow[])
+      .map((row) => withSessionName(row.session_json as GameSession))
+  );
 }
 
 /**
@@ -137,9 +228,11 @@ async function loadSupabaseSessionBy(
 const supabaseSessionRepository: SessionRepository = {
   async createSession(game) {
     const supabase = createSupabasePersistenceClient();
+    const existingSessions = await loadSupabaseActiveSessions(game.id);
+    const sessionName = buildAutomaticSessionName(existingSessions);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const session = buildInitialSession(game);
+      const session = buildInitialSession(game, undefined, undefined, undefined, sessionName);
       const row = buildSupabaseSessionRow(session);
       const { data, error } = await supabase
         .from("sessions")
@@ -148,7 +241,7 @@ const supabaseSessionRepository: SessionRepository = {
         .single();
 
       if (!error && data) {
-        return (data as unknown as SupabaseSessionRow).session_json as GameSession;
+        return withSessionName((data as unknown as SupabaseSessionRow).session_json as GameSession, sessionName);
       }
 
       if (error?.code !== "23505") {
@@ -171,7 +264,7 @@ const supabaseSessionRepository: SessionRepository = {
     const supabase = createSupabasePersistenceClient();
     const { error } = await supabase
       .from("sessions")
-      .upsert(buildSupabaseSessionRow(session), { onConflict: "id" });
+      .upsert(buildSupabaseSessionRow(withSessionName(session)), { onConflict: "id" });
 
     if (error) {
       throw new Error(`Failed to update Supabase session: ${error.message}`);
@@ -199,25 +292,7 @@ const supabaseSessionRepository: SessionRepository = {
   },
 
   async listActiveSessions(gameId) {
-    const normalizedGameId = gameId.trim();
-    if (!normalizedGameId) {
-      return [];
-    }
-
-    const supabase = createSupabasePersistenceClient();
-    const { data, error } = await supabase
-      .from("sessions")
-      .select(SUPABASE_SESSION_COLUMNS)
-      .eq("game_id", normalizedGameId)
-      .is("ended_at", null)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(`Failed to list Supabase sessions: ${error.message}`);
-    }
-
-    return ((data ?? []) as unknown as SupabaseSessionRow[])
-      .map((row) => row.session_json as GameSession);
+    return loadSupabaseActiveSessions(gameId);
   },
 };
 

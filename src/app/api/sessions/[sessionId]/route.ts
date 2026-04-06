@@ -56,6 +56,7 @@ export async function PATCH(req: Request, { params }: Params) {
     action?: string;
     subPhase?: string;
     playerId?: string;
+    sessionName?: string;
   };
 
   const session = await getSession(sessionId);
@@ -119,10 +120,17 @@ export async function PATCH(req: Request, { params }: Params) {
     sharedState.endingStage = nextStage;
     message = `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`;
   } else if (body.action === "end_session") {
-    session.endedAt = new Date().toISOString();
-    newPhase = "ending";
-    sharedState.endingStage = "complete";
-    message = "GM이 세션을 종료했습니다.";
+    return NextResponse.json(
+      { error: "세션 강제 종료는 더 이상 사용할 수 없습니다." },
+      { status: 400 }
+    );
+  } else if (body.action === "update_session_name") {
+    const normalizedSessionName = body.sessionName?.trim();
+    if (!normalizedSessionName) {
+      return NextResponse.json({ error: "방 제목을 입력해주세요." }, { status: 400 });
+    }
+
+    session.sessionName = normalizedSessionName.slice(0, 40);
   } else if (body.action === "unlock_slot") {
     if (!body.playerId) {
       return NextResponse.json({ error: "playerId가 필요합니다." }, { status: 400 });
@@ -175,7 +183,13 @@ export async function PATCH(req: Request, { params }: Params) {
   await updateSession(session);
   broadcast(sessionId, "session_update", { sharedState: session.sharedState });
 
-  return NextResponse.json({ session: { id: session.id, sharedState: session.sharedState } });
+  return NextResponse.json({
+    session: {
+      id: session.id,
+      sessionName: session.sessionName,
+      sharedState: session.sharedState,
+    },
+  });
 }
 
 /** DELETE /api/sessions/[sessionId] — 세션 파일 삭제 */

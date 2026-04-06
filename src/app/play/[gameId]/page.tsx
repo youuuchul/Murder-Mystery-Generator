@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 function toSessionSummary(session: GameSession): GameSessionSummary {
   return {
     id: session.id,
+    sessionName: session.sessionName,
     sessionCode: session.sessionCode,
     createdAt: session.createdAt,
     startedAt: session.startedAt,
@@ -71,9 +72,13 @@ export default async function PlayPage({
 
   const activeSessions = await listActiveSessions(params.gameId);
   const requestedSessionId = searchParams?.session;
-  const currentSession = activeSessions.find((item) => item.id === requestedSessionId)
-    ?? activeSessions[0]
-    ?? null;
+  /**
+   * 기본 진입에서는 세션 선택 화면을 먼저 보여준다.
+   * 특정 세션을 명시적으로 고른 경우에만 해당 세션을 바로 연다.
+   */
+  const currentSession = requestedSessionId
+    ? activeSessions.find((item) => item.id === requestedSessionId) ?? null
+    : null;
   const initialSessionSummaries = activeSessions.map(toSessionSummary);
 
   return (
@@ -82,6 +87,13 @@ export default async function PlayPage({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
           <Link href="/library" className="text-dark-400 hover:text-dark-200 transition-colors text-sm">
             ← 라이브러리
+          </Link>
+          <span className="text-dark-700">|</span>
+          <Link
+            href={`/play/${gmGame.id}`}
+            className="text-dark-400 hover:text-dark-200 transition-colors text-sm"
+          >
+            세션 목록
           </Link>
           <span className="text-dark-700">|</span>
           <span className="text-dark-300 text-sm font-medium truncate">{gmGame.title}</span>

@@ -5,6 +5,7 @@ import { isMakerAdmin } from "@/lib/maker-role";
 import { buildMakerAccessPath } from "@/lib/maker-user";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "./_components/GuideMenu";
+import LibraryQuickJoin from "./_components/LibraryQuickJoin";
 import MakerAccountMenu from "./_components/MakerAccountMenu";
 import PublicGameGrid from "./_components/PublicGameGrid";
 import {
@@ -79,17 +80,17 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Public Library</p>
           <h2 className="mt-4 text-3xl font-semibold text-dark-50">바로 시작할 수 있는 시나리오</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
-            마음에 드는 시나리오를 고른 뒤 세션을 열어 바로 진행할 수 있습니다.
-            이미 열어둔 방이 있으면 이어서 들어가고, 새로 시작하고 싶으면 새 세션을 만들면 됩니다.
+            오늘 진행할 시나리오를 고르거나, 이미 받은 참가 코드로 바로 들어오세요.
           </p>
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-dark-300">
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
               지금 고를 수 있는 작품 {games.length}개
             </span>
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
-              세션은 시작 화면에서 새로 만들거나 이어서 열기
+              GM은 방을 열고, 플레이어는 코드로 참여
             </span>
           </div>
+          <LibraryQuickJoin />
         </section>
 
         <section className="mt-8">

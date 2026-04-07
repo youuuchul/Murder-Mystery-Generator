@@ -11,6 +11,10 @@ import {
   resolveActiveEndingBranch,
   resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
+import {
+  getAdvanceConfirmKind,
+  type SessionAdvanceConfirmKind,
+} from "@/lib/session-phase";
 import type { GamePackage, GameRules } from "@/types/game";
 import type { EndingStage, GameSession, GameSessionSummary, SharedState, CharacterSlot } from "@/types/session";
 
@@ -960,16 +964,18 @@ function EventLog({ entries }: { entries: GameSession["sharedState"]["eventLog"]
 }
 
 /**
- * 대기실에서 오프닝으로 넘어가기 전 현재 참가 인원을 다시 확인한다.
- * 이후 플레이어 합의 기반 진행에서도 같은 확인 UI를 재사용할 수 있게 분리한다.
+ * 실수 비용이 큰 단계 전환은 한 번 더 확인한다.
+ * 오프닝 시작은 인원 정보를, 최종 투표 진입은 경고 문구를 같이 보여준다.
  */
-function LobbyStartConfirmModal({
+function PhaseAdvanceConfirmModal({
+  kind,
   joinedPlayerCount,
   totalPlayerCount,
   onConfirm,
   onCancel,
   confirming,
 }: {
+  kind: SessionAdvanceConfirmKind;
   joinedPlayerCount: number;
   totalPlayerCount: number;
   onConfirm: () => void;
@@ -977,30 +983,45 @@ function LobbyStartConfirmModal({
   confirming: boolean;
 }) {
   const isFull = joinedPlayerCount >= totalPlayerCount;
+  const isOpening = kind === "opening";
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Opening Check</p>
-          <h2 className="text-xl font-semibold text-dark-50">오프닝을 시작할까요?</h2>
+          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">
+            {isOpening ? "Opening Check" : "Vote Check"}
+          </p>
+          <h2 className="text-xl font-semibold text-dark-50">
+            {isOpening ? "오프닝을 시작할까요?" : "최종 투표를 시작할까요?"}
+          </h2>
           <p className="text-sm leading-6 text-dark-300">
-            현재 참가 중인 인원을 확인한 뒤 오프닝으로 넘어갑니다.
+            {isOpening
+              ? "현재 참가 중인 인원을 확인한 뒤 오프닝으로 넘어갑니다."
+              : "투표를 시작하면 전원 투표가 끝난 뒤 바로 엔딩 공개로 이어집니다."}
           </p>
         </div>
 
-        <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
-          <p className="text-xs text-dark-500">현재 참가 인원</p>
-          <p className="mt-2 text-3xl font-bold text-mystery-300">
-            {joinedPlayerCount}
-            <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
-          </p>
-          <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
-            {isFull
-              ? "설정된 인원이 모두 입장했습니다."
-              : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
-          </p>
-        </div>
+        {isOpening ? (
+          <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+            <p className="text-xs text-dark-500">현재 참가 인원</p>
+            <p className="mt-2 text-3xl font-bold text-mystery-300">
+              {joinedPlayerCount}
+              <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
+            </p>
+            <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
+              {isFull
+                ? "설정된 인원이 모두 입장했습니다."
+                : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4">
+            <p className="text-sm leading-6 text-amber-200">
+              이번 투표는 최종 판정으로 이어집니다. 준비가 되었다면 투표를 시작하세요.
+            </p>
+          </div>
+        )}
 
         <div className="mt-5 flex gap-3">
           <button
@@ -1017,7 +1038,7 @@ function LobbyStartConfirmModal({
             disabled={confirming}
             className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
           >
-            {confirming ? "시작 중…" : "확인하고 시작"}
+            {confirming ? "진행 중…" : isOpening ? "확인하고 시작" : "확인하고 투표 시작"}
           </button>
         </div>
       </div>
@@ -1045,7 +1066,7 @@ export default function GMDashboard({
   const [accessPromptSessionId, setAccessPromptSessionId] = useState<string | null>(null);
   const [accessCodeDrafts, setAccessCodeDrafts] = useState<Record<string, string>>({});
   const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
-  const [showLobbyStartConfirm, setShowLobbyStartConfirm] = useState(false);
+  const [advanceConfirmKind, setAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const hasAutoCreatedSessionRef = useRef(false);
 
   useEffect(() => {
@@ -1058,10 +1079,16 @@ export default function GMDashboard({
   }, [initialSession?.id, initialSessionSummaries]);
 
   useEffect(() => {
-    if (!session || session.sharedState.phase !== "lobby") {
-      setShowLobbyStartConfirm(false);
+    if (!session) {
+      setAdvanceConfirmKind(null);
+      return;
     }
-  }, [session]);
+
+    const nextConfirmKind = getAdvanceConfirmKind(session, game);
+    if (advanceConfirmKind && nextConfirmKind !== advanceConfirmKind) {
+      setAdvanceConfirmKind(null);
+    }
+  }, [advanceConfirmKind, game, session]);
 
   /**
    * 현재 게임의 세션 선택 URL을 일관된 형태로 만든다.
@@ -1217,8 +1244,14 @@ export default function GMDashboard({
     }
   }
 
-  async function advancePhase() {
+  async function advancePhase(options?: { skipConfirm?: boolean }) {
     if (!session) return false;
+    const confirmKind = getAdvanceConfirmKind(session, game);
+    if (!options?.skipConfirm && confirmKind) {
+      setAdvanceConfirmKind(confirmKind);
+      return false;
+    }
+
     setAdvancing(true);
     try {
       const res = await fetch(`/api/sessions/${session.id}`, {
@@ -1246,10 +1279,10 @@ export default function GMDashboard({
     }
   }
 
-  async function confirmLobbyStart() {
-    const ok = await advancePhase();
+  async function confirmAdvancePhase() {
+    const ok = await advancePhase({ skipConfirm: true });
     if (ok) {
-      setShowLobbyStartConfirm(false);
+      setAdvanceConfirmKind(null);
     }
   }
 
@@ -1681,11 +1714,6 @@ export default function GMDashboard({
               ) : phase !== "ending" ? (
                 <button
                   onClick={() => {
-                    if (phase === "lobby") {
-                      setShowLobbyStartConfirm(true);
-                      return;
-                    }
-
                     void advancePhase();
                   }}
                   disabled={advancing}
@@ -1794,12 +1822,13 @@ export default function GMDashboard({
         </div>
       )}
 
-      {session && showLobbyStartConfirm ? (
-        <LobbyStartConfirmModal
+      {session && advanceConfirmKind ? (
+        <PhaseAdvanceConfirmModal
+          kind={advanceConfirmKind}
           joinedPlayerCount={session.sharedState.characterSlots.filter((slot) => slot.isLocked).length}
           totalPlayerCount={session.sharedState.characterSlots.length}
-          onCancel={() => setShowLobbyStartConfirm(false)}
-          onConfirm={() => { void confirmLobbyStart(); }}
+          onCancel={() => setAdvanceConfirmKind(null)}
+          onConfirm={() => { void confirmAdvancePhase(); }}
           confirming={advancing}
         />
       ) : null}

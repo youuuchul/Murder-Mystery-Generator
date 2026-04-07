@@ -6,6 +6,7 @@ import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
+import { clearPhaseAdvanceRequests } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
   deleteSession,
@@ -104,6 +105,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       playerState: pState,
       gameId: session.gameId,
       game: buildGameForPlayer(game, pState.playerId),
+      sessionCode: session.sessionCode,
     });
   }
 
@@ -181,12 +183,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           } else if (sharedState.phase === "vote") {
             throw new Error("투표 결과를 먼저 공개하세요.");
           }
+
+          clearPhaseAdvanceRequests(sharedState);
         } else if (body.action === "set_subphase") {
           const sub = normalizeSubPhase(body.subPhase);
           if (sub && sharedState.phase.startsWith("round-")) {
             sharedState.currentSubPhase = sub;
             const labels: Record<string, string> = { investigation: "조사", discussion: "토론" };
             message = `${labels[sub]} 페이즈가 시작됩니다.`;
+            clearPhaseAdvanceRequests(sharedState);
           }
         } else if (body.action === "advance_ending_stage") {
           if (sharedState.phase !== "ending") {
@@ -245,6 +250,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             delete latestSession.votes[releasedToken];
           }
           sharedState.voteCount = Object.keys(latestSession.votes).length;
+          clearPhaseAdvanceRequests(sharedState);
 
           sharedState.eventLog.push({
             id: crypto.randomUUID(),

@@ -64,6 +64,8 @@ export interface SharedState {
   acquiredClueIds: string[];
   eventLog: EventLogEntry[];
   characterSlots: CharacterSlot[];
+  /** 다음 단계 진행 요청을 누른 플레이어 ID 목록 */
+  phaseAdvanceRequestPlayerIds: string[];
   voteCount: number;
   endingStage?: EndingStage;
   voteReveal?: VoteReveal;

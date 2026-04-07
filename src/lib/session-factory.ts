@@ -56,6 +56,7 @@ export function buildInitialSession(
         },
       ],
       characterSlots: slots,
+      phaseAdvanceRequestPlayerIds: [],
       voteCount: 0,
     },
     playerStates: [],

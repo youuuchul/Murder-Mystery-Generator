@@ -11,6 +11,11 @@ import {
   resolveActiveEndingBranch,
   resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
+import {
+  getAdvanceConfirmKind,
+  getPlayerAdvanceRequestLabel,
+  type SessionAdvanceConfirmKind,
+} from "@/lib/session-phase";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
 import type { EndingStage, SharedState, InventoryCard, VoteReveal } from "@/types/session";
 
@@ -707,6 +712,151 @@ function VoteScreen({
   );
 }
 
+/**
+ * 플레이어가 다음 단계 진행 요청 상태를 확인하고 토글하는 패널이다.
+ * 서버가 실제 진행 여부를 판정하고, 클라이언트는 요청/취소와 합의 현황만 표시한다.
+ */
+function PhaseAdvanceRequestPanel({
+  label,
+  requestedCount,
+  totalCount,
+  requested,
+  submitting,
+  onToggle,
+}: {
+  label: string;
+  requestedCount: number;
+  totalCount: number;
+  requested: boolean;
+  submitting: boolean;
+  onToggle: () => void;
+}) {
+  const progress = totalCount > 0 ? (requestedCount / totalCount) * 100 : 0;
+
+  return (
+    <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-dark-500">다음 단계 진행</p>
+          <p className="mt-1 text-sm font-semibold text-dark-100">{label}</p>
+        </div>
+        <span className="rounded-full border border-dark-700 px-2 py-1 text-xs text-dark-300">
+          {requestedCount} / {totalCount}
+        </span>
+      </div>
+
+      <div className="h-2 overflow-hidden rounded-full bg-dark-800">
+        <div
+          className="h-full rounded-full bg-mystery-600 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <p className="text-xs leading-5 text-dark-500">
+        모두 요청하면 자동으로 다음 단계로 넘어갑니다.
+        {requested ? " 내 요청은 이미 반영되어 있습니다." : ""}
+      </p>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={submitting}
+        className={[
+          "w-full rounded-xl px-4 py-3 text-sm font-medium transition-colors disabled:opacity-50",
+          requested
+            ? "border border-dark-700 text-dark-200 hover:border-dark-500 hover:text-dark-50"
+            : "border border-mystery-700 bg-mystery-900/30 text-mystery-100 hover:bg-mystery-800/40",
+        ].join(" ")}
+      >
+        {submitting ? "처리 중…" : requested ? "요청 취소" : label}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * 플레이어가 합의 기반 진행을 누르기 전, 실수하기 쉬운 전환만 한 번 더 확인한다.
+ * 대기실 시작은 인원 확인을, 최종 투표 진입은 마지막 단계 경고를 보여준다.
+ */
+function PlayerAdvanceConfirmModal({
+  kind,
+  joinedPlayerCount,
+  totalPlayerCount,
+  onConfirm,
+  onCancel,
+  confirming,
+}: {
+  kind: SessionAdvanceConfirmKind;
+  joinedPlayerCount: number;
+  totalPlayerCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirming: boolean;
+}) {
+  const isOpening = kind === "opening";
+  const isFull = joinedPlayerCount >= totalPlayerCount;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">
+            {isOpening ? "Opening Check" : "Vote Check"}
+          </p>
+          <h2 className="text-xl font-semibold text-dark-50">
+            {isOpening ? "오프닝을 시작할까요?" : "최종 투표를 시작할까요?"}
+          </h2>
+          <p className="text-sm leading-6 text-dark-300">
+            {isOpening
+              ? "지금 입장한 인원을 확인한 뒤 오프닝으로 넘어갑니다."
+              : "투표가 시작되면 전원 투표 후 바로 엔딩 공개로 이어집니다."}
+          </p>
+        </div>
+
+        {isOpening ? (
+          <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+            <p className="text-xs text-dark-500">현재 참가 인원</p>
+            <p className="mt-2 text-3xl font-bold text-mystery-300">
+              {joinedPlayerCount}
+              <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
+            </p>
+            <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
+              {isFull
+                ? "설정된 인원이 모두 입장했습니다."
+                : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4">
+            <p className="text-sm leading-6 text-amber-200">
+              준비가 되었다면 투표를 시작하세요. 투표가 시작되면 되돌릴 수 없습니다.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={confirming}
+            className="flex-1 rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50 disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={confirming}
+            className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+          >
+            {confirming ? "진행 중…" : isOpening ? "확인하고 시작" : "확인하고 투표 시작"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function PlayerView() {
   const { gameId, charId } = useParams() as { gameId: string; charId: string };
@@ -727,6 +877,8 @@ export default function PlayerView() {
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
   const [selectedSceneClue, setSelectedSceneClue] = useState<Clue | null>(null);
   const previousPhaseRef = useRef<string | null>(null);
+  const [phaseRequestSubmitting, setPhaseRequestSubmitting] = useState(false);
+  const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem(`mm_${sessionId}`) ?? "";
@@ -757,6 +909,18 @@ export default function PlayerView() {
     }
     fetchState();
   }, [token, sessionId, gameId]);
+
+  useEffect(() => {
+    if (!game || !sharedState) {
+      setPhaseAdvanceConfirmKind(null);
+      return;
+    }
+
+    const nextConfirmKind = getAdvanceConfirmKind({ sharedState }, game);
+    if (phaseAdvanceConfirmKind && nextConfirmKind !== phaseAdvanceConfirmKind) {
+      setPhaseAdvanceConfirmKind(null);
+    }
+  }, [game, phaseAdvanceConfirmKind, sharedState]);
 
   // 페이즈 변화가 눈에 띄도록 본게임 진입 시 장소 탐색, 투표 진입 시 투표 탭으로 이동한다.
   useEffect(() => {
@@ -837,6 +1001,34 @@ export default function PlayerView() {
     setAcquiring(null);
   }
 
+  async function submitPhaseAdvanceRequest(action: "request" | "withdraw") {
+    setPhaseRequestSubmitting(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/phase-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, action }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "진행 요청 처리 실패");
+        return false;
+      }
+
+      const data = await res.json() as { sharedState?: SharedState };
+      if (data.sharedState) {
+        setSharedState(data.sharedState);
+      }
+      return true;
+    } catch {
+      alert("진행 요청 처리 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      setPhaseRequestSubmitting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center">
@@ -880,6 +1072,36 @@ export default function PlayerView() {
   const inventoryIds = new Set(inventory.map((i) => i.cardId));
 
   const joinedSlots = sharedState.characterSlots.filter((s) => s.isLocked);
+  const requestedPlayerIds = sharedState.phaseAdvanceRequestPlayerIds ?? [];
+  const hasRequestedAdvance = requestedPlayerIds.includes(charId);
+  const canRequestAdvance = phase !== "vote" && phase !== "ending";
+  const advanceRequestLabel = getPlayerAdvanceRequestLabel({ sharedState }, game);
+
+  async function handlePhaseAdvanceToggle() {
+    if (!sharedState || !game) {
+      return;
+    }
+
+    if (hasRequestedAdvance) {
+      void submitPhaseAdvanceRequest("withdraw");
+      return;
+    }
+
+    const confirmKind = getAdvanceConfirmKind({ sharedState }, game);
+    if (confirmKind) {
+      setPhaseAdvanceConfirmKind(confirmKind);
+      return;
+    }
+
+    void submitPhaseAdvanceRequest("request");
+  }
+
+  async function confirmPhaseAdvanceRequest() {
+    const ok = await submitPhaseAdvanceRequest("request");
+    if (ok) {
+      setPhaseAdvanceConfirmKind(null);
+    }
+  }
 
   // 결과 공개 상태면 전체 결과 화면 표시
   if (phase === "ending" && sharedState.voteReveal) {
@@ -935,6 +1157,17 @@ export default function PlayerView() {
       </div>
 
       <div className="p-4 max-w-lg mx-auto space-y-4 pb-8">
+        {phase === "lobby" && canRequestAdvance && (
+          <PhaseAdvanceRequestPanel
+            label={advanceRequestLabel}
+            requestedCount={requestedPlayerIds.length}
+            totalCount={joinedSlots.length}
+            requested={hasRequestedAdvance}
+            submitting={phaseRequestSubmitting}
+            onToggle={handlePhaseAdvanceToggle}
+          />
+        )}
+
         {/* 오프닝 페이즈 — 도입 배너 */}
         {phase === "opening" && (
           <div className="space-y-3">
@@ -1369,6 +1602,17 @@ export default function PlayerView() {
             token={token}
           />
         )}
+
+        {phase !== "lobby" && canRequestAdvance && (
+          <PhaseAdvanceRequestPanel
+            label={advanceRequestLabel}
+            requestedCount={requestedPlayerIds.length}
+            totalCount={joinedSlots.length}
+            requested={hasRequestedAdvance}
+            submitting={phaseRequestSubmitting}
+            onToggle={handlePhaseAdvanceToggle}
+          />
+        )}
       </div>
 
       {/* 카드 상세 모달 */}
@@ -1392,6 +1636,17 @@ export default function PlayerView() {
         <SceneClueModal
           clue={selectedSceneClue}
           onClose={() => setSelectedSceneClue(null)}
+        />
+      )}
+
+      {phaseAdvanceConfirmKind && (
+        <PlayerAdvanceConfirmModal
+          kind={phaseAdvanceConfirmKind}
+          joinedPlayerCount={joinedSlots.length}
+          totalPlayerCount={game.players.length}
+          onCancel={() => setPhaseAdvanceConfirmKind(null)}
+          onConfirm={() => { void confirmPhaseAdvanceRequest(); }}
+          confirming={phaseRequestSubmitting}
         />
       )}
     </div>

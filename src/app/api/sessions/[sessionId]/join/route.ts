@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clearPhaseAdvanceRequests } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { broadcast } from "@/lib/sse/broadcaster";
 import { isSessionConflictError } from "@/lib/session-repository";
@@ -66,6 +67,7 @@ export async function POST(req: Request, { params }: Params) {
           delete session.votes[previousToken];
         }
         session.sharedState.voteCount = Object.keys(session.votes).length;
+        clearPhaseAdvanceRequests(session.sharedState);
 
         session.sharedState.eventLog.push({
           id: crypto.randomUUID(),

@@ -959,6 +959,72 @@ function EventLog({ entries }: { entries: GameSession["sharedState"]["eventLog"]
   );
 }
 
+/**
+ * 대기실에서 오프닝으로 넘어가기 전 현재 참가 인원을 다시 확인한다.
+ * 이후 플레이어 합의 기반 진행에서도 같은 확인 UI를 재사용할 수 있게 분리한다.
+ */
+function LobbyStartConfirmModal({
+  joinedPlayerCount,
+  totalPlayerCount,
+  onConfirm,
+  onCancel,
+  confirming,
+}: {
+  joinedPlayerCount: number;
+  totalPlayerCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirming: boolean;
+}) {
+  const isFull = joinedPlayerCount >= totalPlayerCount;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Opening Check</p>
+          <h2 className="text-xl font-semibold text-dark-50">오프닝을 시작할까요?</h2>
+          <p className="text-sm leading-6 text-dark-300">
+            현재 참가 중인 인원을 확인한 뒤 오프닝으로 넘어갑니다.
+          </p>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+          <p className="text-xs text-dark-500">현재 참가 인원</p>
+          <p className="mt-2 text-3xl font-bold text-mystery-300">
+            {joinedPlayerCount}
+            <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
+          </p>
+          <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
+            {isFull
+              ? "설정된 인원이 모두 입장했습니다."
+              : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
+          </p>
+        </div>
+
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={confirming}
+            className="flex-1 rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50 disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={confirming}
+            className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+          >
+            {confirming ? "시작 중…" : "확인하고 시작"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function GMDashboard({
   game,
@@ -979,6 +1045,7 @@ export default function GMDashboard({
   const [accessPromptSessionId, setAccessPromptSessionId] = useState<string | null>(null);
   const [accessCodeDrafts, setAccessCodeDrafts] = useState<Record<string, string>>({});
   const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
+  const [showLobbyStartConfirm, setShowLobbyStartConfirm] = useState(false);
   const hasAutoCreatedSessionRef = useRef(false);
 
   useEffect(() => {
@@ -989,6 +1056,12 @@ export default function GMDashboard({
     setSessionSummaries(initialSessionSummaries);
     void refreshSessionSummaries(initialSession?.id);
   }, [initialSession?.id, initialSessionSummaries]);
+
+  useEffect(() => {
+    if (!session || session.sharedState.phase !== "lobby") {
+      setShowLobbyStartConfirm(false);
+    }
+  }, [session]);
 
   /**
    * 현재 게임의 세션 선택 URL을 일관된 형태로 만든다.
@@ -1170,6 +1243,13 @@ export default function GMDashboard({
       return false;
     } finally {
       setAdvancing(false);
+    }
+  }
+
+  async function confirmLobbyStart() {
+    const ok = await advancePhase();
+    if (ok) {
+      setShowLobbyStartConfirm(false);
     }
   }
 
@@ -1600,7 +1680,14 @@ export default function GMDashboard({
                 </div>
               ) : phase !== "ending" ? (
                 <button
-                  onClick={() => { void advancePhase(); }}
+                  onClick={() => {
+                    if (phase === "lobby") {
+                      setShowLobbyStartConfirm(true);
+                      return;
+                    }
+
+                    void advancePhase();
+                  }}
                   disabled={advancing}
                   className="w-full py-2.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
@@ -1706,6 +1793,16 @@ export default function GMDashboard({
           </div>
         </div>
       )}
+
+      {session && showLobbyStartConfirm ? (
+        <LobbyStartConfirmModal
+          joinedPlayerCount={session.sharedState.characterSlots.filter((slot) => slot.isLocked).length}
+          totalPlayerCount={session.sharedState.characterSlots.length}
+          onCancel={() => setShowLobbyStartConfirm(false)}
+          onConfirm={() => { void confirmLobbyStart(); }}
+          confirming={advancing}
+        />
+      ) : null}
     </div>
   );
 }

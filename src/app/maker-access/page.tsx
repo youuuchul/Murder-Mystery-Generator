@@ -26,6 +26,7 @@ type Props = {
     notice?: string;
     mode?: string;
     token?: string;
+    recoveryEmail?: string;
   }>;
 };
 
@@ -93,10 +94,15 @@ function getMakerAccessErrorMessage(error: string | undefined): string | null {
 }
 
 /** 화면 상단에 띄울 성공 메시지를 현재 query 값에서 고른다. */
-function getMakerAccessNoticeMessage(notice: string | undefined): string | null {
+function getMakerAccessNoticeMessage(
+  notice: string | undefined,
+  recoveryEmail: string | undefined
+): string | null {
   switch (notice) {
     case "password_reset_sent":
-      return "가입 때 입력한 복구 이메일로 비밀번호 재설정 링크를 보냈습니다.";
+      return recoveryEmail
+        ? `${recoveryEmail} 주소로 비밀번호 재설정 링크를 보냈습니다.`
+        : "가입 때 입력한 복구 이메일로 비밀번호 재설정 링크를 보냈습니다.";
     case "password_reset_completed":
       return "새 비밀번호가 저장되었습니다. 이제 새 비밀번호로 로그인할 수 있습니다.";
     default:
@@ -109,7 +115,7 @@ function getMakerAccessNoticeMessage(notice: string | undefined): string | null 
  * 가입, 비밀번호 찾기, 재설정까지 한 경로에서 처리한다.
  */
 export default async function MakerAccessPage({ searchParams }: Props) {
-  const { next, error, notice, mode: rawMode, token } = await searchParams;
+  const { next, error, notice, mode: rawMode, token, recoveryEmail } = await searchParams;
   const nextPath = normalizeMakerNextPath(next, "/library/manage");
   const authProvider = getMakerAuthProviderConfig().provider;
   const supportsTemporaryAccess = authProvider === "local";
@@ -123,7 +129,7 @@ export default async function MakerAccessPage({ searchParams }: Props) {
   );
   const needsPassword = isMakerAccessEnabled() && !granted;
   const errorMessage = getMakerAccessErrorMessage(error);
-  const noticeMessage = getMakerAccessNoticeMessage(notice);
+  const noticeMessage = getMakerAccessNoticeMessage(notice, recoveryEmail);
   const resetPreview = mode === "reset"
     ? await previewMakerPasswordResetToken(token ?? "")
     : null;

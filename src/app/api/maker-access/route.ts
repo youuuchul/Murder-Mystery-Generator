@@ -101,6 +101,7 @@ function redirectWithFeedback(
     mode?: string;
     token?: string;
     next?: string;
+    recoveryEmail?: string;
   }
 ) {
   const redirectUrl = buildRedirectUrl(request, next);
@@ -123,6 +124,10 @@ function redirectWithFeedback(
 
   if (feedback.next) {
     redirectUrl.searchParams.set("next", feedback.next);
+  }
+
+  if (feedback.recoveryEmail) {
+    redirectUrl.searchParams.set("recoveryEmail", feedback.recoveryEmail);
   }
 
   return NextResponse.redirect(redirectUrl, 303);
@@ -248,6 +253,7 @@ export async function POST(request: NextRequest) {
         notice: "password_reset_sent",
         mode: "login",
         next,
+        recoveryEmail: result.maskedRecoveryEmail,
       });
     }
 

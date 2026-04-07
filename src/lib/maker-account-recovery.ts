@@ -131,19 +131,63 @@ function hashMakerPasswordResetToken(rawToken: string): string {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 
-/** 비밀번호 재설정 링크를 만들 때 쓸 base URL 을 정한다. */
+/** 환경변수나 요청 헤더에서 받은 origin 문자열을 URL 로 정규화한다. */
+function parseMakerRecoveryOrigin(origin: string | undefined): URL | null {
+  const normalizedOrigin = origin?.trim();
+  if (!normalizedOrigin) {
+    return null;
+  }
+
+  try {
+    return new URL(normalizedOrigin);
+  } catch {
+    return null;
+  }
+}
+
+/** 로컬 개발용 origin 인지 확인한다. */
+function isLocalMakerRecoveryOrigin(origin: URL | null): boolean {
+  return origin?.hostname === "127.0.0.1"
+    || origin?.hostname === "localhost";
+}
+
+/** 기본 `*.vercel.app` 주소인지 확인한다. */
+function isVercelPreviewOrigin(origin: URL | null): boolean {
+  return origin?.hostname.endsWith(".vercel.app") ?? false;
+}
+
+/**
+ * 비밀번호 재설정 링크를 만들 때 쓸 base URL 을 정한다.
+ * 커스텀 도메인에서 요청이 들어오면 예전에 남은 `*.vercel.app`
+ * 환경변수보다 현재 도메인을 우선해 링크를 만든다.
+ */
 function resolveMakerRecoveryBaseUrl(requestOrigin?: string): string {
-  const envBaseUrl = (
+  const envOrigin = parseMakerRecoveryOrigin(
     process.env.MAKER_RECOVERY_BASE_URL
     ?? process.env.APP_BASE_URL
     ?? ""
-  ).trim();
+  );
+  const requestOriginUrl = parseMakerRecoveryOrigin(requestOrigin);
 
-  if (envBaseUrl) {
-    return envBaseUrl;
+  if (
+    requestOriginUrl
+    && !isLocalMakerRecoveryOrigin(requestOriginUrl)
+    && (
+      !envOrigin
+      || (
+        isVercelPreviewOrigin(envOrigin)
+        && !isVercelPreviewOrigin(requestOriginUrl)
+      )
+    )
+  ) {
+    return requestOriginUrl.origin;
   }
 
-  return requestOrigin?.trim() || "http://127.0.0.1:3000";
+  if (envOrigin) {
+    return envOrigin.origin;
+  }
+
+  return requestOriginUrl?.origin || "http://127.0.0.1:3000";
 }
 
 /** 현재 환경에서 비밀번호 재설정 메일 발송에 필요한 값을 읽는다. */

@@ -18,6 +18,7 @@ interface GMDashboardProps {
   game: GamePackage;
   initialSession: GameSession | null;
   initialSessionSummaries: GameSessionSummary[];
+  autoCreateSession?: boolean;
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -963,6 +964,7 @@ export default function GMDashboard({
   game,
   initialSession,
   initialSessionSummaries,
+  autoCreateSession = false,
 }: GMDashboardProps) {
   const router = useRouter();
   const [session, setSession] = useState<GameSession | null>(initialSession);
@@ -977,6 +979,7 @@ export default function GMDashboard({
   const [accessPromptSessionId, setAccessPromptSessionId] = useState<string | null>(null);
   const [accessCodeDrafts, setAccessCodeDrafts] = useState<Record<string, string>>({});
   const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
+  const hasAutoCreatedSessionRef = useRef(false);
 
   useEffect(() => {
     setSession(initialSession);
@@ -1082,6 +1085,15 @@ export default function GMDashboard({
       setCreating(false);
     }
   }
+
+  useEffect(() => {
+    if (!autoCreateSession || session || creating || hasAutoCreatedSessionRef.current) {
+      return;
+    }
+
+    hasAutoCreatedSessionRef.current = true;
+    void createSession();
+  }, [autoCreateSession, session, creating]);
 
   function handleSessionCodeDraftChange(sessionId: string, value: string) {
     setAccessCodeDrafts((prev) => ({

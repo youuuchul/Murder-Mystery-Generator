@@ -8,6 +8,7 @@ import {
 } from "@/lib/game-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { resolveMakerIdentityTarget } from "@/lib/maker-identity";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 
 type Params = { params: Promise<{ gameId: string }> };
@@ -77,9 +78,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     });
   }
 
-  if (!isGameOwner(game, currentUser.id)) {
+  if (!isGameOwner(game, currentUser.id) && !isMakerAdmin(currentUser)) {
     return NextResponse.json(
-      { error: "현재 소유자만 다른 작업자에게 이관할 수 있습니다." },
+      { error: "현재 소유자 또는 관리자만 다른 작업자에게 이관할 수 있습니다." },
       { status: 403 }
     );
   }

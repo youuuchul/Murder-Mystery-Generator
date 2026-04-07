@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const editableGame = resolveEditableGameForUser(game, currentUser.id);
+  const editableGame = resolveEditableGameForUser(game, currentUser);
   if (!editableGame) {
     return NextResponse.json(
       { error: "이 게임에는 현재 작업자가 이미지를 업로드할 수 없습니다." },

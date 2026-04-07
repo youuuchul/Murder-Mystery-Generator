@@ -49,7 +49,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
       return {
         game,
         ownershipState,
-        canEdit: ownershipState !== "readonly",
+        canEdit: ownershipState !== "readonly" || isMakerAdmin(currentUser),
         canDelete: canDeleteGame(game, currentUser),
         canPlay: canAccessGmPlay(game, currentUser),
         ownerDisplayName: ownerNameMap.get(game.access.ownerId),
@@ -220,7 +220,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
         </section>
 
         <section className="mt-8">
-          <GameGrid games={filteredGames} />
+          <GameGrid games={filteredGames} isAdminViewer={isMakerAdmin(currentUser)} />
         </section>
       </main>
     </div>

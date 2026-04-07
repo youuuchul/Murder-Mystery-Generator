@@ -40,7 +40,7 @@ export default async function PlayPage({
   searchParams,
 }: {
   params: { gameId: string };
-  searchParams?: { session?: string };
+  searchParams?: { session?: string; create?: string };
 }) {
   const game = await getGame(params.gameId);
   if (!game) notFound();
@@ -68,11 +68,11 @@ export default async function PlayPage({
   }
 
   const gmGame = currentUser && game.access.visibility !== "public"
-    ? resolveEditableGameForUser(game, currentUser.id)?.game ?? game
+    ? resolveEditableGameForUser(game, currentUser)?.game ?? game
     : game;
 
   if (currentUser && game.access.visibility !== "public") {
-    const editableGame = resolveEditableGameForUser(game, currentUser.id);
+    const editableGame = resolveEditableGameForUser(game, currentUser);
     if (editableGame?.claimed) {
       await saveGame(editableGame.game);
     }
@@ -129,6 +129,7 @@ export default async function PlayPage({
           game={gmGame}
           initialSession={currentSession}
           initialSessionSummaries={initialSessionSummaries}
+          autoCreateSession={searchParams?.create === "1"}
         />
       </main>
     </div>

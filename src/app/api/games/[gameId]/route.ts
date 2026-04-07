@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const editableGame = resolveEditableGameForUser(existing, currentUser.id);
+    const editableGame = resolveEditableGameForUser(existing, currentUser);
 
     if (!editableGame) {
       return NextResponse.json(

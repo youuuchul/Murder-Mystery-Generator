@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
   }
 
   const sessionGame = currentUser && game.access.visibility !== "public"
-    ? resolveEditableGameForUser(game, currentUser.id)?.game ?? game
+    ? resolveEditableGameForUser(game, currentUser)?.game ?? game
     : game;
 
   if (currentUser && game.access.visibility !== "public") {
-    const editableGame = resolveEditableGameForUser(game, currentUser.id);
+    const editableGame = resolveEditableGameForUser(game, currentUser);
     if (editableGame?.claimed) {
       await saveGame(editableGame.game);
     }

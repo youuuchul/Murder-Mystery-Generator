@@ -89,6 +89,13 @@ export function resolveEditableGameForUser(
   game: GamePackage,
   actor: GameActor
 ): { game: GamePackage; claimed: boolean } | null {
+  if (isMakerAdmin(typeof actor === "string" ? null : actor)) {
+    return {
+      game,
+      claimed: false,
+    };
+  }
+
   const ownershipState = getGameOwnershipState(game, actor);
   const userId = resolveActorUserId(actor);
 

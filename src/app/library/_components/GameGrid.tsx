@@ -13,9 +13,10 @@ export interface GameGridItem {
 
 interface GameGridProps {
   games: GameGridItem[];
+  isAdminViewer?: boolean;
 }
 
-export default function GameGrid({ games }: GameGridProps) {
+export default function GameGrid({ games, isAdminViewer = false }: GameGridProps) {
   if (games.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -40,6 +41,7 @@ export default function GameGrid({ games }: GameGridProps) {
           canPlay={item.canPlay}
           ownershipState={item.ownershipState}
           ownerDisplayName={item.ownerDisplayName}
+          isAdminViewer={isAdminViewer}
         />
       ))}
     </div>

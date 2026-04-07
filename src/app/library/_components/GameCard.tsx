@@ -26,6 +26,7 @@ interface GameCardProps {
   canPlay: boolean;
   ownershipState: GameOwnershipState;
   ownerDisplayName?: string;
+  isAdminViewer?: boolean;
 }
 
 const VISIBILITY_LABELS: Record<GameMetadata["access"]["visibility"], string> = {
@@ -47,6 +48,7 @@ export default function GameCard({
   canPlay,
   ownershipState,
   ownerDisplayName,
+  isAdminViewer = false,
 }: GameCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -198,6 +200,8 @@ export default function GameCard({
     : "";
   const missingPublishItems = publishChecklist.filter((item) => !item.passed);
   const playActionLabel = ownershipState === "readonly" ? "세션 보기" : "플레이";
+  const showOwnershipTransfer = isAdminViewer && ownershipState !== "claimable";
+  const showAdminReadonlyTools = isAdminViewer && ownershipState === "readonly";
 
   return (
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
@@ -257,7 +261,7 @@ export default function GameCard({
               </>
             ) : null}
             <br />
-            관리자 계정은 이 게임의 세션 화면만 열 수 있습니다.
+            관리자 계정은 이 게임의 세션 운영, 편집, 소유권 정리를 할 수 있습니다.
           </p>
         ) : null}
 
@@ -326,7 +330,7 @@ export default function GameCard({
           </div>
         ) : null}
 
-        {ownershipState === "owned" ? (
+        {showOwnershipTransfer ? (
           <form
             onSubmit={handleTransferOwnership}
             className="space-y-2 rounded-lg border border-dark-800 bg-dark-950/70 px-3 py-3"
@@ -335,7 +339,7 @@ export default function GameCard({
               소유권 이관
             </p>
             <p className="text-xs leading-5 text-dark-400">
-              다른 작업자의 로그인 ID 또는 작업자 키를 입력하면 이 게임 소유자를 바로 바꿉니다.
+              다른 작업자의 로그인 ID를 입력하면 이 게임 소유자를 바로 바꿉니다.
             </p>
             <input
               type="text"
@@ -343,7 +347,7 @@ export default function GameCard({
               onChange={(event) => setTransferTarget(event.target.value)}
               autoComplete="off"
               className="w-full rounded-lg border border-dark-700 bg-dark-900 px-3 py-2 font-mono text-xs text-dark-100 outline-none transition focus:border-mystery-500"
-              placeholder="예: studio-a 또는 123e4567-e89b-12d3-a456-426614174000"
+              placeholder="예: studio-a"
             />
             <button
               type="submit"
@@ -355,42 +359,73 @@ export default function GameCard({
           </form>
         ) : null}
 
-        {/* 액션 버튼 */}
-        <div className="flex gap-2 pt-1">
-          {canEdit ? (
+        {showAdminReadonlyTools ? (
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <Link
               href={`/maker/${game.id}/edit`}
-              className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-dark-50 border border-dark-600 transition-colors"
+              className="text-center text-xs py-2 px-3 rounded bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-dark-50 border border-dark-600 transition-colors"
             >
               편집
             </Link>
-          ) : (
-            <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">
-              편집 불가
-            </span>
-          )}
-          {canPlay ? (
             <Link
               href={`/play/${game.id}`}
-              className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
+              className="text-center text-xs py-2 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
             >
               {playActionLabel}
             </Link>
-          ) : (
-            <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">
-              비공개
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting || !canDelete}
-            className="text-xs py-1.5 px-2 rounded border border-dark-700 text-dark-500 hover:text-red-400 hover:border-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="삭제"
-          >
-            {deleting ? "삭제 중" : "삭제"}
-          </button>
-        </div>
+            <Link
+              href={`/play/${game.id}?create=1`}
+              className="text-center text-xs py-2 px-3 rounded border border-amber-700 bg-amber-950/30 text-amber-200 transition-colors hover:bg-amber-900/40"
+            >
+              테스트
+            </Link>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting || !canDelete}
+              className="text-xs py-2 px-3 rounded border border-dark-700 text-dark-400 hover:text-red-400 hover:border-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              title="삭제"
+            >
+              {deleting ? "삭제 중" : "삭제"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2 pt-1">
+            {canEdit ? (
+              <Link
+                href={`/maker/${game.id}/edit`}
+                className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-dark-50 border border-dark-600 transition-colors"
+              >
+                편집
+              </Link>
+            ) : (
+              <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">
+                편집 불가
+              </span>
+            )}
+            {canPlay ? (
+              <Link
+                href={`/play/${game.id}`}
+                className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
+              >
+                {playActionLabel}
+              </Link>
+            ) : (
+              <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">
+                비공개
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting || !canDelete}
+              className="text-xs py-1.5 px-2 rounded border border-dark-700 text-dark-500 hover:text-red-400 hover:border-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              title="삭제"
+            >
+              {deleting ? "삭제 중" : "삭제"}
+            </button>
+          </div>
+        )}
 
         {actionError ? (
           <p className="text-xs leading-5 text-red-300">{actionError}</p>

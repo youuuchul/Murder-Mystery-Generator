@@ -1,8 +1,15 @@
+import type { AppUser } from "@/types/auth";
 import type { GameAccessMeta, GameMetadata, GamePackage } from "@/types/game";
+import { isMakerAdmin } from "@/lib/maker-role";
 
 export type GameOwnershipState = "owned" | "claimable" | "readonly";
 
 type GameWithAccess = Pick<GamePackage, "access"> | Pick<GameMetadata, "access">;
+type GameActor = Pick<AppUser, "id" | "role"> | string | null | undefined;
+
+function resolveActorUserId(actor: GameActor): string {
+  return typeof actor === "string" ? actor.trim() : actor?.id.trim() ?? "";
+}
 
 /**
  * 현재 게임이 아직 어느 작업자에게도 귀속되지 않은 레거시 데이터인지 판별한다.
@@ -13,15 +20,16 @@ export function isClaimableLegacyGame(game: GameWithAccess): boolean {
 }
 
 /** 현재 작업자가 게임 소유자인지 검사한다. */
-export function isGameOwner(game: GameWithAccess, userId: string): boolean {
-  return game.access.ownerId.trim() === userId.trim();
+export function isGameOwner(game: GameWithAccess, actor: GameActor): boolean {
+  return game.access.ownerId.trim() === resolveActorUserId(actor);
 }
 
 /** 현재 작업자 기준으로 게임 소유권 상태를 계산한다. */
 export function getGameOwnershipState(
   game: GameWithAccess,
-  userId: string
+  actor: GameActor
 ): GameOwnershipState {
+  const userId = resolveActorUserId(actor);
   if (isClaimableLegacyGame(game)) {
     return "claimable";
   }
@@ -79,9 +87,10 @@ export function reassignGameOwnership(
  */
 export function resolveEditableGameForUser(
   game: GamePackage,
-  userId: string
+  actor: GameActor
 ): { game: GamePackage; claimed: boolean } | null {
-  const ownershipState = getGameOwnershipState(game, userId);
+  const ownershipState = getGameOwnershipState(game, actor);
+  const userId = resolveActorUserId(actor);
 
   if (ownershipState === "readonly") {
     return null;
@@ -104,16 +113,46 @@ export function resolveEditableGameForUser(
  * GM 화면 진입 / 세션 시작 가능 여부를 판별한다.
  * 공개 게임은 누구나 가능하고, 비공개/초안은 소유자 또는 귀속 가능한 레거시 게임만 허용한다.
  */
-export function canAccessGmPlay(game: GameWithAccess, userId?: string): boolean {
+export function canAccessGmPlay(game: GameWithAccess, actor?: GameActor): boolean {
   if (normalizeGameVisibility(game.access) === "public") {
     return true;
   }
 
-  if (!userId) {
+  if (isMakerAdmin(typeof actor === "string" ? null : actor)) {
+    return true;
+  }
+
+  if (!resolveActorUserId(actor)) {
     return false;
   }
 
-  return getGameOwnershipState(game, userId) !== "readonly";
+  return getGameOwnershipState(game, actor) !== "readonly";
+}
+
+/**
+ * 관리자 화면에서 다른 작업자의 숨김 게임까지 포함해 볼 수 있는지 판별한다.
+ * 현재는 `admin` 역할만 전체 범위를 볼 수 있다.
+ */
+export function canViewAllGames(actor?: Pick<AppUser, "role"> | null): boolean {
+  return isMakerAdmin(actor);
+}
+
+/**
+ * 게임 원본 JSON을 그대로 읽을 수 있는지 확인한다.
+ * 소유자/귀속 가능 게임과 운영 관리자만 전체 원본을 본다.
+ */
+export function canReadGameSource(game: GameWithAccess, actor?: GameActor): boolean {
+  return isMakerAdmin(typeof actor === "string" ? null : actor)
+    || getGameOwnershipState(game, actor) !== "readonly";
+}
+
+/**
+ * 게임 삭제 권한을 판단한다.
+ * 소유자와 claimable 레거시 게임의 현재 작업자, 그리고 admin만 삭제할 수 있다.
+ */
+export function canDeleteGame(game: GameWithAccess, actor?: GameActor): boolean {
+  return isMakerAdmin(typeof actor === "string" ? null : actor)
+    || getGameOwnershipState(game, actor) !== "readonly";
 }
 
 function normalizeGameVisibility(access: GameAccessMeta): GameAccessMeta["visibility"] {

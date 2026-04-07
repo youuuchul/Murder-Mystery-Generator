@@ -1,3 +1,5 @@
+export type MakerRole = "creator" | "admin";
+
 /**
  * 메이커 제작/관리 동선에서 쓰는 최소 사용자 식별 정보.
  * 외부 Auth 도입 전까지는 브라우저 쿠키 세션으로만 유지한다.
@@ -5,6 +7,7 @@
 export interface AppUser {
   id: string;
   displayName: string;
+  role: MakerRole;
 }
 
 /**

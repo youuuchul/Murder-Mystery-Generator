@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { subscribe, unsubscribe } from "@/lib/sse/broadcaster";
 import { getSession } from "@/lib/session-repository";
@@ -29,12 +30,13 @@ export async function GET(
     const game = await getGame(session.gameId);
     const currentUser = await getRequestMakerUser(req);
 
-    if (!game || !canAccessGmPlay(game, currentUser?.id)) {
+    if (!game || !canAccessGmPlay(game, currentUser)) {
       return new Response("Forbidden", { status: 403 });
     }
 
     const canResume = canResumeGmSessionDirectly(session, {
       currentUserId: currentUser?.id,
+      isAdmin: isMakerAdmin(currentUser),
       cookieStore: req.cookies,
     });
     if (!canResume) {

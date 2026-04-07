@@ -10,6 +10,7 @@ import {
   normalizeMakerLoginId,
   verifyMakerAccountPassword,
 } from "@/lib/maker-account";
+import { normalizeMakerRole } from "@/lib/maker-role";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import {
   getMakerAuthProviderConfig,
@@ -62,6 +63,7 @@ function toMakerAccountIdentity(account: MakerAccountRecord): MakerAccountIdenti
   return {
     id: account.id,
     displayName: account.displayName,
+    role: normalizeMakerRole(account.role),
     loginId: account.loginId,
     recoveryEmail: account.recoveryEmail ?? null,
     createdAt: account.createdAt,
@@ -115,6 +117,7 @@ const localMakerAuthGateway: MakerAuthGateway = {
       id: preferredUserId?.trim() || crypto.randomUUID(),
       displayName,
       loginId,
+      role: "creator",
       recoveryEmail: normalizeMakerRecoveryEmail(recoveryEmail ?? ""),
       ...passwordFields,
       createdAt: now,

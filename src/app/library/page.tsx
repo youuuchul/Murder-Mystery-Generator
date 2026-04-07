@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listPublicGames } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { buildMakerAccessPath } from "@/lib/maker-user";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "./_components/GuideMenu";
@@ -24,6 +25,11 @@ export default async function LibraryPage() {
                 <span className="hidden rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-xs font-medium text-dark-200 sm:inline-flex">
                   작업자 {currentUser.displayName}
                 </span>
+                {isMakerAdmin(currentUser) ? (
+                  <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
+                    ADMIN
+                  </span>
+                ) : null}
                 <Link
                   href="/library/manage"
                   className="rounded-md border border-dark-700 px-3 py-1.5 text-sm text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"

@@ -4,6 +4,7 @@ import {
 } from "@/lib/maker-account";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { migrateLocalGameOwnership } from "@/lib/game-ownership-migration";
+import { normalizeMakerRole } from "@/lib/maker-role";
 import type {
   CreateMakerAccountInput,
   MakerAuthGateway,
@@ -84,6 +85,7 @@ function toMakerUserRecord(profile: SupabaseMakerProfileRow): MakerUserRecord {
   return {
     id: profile.id,
     displayName: profile.display_name,
+    role: normalizeMakerRole(profile.role),
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -93,6 +95,7 @@ function toMakerAccountIdentity(profile: SupabaseMakerProfileRow): MakerAccountI
   return {
     id: profile.id,
     displayName: profile.display_name,
+    role: normalizeMakerRole(profile.role),
     loginId: profile.login_id,
     recoveryEmail: profile.recovery_email ?? null,
     createdAt: profile.created_at,

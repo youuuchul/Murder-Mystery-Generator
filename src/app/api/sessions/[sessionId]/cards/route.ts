@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
@@ -23,12 +24,13 @@ async function canAccessGmSession(request: NextRequest, sessionId: string): Prom
   }
 
   const currentUser = await getRequestMakerUser(request);
-  if (!canAccessGmPlay(game, currentUser?.id)) {
+  if (!canAccessGmPlay(game, currentUser)) {
     return false;
   }
 
   return canResumeGmSessionDirectly(session, {
     currentUserId: currentUser?.id,
+    isAdmin: isMakerAdmin(currentUser),
     cookieStore: request.cookies,
   });
 }

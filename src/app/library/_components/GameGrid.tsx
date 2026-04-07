@@ -5,6 +5,7 @@ import GameCard from "./GameCard";
 export interface GameGridItem {
   game: GameMetadata;
   canEdit: boolean;
+  canDelete: boolean;
   canPlay: boolean;
   ownershipState: GameOwnershipState;
   ownerDisplayName?: string;
@@ -35,6 +36,7 @@ export default function GameGrid({ games }: GameGridProps) {
           key={item.game.id}
           game={item.game}
           canEdit={item.canEdit}
+          canDelete={item.canDelete}
           canPlay={item.canPlay}
           ownershipState={item.ownershipState}
           ownerDisplayName={item.ownerDisplayName}

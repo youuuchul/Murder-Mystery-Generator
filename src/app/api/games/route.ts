@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { canReadGameSource, canViewAllGames } from "@/lib/game-access";
 import { listGames, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import type { GamePackage, GameRules } from "@/types/game";
@@ -43,10 +44,19 @@ const CreateGameSchema = z.object({
   }),
 });
 
-/** GET /api/games — 게임 목록 */
-export async function GET() {
+/** GET /api/games — 현재 권한에 맞는 게임 목록 */
+export async function GET(request: NextRequest) {
   try {
-    const games = await listGames();
+    const currentUser = await getRequestMakerUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "제작자 로그인이 필요합니다." }, { status: 401 });
+    }
+
+    const allGames = await listGames();
+    const games = canViewAllGames(currentUser)
+      ? allGames
+      : allGames.filter((game) => canReadGameSource(game, currentUser));
+
     return NextResponse.json({ games });
   } catch (error) {
     console.error("[GET /api/games]", error);

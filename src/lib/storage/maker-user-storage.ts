@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { AppUser, MakerUserRecord } from "@/types/auth";
+import { normalizeMakerRole } from "@/lib/maker-role";
 import { normalizeMakerDisplayName } from "@/lib/maker-user";
 
 const MAKER_USERS_DIR = path.join(process.cwd(), "data", "makers");
@@ -30,6 +31,7 @@ export function listMakerUsers(): MakerUserRecord[] {
         .map((record) => ({
           id: typeof record.id === "string" ? record.id.trim() : "",
           displayName: normalizeMakerDisplayName(record.displayName),
+          role: normalizeMakerRole(record.role),
           createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
           updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
         }))
@@ -70,6 +72,7 @@ export function upsertMakerUser(user: AppUser, now = new Date().toISOString()): 
   const normalizedUser: AppUser = {
     id: user.id.trim(),
     displayName: normalizeMakerDisplayName(user.displayName),
+    role: normalizeMakerRole(user.role),
   };
   const existingUsers = listMakerUsers();
   const existingRecord = existingUsers.find((record) => record.id === normalizedUser.id);
@@ -77,6 +80,7 @@ export function upsertMakerUser(user: AppUser, now = new Date().toISOString()): 
     ? {
       ...existingRecord,
       displayName: normalizedUser.displayName,
+      role: normalizedUser.role,
       updatedAt: now,
     }
     : {

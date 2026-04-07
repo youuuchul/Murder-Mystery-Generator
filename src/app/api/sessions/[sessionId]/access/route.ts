@@ -6,6 +6,7 @@ import {
   GM_SESSION_ACCESS_COOKIE_NAME,
 } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { getSession } from "@/lib/session-repository";
 
@@ -29,12 +30,13 @@ export async function POST(request: NextRequest, { params }: Params) {
   const game = await getGame(session.gameId);
   const currentUser = await getRequestMakerUser(request);
 
-  if (!game || !canAccessGmPlay(game, currentUser?.id)) {
+  if (!game || !canAccessGmPlay(game, currentUser)) {
     return NextResponse.json({ error: "이 세션에 들어갈 수 없습니다." }, { status: 403 });
   }
 
   if (!canResumeGmSessionDirectly(session, {
     currentUserId: currentUser?.id,
+    isAdmin: isMakerAdmin(currentUser),
     cookieStore: request.cookies,
   })) {
     const { sessionCode } = await request.json().catch(() => ({})) as AccessRequestBody;

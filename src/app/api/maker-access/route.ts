@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_account_credentials", "login");
     }
 
-    const user = createMakerUser(account.displayName, account.id);
+    const user = createMakerUser(account.displayName, account.id, account.role);
     await makerAuthGateway.upsertUser(user);
     const response = await buildLoginSuccessResponse(request, next, gatePassword);
     applyLocalMakerUserCookie(response, user);
@@ -431,7 +431,7 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const user = createMakerUser(account.displayName, account.id);
+    const user = createMakerUser(account.displayName, account.id, account.role);
     await makerAuthGateway.upsertUser(user);
 
     const response = await buildLoginSuccessResponse(request, next, gatePassword);

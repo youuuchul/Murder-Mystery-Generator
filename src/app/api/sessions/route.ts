@@ -6,6 +6,7 @@ import {
   GM_SESSION_ACCESS_COOKIE_NAME,
 } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { createSession, listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
   const currentUser = await getRequestMakerUser(req);
 
-  if (!canAccessGmPlay(game, currentUser?.id)) {
+  if (!canAccessGmPlay(game, currentUser)) {
     return NextResponse.json(
       { error: "이 게임은 현재 작업자가 세션을 시작할 수 없습니다." },
       { status: 403 }
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   const currentUser = await getRequestMakerUser(req);
-  if (!canAccessGmPlay(game, currentUser?.id)) {
+  if (!canAccessGmPlay(game, currentUser)) {
     return NextResponse.json(
       { error: "이 게임의 세션 목록을 볼 권한이 없습니다." },
       { status: 403 }
@@ -94,6 +95,7 @@ export async function GET(req: NextRequest) {
     toSessionSummary(session, {
       canResumeDirectly: canResumeGmSessionDirectly(session, {
         currentUserId: currentUser?.id,
+        isAdmin: isMakerAdmin(currentUser),
         cookieStore: req.cookies,
       }),
     })

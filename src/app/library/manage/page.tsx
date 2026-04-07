@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { describeMakerRecoveryEmail } from "@/lib/maker-account-recovery";
-import { canAccessGmPlay, getGameOwnershipState } from "@/lib/game-access";
+import {
+  canAccessGmPlay,
+  canDeleteGame,
+  canViewAllGames,
+  getGameOwnershipState,
+} from "@/lib/game-access";
 import { listGames } from "@/lib/game-repository";
 import { isMakerAccessEnabled } from "@/lib/maker-access";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
@@ -56,7 +62,8 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const resolvedSearchParams = await searchParams;
   const currentUser = await requireCurrentMakerUser("/library/manage");
   const currentAccount = await makerAuthGateway.getAccountById(currentUser.id);
-  const includeReadonly = resolvedSearchParams?.scope === "all";
+  const canSeeAllGames = canViewAllGames(currentUser);
+  const includeReadonly = canSeeAllGames && resolvedSearchParams?.scope === "all";
   const makerUsers = await makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
   const managedGames = (await listGames())
@@ -67,7 +74,8 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
         game,
         ownershipState,
         canEdit: ownershipState !== "readonly",
-        canPlay: canAccessGmPlay(game, currentUser.id),
+        canDelete: canDeleteGame(game, currentUser),
+        canPlay: canAccessGmPlay(game, currentUser),
         ownerDisplayName: ownerNameMap.get(game.access.ownerId),
       };
     })
@@ -80,6 +88,10 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
   const accountErrorMessage = getManageAccountErrorMessage(resolvedSearchParams?.error);
   const accountNoticeMessage = getManageAccountNoticeMessage(resolvedSearchParams?.notice);
+  const pageTitle = includeReadonly ? "게임 관리" : "내 게임 관리";
+  const pageDescription = includeReadonly
+    ? "내 게임과 운영 확인이 필요한 전체 게임을 함께 관리합니다. 공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다."
+    : "내가 만든 게임과 아직 귀속되지 않은 레거시 게임을 관리합니다. 공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다.";
 
   return (
     <div className="min-h-screen bg-dark-950">
@@ -97,6 +109,11 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
             <span className="hidden rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-xs font-medium text-dark-200 sm:inline-flex">
               작업자 {currentUser.displayName}
             </span>
+            {isMakerAdmin(currentUser) ? (
+              <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
+                ADMIN
+              </span>
+            ) : null}
             {makerAccessEnabled ? (
               <span className="hidden rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300 sm:inline-flex">
                 제작 보호 ON
@@ -126,11 +143,15 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="rounded-[28px] border border-dark-800 bg-[radial-gradient(circle_at_top_left,rgba(126,84,99,0.18),transparent_34%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(11,11,14,0.98))] p-6 sm:p-8">
           <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Manage</p>
-          <h1 className="mt-4 text-3xl font-semibold text-dark-50">내 게임 관리</h1>
+          <h1 className="mt-4 text-3xl font-semibold text-dark-50">{pageTitle}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
-            내가 만든 게임과 아직 귀속되지 않은 레거시 게임을 관리합니다.
-            공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다.
+            {pageDescription}
           </p>
+          {canSeeAllGames ? (
+            <p className="mt-2 text-sm leading-6 text-amber-200/90">
+              관리자 계정은 다른 작업자의 비공개 게임과 세션도 운영 점검용으로 열 수 있습니다.
+            </p>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
@@ -144,17 +165,19 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
             >
               내 게임만 보기
             </Link>
-            <Link
-              href="/library/manage?scope=all"
-              className={[
-                "rounded-full border px-3 py-1 text-xs transition-colors",
-                includeReadonly
-                  ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
-                  : "border-dark-700 bg-dark-950 text-dark-300 hover:border-dark-500 hover:text-dark-100",
-              ].join(" ")}
-            >
-              숨김 포함 전체 보기
-            </Link>
+            {canSeeAllGames ? (
+              <Link
+                href="/library/manage?scope=all"
+                className={[
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  includeReadonly
+                    ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
+                    : "border-dark-700 bg-dark-950 text-dark-300 hover:border-dark-500 hover:text-dark-100",
+                ].join(" ")}
+              >
+                숨김 포함 전체 보기
+              </Link>
+            ) : null}
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2 text-xs">

@@ -22,6 +22,7 @@ const difficultyColor: Record<string, string> = {
 interface GameCardProps {
   game: GameMetadata;
   canEdit: boolean;
+  canDelete: boolean;
   canPlay: boolean;
   ownershipState: GameOwnershipState;
   ownerDisplayName?: string;
@@ -42,6 +43,7 @@ const OWNERSHIP_LABELS: Record<GameOwnershipState, string> = {
 export default function GameCard({
   game,
   canEdit,
+  canDelete,
   canPlay,
   ownershipState,
   ownerDisplayName,
@@ -61,7 +63,7 @@ export default function GameCard({
   }, [game.publishReadiness.checklist]);
 
   async function handleDelete() {
-    if (!canEdit) {
+    if (!canDelete) {
       setActionError("현재 작업자는 이 게임을 삭제할 수 없습니다.");
       return;
     }
@@ -379,7 +381,7 @@ export default function GameCard({
           <button
             type="button"
             onClick={handleDelete}
-            disabled={deleting || !canEdit}
+            disabled={deleting || !canDelete}
             className="text-xs py-1.5 px-2 rounded border border-dark-700 text-dark-500 hover:text-red-400 hover:border-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             title="삭제"
           >

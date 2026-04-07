@@ -4,6 +4,7 @@ import Link from "next/link";
 import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
+import { isMakerAdmin } from "@/lib/maker-role";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
@@ -45,7 +46,7 @@ export default async function PlayPage({
   if (!game) notFound();
   const currentUser = await getCurrentMakerUser();
 
-  if (!canAccessGmPlay(game, currentUser?.id)) {
+  if (!canAccessGmPlay(game, currentUser)) {
     return (
       <div className="min-h-screen bg-dark-950 px-4 py-12 text-dark-50">
         <div className="mx-auto max-w-2xl rounded-3xl border border-dark-800 bg-dark-900/90 p-8 shadow-2xl">
@@ -89,6 +90,7 @@ export default async function PlayPage({
       item.id === requestedSessionId
       && canResumeGmSessionDirectly(item, {
         currentUserId: currentUser?.id,
+        isAdmin: isMakerAdmin(currentUser),
         cookieStore,
       })
     )) ?? null
@@ -97,6 +99,7 @@ export default async function PlayPage({
     toSessionSummary(session, {
       canResumeDirectly: canResumeGmSessionDirectly(session, {
         currentUserId: currentUser?.id,
+        isAdmin: isMakerAdmin(currentUser),
         cookieStore,
       }),
     })

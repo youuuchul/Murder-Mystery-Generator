@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { MakerAccountRecord } from "@/types/auth";
+import { normalizeMakerRole } from "@/lib/maker-role";
 import { normalizeMakerDisplayName } from "@/lib/maker-user";
 import { normalizeMakerLoginId, normalizeMakerRecoveryEmail } from "@/lib/maker-account";
 
@@ -20,6 +21,7 @@ function normalizeMakerAccountRecord(record: MakerAccountRecord): MakerAccountRe
     id: typeof record.id === "string" ? record.id.trim() : "",
     loginId: normalizeMakerLoginId(record.loginId),
     displayName: normalizeMakerDisplayName(record.displayName),
+    role: normalizeMakerRole(record.role),
     recoveryEmail: normalizeMakerRecoveryEmail(record.recoveryEmail ?? ""),
     passwordSalt: typeof record.passwordSalt === "string" ? record.passwordSalt : "",
     passwordHash: typeof record.passwordHash === "string" ? record.passwordHash : "",

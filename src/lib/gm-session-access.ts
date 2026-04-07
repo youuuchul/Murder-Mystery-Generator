@@ -118,9 +118,14 @@ export function canResumeGmSessionDirectly(
   session: SessionAccessTarget,
   options: {
     currentUserId?: string | null;
+    isAdmin?: boolean;
     cookieStore?: CookieStoreLike;
   } = {}
 ): boolean {
+  if (options.isAdmin) {
+    return true;
+  }
+
   if (isSessionHost(session, options.currentUserId)) {
     return true;
   }

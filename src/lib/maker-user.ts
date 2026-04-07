@@ -1,4 +1,5 @@
 import type { AppUser } from "@/types/auth";
+import { normalizeMakerRole } from "@/lib/maker-role";
 
 export const MAKER_USER_COOKIE_NAME = "mm_maker_user";
 
@@ -38,10 +39,15 @@ export function isValidMakerUserId(value: string): boolean {
  * 현재 사용자 쿠키가 있으면 같은 userId를 유지하고,
  * 없으면 새 작업자 세션 ID를 만든다.
  */
-export function createMakerUser(displayName: string, existingUserId?: string): AppUser {
+export function createMakerUser(
+  displayName: string,
+  existingUserId?: string,
+  role?: AppUser["role"]
+): AppUser {
   return {
     id: normalizeMakerUserId(existingUserId ?? "") || crypto.randomUUID(),
     displayName: normalizeMakerDisplayName(displayName),
+    role: normalizeMakerRole(role),
   };
 }
 
@@ -51,6 +57,7 @@ export function serializeMakerUser(user: AppUser): string {
     JSON.stringify({
       id: user.id,
       displayName: normalizeMakerDisplayName(user.displayName),
+      role: normalizeMakerRole(user.role),
     })
   );
 }
@@ -67,12 +74,13 @@ export function parseMakerUser(cookieValue: string | undefined): AppUser | null 
     const displayName = normalizeMakerDisplayName(
       typeof parsed.displayName === "string" ? parsed.displayName : ""
     );
+    const role = normalizeMakerRole(parsed.role);
 
     if (!id || !displayName) {
       return null;
     }
 
-    return { id, displayName };
+    return { id, displayName, role };
   } catch {
     return null;
   }

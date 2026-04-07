@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGameOwnershipState, resolveEditableGameForUser } from "@/lib/game-access";
+import {
+  canDeleteGame,
+  canReadGameSource,
+  resolveEditableGameForUser,
+} from "@/lib/game-access";
 import { deleteGame, getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { buildPublicGame } from "@/lib/game-sanitizer";
@@ -17,7 +21,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const currentUser = await getRequestMakerUser(request);
-  if (currentUser && getGameOwnershipState(game, currentUser.id) !== "readonly") {
+  if (currentUser && canReadGameSource(game, currentUser)) {
     return NextResponse.json({ game });
   }
 
@@ -103,8 +107,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "게임을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  const editableGame = resolveEditableGameForUser(existing, currentUser.id);
-  if (!editableGame) {
+  if (!canDeleteGame(existing, currentUser)) {
     return NextResponse.json(
       { error: "이 게임은 현재 작업자가 삭제할 수 없습니다." },
       { status: 403 }

@@ -9,6 +9,7 @@ import {
   getMakerUserFromCookieStore,
   normalizeMakerDisplayName,
 } from "@/lib/maker-user";
+import { normalizeMakerRole } from "@/lib/maker-role";
 import {
   createSupabaseRequestClient,
   createSupabaseServerComponentClient,
@@ -48,6 +49,7 @@ async function resolveSupabaseMakerUser(
   return {
     id: data.user.id,
     displayName,
+    role: normalizeMakerRole(account?.role),
   };
 }
 

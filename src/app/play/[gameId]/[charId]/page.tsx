@@ -11,13 +11,14 @@ import {
   resolveActiveEndingBranch,
   resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
+import type { PlayerSharedBoardContent } from "@/lib/player-shared-board";
 import {
   getAdvanceConfirmKind,
   getPlayerAdvanceRequestLabel,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
-import type { EndingStage, SharedState, InventoryCard, VoteReveal } from "@/types/session";
+import type { EndingStage, SharedState, InventoryCard, VoteReveal, SessionMode } from "@/types/session";
 
 const PHASE_LABEL: Record<string, string> = {
   lobby: "대기 중",
@@ -76,13 +77,65 @@ const TYPE_LABEL: Record<string, string> = {
   physical: "물적 증거", testimony: "증언", scene: "현장 단서",
 };
 
-type Tab = "character" | "inventory" | "locations" | "vote";
+type Tab = "shared" | "character" | "inventory" | "locations" | "vote";
 type CharacterPanel = "profile" | "people" | "timeline";
 const CHARACTER_PANEL_LABELS: Record<CharacterPanel, string> = {
   profile: "내 정보",
   people: "인물 정보",
   timeline: "타임라인",
 };
+
+interface PlayerSessionStateResponse {
+  sharedState: SharedState;
+  playerState: {
+    inventory?: InventoryCard[];
+    roundAcquired?: Record<string, number>;
+    roundVisitedLocations?: Record<string, string[]>;
+  };
+  gameId: string;
+  game: GamePackage;
+  sessionCode?: string;
+  sessionName?: string;
+  sessionMode?: SessionMode;
+  sharedBoard?: PlayerSharedBoardContent | null;
+}
+
+type VideoSource =
+  | { kind: "html5"; src: string }
+  | { kind: "iframe"; src: string }
+  | { kind: "external"; src: string };
+
+function resolveVideoSource(url?: string): VideoSource | null {
+  const normalizedUrl = url?.trim();
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (hostname.includes("youtube.com") || hostname === "youtu.be") {
+      return { kind: "iframe", src: normalizedUrl };
+    }
+
+    if (
+      normalizedUrl.endsWith(".mp4")
+      || normalizedUrl.endsWith(".webm")
+      || normalizedUrl.endsWith(".ogg")
+    ) {
+      return { kind: "html5", src: normalizedUrl };
+    }
+
+    if (normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://")) {
+      return { kind: "external", src: normalizedUrl };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 /**
  * 모바일 화면에서 긴 개인 정보를 접고 펼칠 수 있는 공통 섹션.
@@ -1022,6 +1075,103 @@ function PlayerJoinAccessPanel({
   );
 }
 
+/**
+ * GM 없는 세션에서 모두가 보는 공통 화면.
+ * 현재 페이즈에 필요한 텍스트, 지도, 영상, 배경음악만 플레이어에게 노출한다.
+ */
+function SharedBoardPanel({
+  content,
+}: {
+  content: PlayerSharedBoardContent;
+}) {
+  const videoSource = resolveVideoSource(content.videoUrl);
+  const hasMedia = Boolean(content.imageUrl || videoSource || content.backgroundMusic?.trim());
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-dark-500">공통 화면</p>
+            <p className="mt-1 text-lg font-semibold text-dark-50">{content.title}</p>
+          </div>
+          <span className="rounded-full border border-dark-700 px-3 py-1 text-xs text-dark-300">
+            {content.badge}
+          </span>
+        </div>
+      </div>
+
+      {content.narrationBlocks.map((block) => (
+        <div key={block.label} className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
+          <p className="text-xs text-dark-500">{block.label}</p>
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-dark-200">{block.text}</p>
+        </div>
+      ))}
+
+      {hasMedia ? (
+        <div className="space-y-4">
+          {content.imageUrl ? (
+            <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+              <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
+              <ImageFrame src={content.imageUrl} alt={`${content.title} 공통 이미지`} />
+            </div>
+          ) : null}
+
+          {videoSource ? (
+            <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+              <p className="text-xs text-dark-500">공통 영상</p>
+              {videoSource.kind === "html5" ? (
+                <video
+                  controls
+                  preload="metadata"
+                  className="w-full rounded-xl border border-dark-700 bg-black aspect-video"
+                  src={videoSource.src}
+                />
+              ) : videoSource.kind === "iframe" ? (
+                <iframe
+                  src={videoSource.src}
+                  title={content.title}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full rounded-xl border border-dark-700 bg-black aspect-video"
+                />
+              ) : (
+                <a
+                  href={videoSource.src}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center rounded-xl border border-emerald-800 bg-emerald-950/20 px-4 py-8 text-sm font-medium text-emerald-300"
+                >
+                  외부 영상 열기
+                </a>
+              )}
+            </div>
+          ) : null}
+
+          {content.backgroundMusic ? (
+            <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
+              <p className="text-xs text-dark-500">배경 음악</p>
+              <a
+                href={content.backgroundMusic}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-emerald-800 bg-emerald-950/20 px-4 py-3 text-sm font-medium text-emerald-300"
+              >
+                배경 음악 열기
+              </a>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
+          현재 페이즈에 공개된 공통 화면 자료가 없습니다.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function PlayerView() {
   const { gameId, charId } = useParams() as { gameId: string; charId: string };
@@ -1033,6 +1183,8 @@ export default function PlayerView() {
   const [sharedState, setSharedState] = useState<SharedState | null>(null);
   const [sessionCode, setSessionCode] = useState("");
   const [sessionName, setSessionName] = useState("");
+  const [sessionMode, setSessionMode] = useState<SessionMode>("gm");
+  const [sharedBoard, setSharedBoard] = useState<PlayerSharedBoardContent | null>(null);
   const [inventory, setInventory] = useState<InventoryCard[]>([]);
   const [roundAcquired, setRoundAcquired] = useState<Record<string, number>>({});
   const [roundVisited, setRoundVisited] = useState<Record<string, string[]>>({});
@@ -1044,6 +1196,7 @@ export default function PlayerView() {
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
   const [selectedSceneClue, setSelectedSceneClue] = useState<Clue | null>(null);
   const previousPhaseRef = useRef<string | null>(null);
+  const initializedConsensusTabRef = useRef(false);
   const [phaseRequestSubmitting, setPhaseRequestSubmitting] = useState(false);
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
 
@@ -1066,10 +1219,20 @@ export default function PlayerView() {
         setLoading(false);
         return;
       }
-      const { sharedState: ss, playerState, game: g, sessionCode: nextSessionCode, sessionName: nextSessionName } = await sessionRes.json();
+      const {
+        sharedState: ss,
+        playerState,
+        game: g,
+        sessionCode: nextSessionCode,
+        sessionName: nextSessionName,
+        sessionMode: nextSessionMode,
+        sharedBoard: nextSharedBoard,
+      } = await sessionRes.json() as PlayerSessionStateResponse;
       setSharedState(ss);
       setSessionCode(nextSessionCode ?? "");
       setSessionName(nextSessionName ?? "현재 방");
+      setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
+      setSharedBoard(nextSharedBoard ?? null);
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});
       setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -1114,10 +1277,19 @@ export default function PlayerView() {
       try {
         const res = await fetch(`/api/sessions/${sessionId}?token=${token}`);
         if (!res.ok) return;
-        const { sharedState: ss, playerState, sessionCode: nextSessionCode, sessionName: nextSessionName } = await res.json();
+        const {
+          sharedState: ss,
+          playerState,
+          sessionCode: nextSessionCode,
+          sessionName: nextSessionName,
+          sessionMode: nextSessionMode,
+          sharedBoard: nextSharedBoard,
+        } = await res.json() as PlayerSessionStateResponse;
         setSharedState(ss);
         setSessionCode(nextSessionCode ?? "");
         setSessionName(nextSessionName ?? "현재 방");
+        setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
+        setSharedBoard(nextSharedBoard ?? null);
         setInventory(playerState.inventory ?? []);
         setRoundAcquired(playerState.roundAcquired ?? {});
         setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -1141,6 +1313,13 @@ export default function PlayerView() {
       },
     }
   );
+
+  useEffect(() => {
+    if (sessionMode === "player-consensus" && !initializedConsensusTabRef.current) {
+      setTab("shared");
+      initializedConsensusTabRef.current = true;
+    }
+  }, [sessionMode]);
 
   /**
    * 클라이언트 사이드 조건 평가
@@ -1288,6 +1467,11 @@ export default function PlayerView() {
           </span>
         </div>
         <div className="p-4 max-w-lg mx-auto pb-8">
+          {sessionMode === "player-consensus" && sharedBoard ? (
+            <div className="mb-4">
+              <SharedBoardPanel content={sharedBoard} />
+            </div>
+          ) : null}
           <VoteResultScreen
             reveal={sharedState.voteReveal}
             game={game}
@@ -1300,6 +1484,7 @@ export default function PlayerView() {
   }
 
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
+    { id: "shared", label: "공통화면", hidden: sessionMode !== "player-consensus" },
     { id: "character", label: "캐릭터 카드" },
     { id: "inventory", label: `인벤토리 (${inventory.length})` },
     { id: "locations", label: "장소 탐색" },
@@ -1402,6 +1587,16 @@ export default function PlayerView() {
               </button>
             ))}
         </div>
+
+        {tab === "shared" && sessionMode === "player-consensus" && sharedBoard && (
+          <SharedBoardPanel content={sharedBoard} />
+        )}
+
+        {tab === "shared" && sessionMode === "player-consensus" && !sharedBoard && (
+          <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
+            현재 단계에서 볼 공통 화면이 없습니다.
+          </div>
+        )}
 
         {/* ── 캐릭터 카드 ── */}
         {tab === "character" && (

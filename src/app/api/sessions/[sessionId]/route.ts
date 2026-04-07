@@ -3,6 +3,7 @@ import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
+import { buildPlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
@@ -112,6 +113,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       game: buildGameForPlayer(game, pState.playerId),
       sessionCode: session.sessionCode,
       sessionName: session.sessionName,
+      sessionMode: session.mode,
+      sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
     });
   }
 

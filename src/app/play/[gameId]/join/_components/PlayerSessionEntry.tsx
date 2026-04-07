@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 interface PlayerSessionEntryItem {
   id: string;
   sessionName: string;
+  modeLabel?: string;
   phaseLabel: string;
   createdAtLabel: string;
   lockedPlayerCount: number;
@@ -221,6 +222,9 @@ export default function PlayerSessionEntry({
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Room List</p>
               <h2 className="mt-2 text-xl font-semibold text-dark-50">참가 가능한 방</h2>
+              <p className="mt-2 text-sm leading-6 text-dark-400">
+                GM이 연 방과 GM 없이 함께 진행하는 방이 모두 여기에 표시됩니다.
+              </p>
             </div>
             <span className="rounded-full border border-dark-700 bg-dark-950 px-3 py-1 text-xs text-dark-300">
               활성 {sessions.length}개
@@ -251,7 +255,14 @@ export default function PlayerSessionEntry({
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-base font-semibold text-dark-50">{session.sessionName}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold text-dark-50">{session.sessionName}</p>
+                          {session.modeLabel ? (
+                            <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-300">
+                              {session.modeLabel}
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="mt-1 text-xs text-dark-500">{session.createdAtLabel} 생성</p>
                       </div>
                       <span className="rounded-full border border-dark-700 bg-dark-900 px-3 py-1 text-xs text-dark-300">

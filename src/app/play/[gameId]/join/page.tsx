@@ -57,11 +57,12 @@ export default async function PlayJoinPage({
   const sessions = activeSessions.map((session) => ({
     id: session.id,
     sessionName: session.sessionName,
+    modeLabel: session.mode === "player-consensus" ? "GM 없음" : "GM 진행",
     phaseLabel: formatPlayerSessionPhaseLabel({
       id: session.id,
-    sessionName: session.sessionName,
-    mode: session.mode,
-    createdAt: session.createdAt,
+      sessionName: session.sessionName,
+      mode: session.mode,
+      createdAt: session.createdAt,
       startedAt: session.startedAt,
       phase: session.sharedState.phase,
       currentRound: session.sharedState.currentRound,

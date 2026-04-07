@@ -6,7 +6,7 @@ import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
-import { isGmManagedSession, listActiveSessions } from "@/lib/session-repository";
+import { listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 import GMDashboard from "./_components/GMDashboard";
 
@@ -79,9 +79,7 @@ export default async function PlayPage({
     }
   }
 
-  const activeSessions = (await listActiveSessions(params.gameId)).filter((session) => (
-    isGmManagedSession(session)
-  ));
+  const activeSessions = await listActiveSessions(params.gameId);
   const cookieStore = cookies();
   const requestedSessionId = searchParams?.session;
   /**

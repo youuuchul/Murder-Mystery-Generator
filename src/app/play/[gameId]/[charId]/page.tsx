@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import {
   ENDING_STAGE_LABELS,
@@ -1076,6 +1076,95 @@ function PlayerJoinAccessPanel({
 }
 
 /**
+ * GM 없이 진행하는 방에서 현재 참가 인원을 접어서 확인하는 패널이다.
+ * 공통화면 안에서 누가 들어와 있는지 빠르게 확인할 수 있게 한다.
+ */
+function PlayerRoomRosterPanel({
+  slots,
+}: {
+  slots: SharedState["characterSlots"];
+}) {
+  const joinedSlots = slots.filter((slot) => slot.isLocked);
+  const waitingCount = Math.max(slots.length - joinedSlots.length, 0);
+
+  return (
+    <CollapsibleSection title={`플레이어 참여 현황 (${joinedSlots.length}/${slots.length})`}>
+      <div className="space-y-3">
+        {joinedSlots.length > 0 ? (
+          joinedSlots.map((slot) => (
+            <div
+              key={slot.playerId}
+              className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-950/50 px-3 py-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-dark-100">{slot.playerName || "이름 없음"}</p>
+                <p className="mt-1 text-xs text-dark-500">{slot.playerId}</p>
+              </div>
+              <span className="rounded-full border border-emerald-800/60 px-2 py-1 text-[11px] text-emerald-300">
+                참여 중
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-dark-500">아직 입장한 플레이어가 없습니다.</p>
+        )}
+
+        {waitingCount > 0 ? (
+          <div className="rounded-xl border border-dashed border-dark-800 bg-dark-950/30 px-3 py-3 text-sm text-dark-500">
+            아직 비어 있는 자리 {waitingCount}개
+          </div>
+        ) : null}
+      </div>
+    </CollapsibleSection>
+  );
+}
+
+/**
+ * 플레이어가 세션 목록으로 돌아가기 전에 한 번 더 확인하는 이탈 모달.
+ * 진행 중 화면에서 실수로 빠져나가 재접속 흐름이 꼬이지 않게 막는다.
+ */
+function LeaveSessionConfirmModal({
+  destinationLabel,
+  onCancel,
+  onConfirm,
+}: {
+  destinationLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Leave Session</p>
+          <h2 className="text-xl font-semibold text-dark-50">{destinationLabel}으로 나갈까요?</h2>
+          <p className="text-sm leading-6 text-dark-300">
+            현재 진행 화면을 나가면 다시 참가 코드를 통해 들어와야 할 수 있습니다.
+          </p>
+        </div>
+
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+          >
+            머무르기
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
+          >
+            {destinationLabel}으로 이동
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * GM 없는 세션에서 모두가 보는 공통 화면.
  * 현재 페이즈에 필요한 텍스트, 지도, 영상, 배경음악만 플레이어에게 노출한다.
  */
@@ -1175,6 +1264,7 @@ function SharedBoardPanel({
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function PlayerView() {
   const { gameId, charId } = useParams() as { gameId: string; charId: string };
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("s") ?? "";
 
@@ -1199,6 +1289,7 @@ export default function PlayerView() {
   const initializedConsensusTabRef = useRef(false);
   const [phaseRequestSubmitting, setPhaseRequestSubmitting] = useState(false);
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem(`mm_${sessionId}`) ?? "";
@@ -1426,6 +1517,8 @@ export default function PlayerView() {
   const hasRequestedAdvance = requestedPlayerIds.includes(charId);
   const canRequestAdvance = phase !== "vote" && phase !== "ending";
   const advanceRequestLabel = getPlayerAdvanceRequestLabel({ sharedState }, game);
+  const leavePath = game.access.visibility === "public" ? `/play/${gameId}/join` : "/join";
+  const leaveLabel = game.access.visibility === "public" ? "세션 목록" : "코드 입장";
 
   async function handlePhaseAdvanceToggle() {
     if (!sharedState || !game) {
@@ -1495,8 +1588,15 @@ export default function PlayerView() {
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
       {/* 상단 상태 바 */}
       <div className="sticky top-0 z-10 bg-dark-950/95 backdrop-blur border-b border-dark-800 px-4 py-2.5 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-dark-500 truncate max-w-[140px]">{game.title}</p>
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => setShowLeaveConfirm(true)}
+            className="text-xs text-dark-500 transition-colors hover:text-dark-300"
+          >
+            ← {leaveLabel}
+          </button>
+          <p className="mt-1 text-xs text-dark-500 truncate max-w-[180px]">{game.title}</p>
           <p className="text-sm font-semibold text-dark-100">{character.name}</p>
         </div>
         <span
@@ -1589,12 +1689,18 @@ export default function PlayerView() {
         </div>
 
         {tab === "shared" && sessionMode === "player-consensus" && sharedBoard && (
-          <SharedBoardPanel content={sharedBoard} />
+          <div className="space-y-4">
+            <SharedBoardPanel content={sharedBoard} />
+            <PlayerRoomRosterPanel slots={sharedState.characterSlots} />
+          </div>
         )}
 
         {tab === "shared" && sessionMode === "player-consensus" && !sharedBoard && (
-          <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
-            현재 단계에서 볼 공통 화면이 없습니다.
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
+              현재 단계에서 볼 공통 화면이 없습니다.
+            </div>
+            <PlayerRoomRosterPanel slots={sharedState.characterSlots} />
           </div>
         )}
 
@@ -2029,6 +2135,17 @@ export default function PlayerView() {
           onCancel={() => setPhaseAdvanceConfirmKind(null)}
           onConfirm={() => { void confirmPhaseAdvanceRequest(); }}
           confirming={phaseRequestSubmitting}
+        />
+      )}
+
+      {showLeaveConfirm && (
+        <LeaveSessionConfirmModal
+          destinationLabel={leaveLabel}
+          onCancel={() => setShowLeaveConfirm(false)}
+          onConfirm={() => {
+            setShowLeaveConfirm(false);
+            router.push(leavePath);
+          }}
         />
       )}
     </div>

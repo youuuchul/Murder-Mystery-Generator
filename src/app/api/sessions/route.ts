@@ -109,15 +109,16 @@ export async function GET(req: NextRequest) {
   }
 
   const sessions = (await listActiveSessions(gameId))
-    .filter((session) => isGmManagedSession(session))
     .map((session) => (
-    toSessionSummary(session, {
-      canResumeDirectly: canResumeGmSessionDirectly(session, {
-        currentUserId: currentUser?.id,
-        isAdmin: isMakerAdmin(currentUser),
-        cookieStore: req.cookies,
-      }),
-    })
-  ));
+      toSessionSummary(session, {
+        canResumeDirectly: isGmManagedSession(session)
+          ? canResumeGmSessionDirectly(session, {
+              currentUserId: currentUser?.id,
+              isAdmin: isMakerAdmin(currentUser),
+              cookieStore: req.cookies,
+            })
+          : false,
+      })
+    ));
   return NextResponse.json({ sessions });
 }

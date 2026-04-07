@@ -1232,13 +1232,15 @@ export default function GMDashboard({
         return;
       }
 
+      const data = await response.json() as { entryPath?: string };
+
       setAccessPromptSessionId(null);
       setAccessCodeDrafts((prev) => ({
         ...prev,
         [sessionId]: "",
       }));
       await refreshSessionSummaries(sessionId);
-      router.push(buildSessionPath(sessionId));
+      router.push(data.entryPath ?? buildSessionPath(sessionId));
     } finally {
       setVerifyingSessionId(null);
     }
@@ -1516,7 +1518,7 @@ export default function GMDashboard({
                   <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Select</p>
                   <h2 className="mt-2 text-2xl font-semibold text-dark-50">어떤 세션으로 진행할까요?</h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-dark-300">
-                    내 방은 바로 이어서 열 수 있고, 다른 방은 세션 코드를 입력하면 들어갈 수 있습니다.
+                    내 GM 방은 바로 이어서 열 수 있습니다. 다른 방은 세션 코드를 확인한 뒤 들어가며, GM 없는 방은 플레이어 화면으로 이동합니다.
                   </p>
                 </div>
                 <button
@@ -1541,6 +1543,9 @@ export default function GMDashboard({
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-dark-50">{item.sessionName}</p>
                       <div className="flex items-center gap-2">
+                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-300">
+                          {item.mode === "player-consensus" ? "GM 없음" : "GM 진행"}
+                        </span>
                         {needsCode ? (
                           <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">
                             코드 필요
@@ -1576,7 +1581,9 @@ export default function GMDashboard({
                           {isAccessPromptOpen ? (
                             <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-3 space-y-2">
                               <p className="text-xs leading-5 text-dark-400">
-                                세션 코드를 입력하면 이 방으로 들어갈 수 있습니다.
+                                {item.mode === "player-consensus"
+                                  ? "세션 코드를 입력하면 플레이어 화면으로 입장합니다."
+                                  : "세션 코드를 입력하면 이 GM 방으로 들어갈 수 있습니다."}
                               </p>
                               <div className="flex items-center gap-2">
                                 <input

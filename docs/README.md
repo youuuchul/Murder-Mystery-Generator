@@ -39,6 +39,10 @@
 - [20260319_VERCEL_SUPABASE_DEPLOYMENT_REVIEW.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/research/20260319_VERCEL_SUPABASE_DEPLOYMENT_REVIEW.md)
 - [20260319_LOCAL_DATA_DEPLOYMENT_RISK.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/research/20260319_LOCAL_DATA_DEPLOYMENT_RISK.md)
 
+## Operations
+
+- [20260407_ADMIN_ROLE_OPERATION.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/operations/20260407_ADMIN_ROLE_OPERATION.md)
+
 ## Handoff
 
 - [20260317_HANDOFF.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/handoff/20260317_HANDOFF.md)

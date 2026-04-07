@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { describeMakerRecoveryEmail } from "@/lib/maker-account-recovery";
 import {
   canAccessGmPlay,
   canDeleteGame,
@@ -13,6 +12,7 @@ import { isMakerAdmin } from "@/lib/maker-role";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
+import MakerAccountMenu from "../_components/MakerAccountMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +88,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
   const accountErrorMessage = getManageAccountErrorMessage(resolvedSearchParams?.error);
   const accountNoticeMessage = getManageAccountNoticeMessage(resolvedSearchParams?.notice);
+  const managePagePath = includeReadonly ? "/library/manage?scope=all" : "/library/manage";
   const pageTitle = includeReadonly ? "게임 관리" : "내 게임 관리";
   const pageDescription = includeReadonly
     ? "내 게임과 운영 확인이 필요한 전체 게임을 함께 관리합니다. 공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다."
@@ -106,9 +107,13 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
           </div>
 
           <nav className="flex items-center gap-2">
-            <span className="hidden rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-xs font-medium text-dark-200 sm:inline-flex">
-              작업자 {currentUser.displayName}
-            </span>
+            <MakerAccountMenu
+              currentUser={currentUser}
+              currentAccount={currentAccount}
+              nextPath={managePagePath}
+              errorMessage={accountErrorMessage}
+              noticeMessage={accountNoticeMessage}
+            />
             {isMakerAdmin(currentUser) ? (
               <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
                 ADMIN
@@ -120,16 +125,6 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
               </span>
             ) : null}
             <GuideMenu />
-            <form action="/api/maker-access" method="post">
-              <input type="hidden" name="intent" value="logout" />
-              <input type="hidden" name="next" value="/maker-access" />
-              <button
-                type="submit"
-                className="rounded-md border border-dark-700 px-3 py-1.5 text-sm text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
-              >
-                로그아웃
-              </button>
-            </form>
             <Link
               href="/maker/new"
               className="rounded-md border border-mystery-600 bg-mystery-700 px-4 py-1.5 text-sm text-white transition-colors hover:bg-mystery-600"
@@ -198,163 +193,6 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
                 다른 작업자 게임 {readonlyCount}개
               </span>
             ) : null}
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-dark-800 bg-dark-950/70 p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Account</p>
-              {currentAccount ? (
-                <div className="space-y-4">
-                  {accountErrorMessage ? (
-                    <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                      {accountErrorMessage}
-                    </div>
-                  ) : null}
-                  {accountNoticeMessage ? (
-                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                      {accountNoticeMessage}
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <p className="mt-2 text-sm leading-6 text-dark-300">
-                      다른 기기에서는 아래 로그인 ID와 계정 비밀번호로 들어오면 됩니다.
-                    </p>
-                    <p className="mt-3 rounded-xl border border-dark-700 bg-dark-900 px-3 py-3 font-mono text-xs text-dark-100">
-                      {currentAccount.loginId}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-dark-800 bg-dark-900/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-dark-100">복구 이메일</p>
-                        <p className="mt-1 text-xs text-dark-400">
-                          현재 {describeMakerRecoveryEmail(currentAccount.recoveryEmail)}
-                        </p>
-                      </div>
-                      {currentAccount.recoveryEmail ? (
-                        <span className="rounded-full border border-emerald-900 bg-emerald-950/50 px-3 py-1 text-[11px] text-emerald-300">
-                          복구 가능
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-amber-900 bg-amber-950/40 px-3 py-1 text-[11px] text-amber-300">
-                          미등록
-                        </span>
-                      )}
-                    </div>
-                    <form action="/api/maker-access" method="post" className="mt-4 space-y-3">
-                      <input type="hidden" name="intent" value="update_recovery_email" />
-                      <input type="hidden" name="next" value="/library/manage" />
-                      <label className="block">
-                        <span className="mb-2 block text-sm font-medium text-dark-200">
-                          이메일 주소
-                        </span>
-                        <input
-                          type="email"
-                          name="recoveryEmail"
-                          defaultValue={currentAccount.recoveryEmail ?? ""}
-                          autoComplete="email"
-                          className="w-full rounded-xl border border-emerald-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-emerald-500"
-                          placeholder="name@example.com"
-                        />
-                      </label>
-                      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                        비워두면 비밀번호를 찾을 수 없습니다.
-                        <div className="mt-1 text-xs text-amber-200/80">
-                          저장 후에는 로그인 화면에서 메일로 재설정 링크를 받을 수 있습니다.
-                        </div>
-                      </div>
-                      <button
-                        type="submit"
-                        className="w-full rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition hover:bg-mystery-600"
-                      >
-                        복구 이메일 저장
-                      </button>
-                    </form>
-                  </div>
-
-                  <div className="rounded-2xl border border-dark-800 bg-dark-900/70 p-4">
-                    <p className="text-sm font-medium text-dark-100">비밀번호 변경</p>
-                    <p className="mt-1 text-xs text-dark-400">
-                      현재 비밀번호를 확인한 뒤 새 비밀번호로 바꿉니다.
-                    </p>
-                    <form action="/api/maker-access" method="post" className="mt-4 space-y-3">
-                      <input type="hidden" name="intent" value="change_password" />
-                      <input type="hidden" name="next" value="/library/manage" />
-                      <label className="block">
-                        <span className="mb-2 block text-sm font-medium text-dark-200">
-                          현재 비밀번호
-                        </span>
-                        <input
-                          type="password"
-                          name="currentPassword"
-                          required
-                          autoComplete="current-password"
-                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                          placeholder="현재 비밀번호"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-2 block text-sm font-medium text-dark-200">
-                          새 비밀번호
-                        </span>
-                        <input
-                          type="password"
-                          name="accountPassword"
-                          required
-                          autoComplete="new-password"
-                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                          placeholder="8자 이상"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-2 block text-sm font-medium text-dark-200">
-                          새 비밀번호 확인
-                        </span>
-                        <input
-                          type="password"
-                          name="accountPasswordConfirm"
-                          required
-                          autoComplete="new-password"
-                          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                          placeholder="한 번 더 입력"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        className="w-full rounded-xl border border-dark-700 bg-dark-800 px-4 py-3 text-sm font-medium text-dark-100 transition hover:border-dark-500 hover:bg-dark-700"
-                      >
-                        새 비밀번호 저장
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <p className="mt-2 text-sm leading-6 text-dark-300">
-                    아직 계정이 연결되지 않았습니다. 지금 계정을 만들면 현재 ownerId 를 유지한 채 다른 브라우저와 다른 기기에서도 같은 작업자로 로그인할 수 있습니다.
-                  </p>
-                  <Link
-                    href="/maker-access?mode=signup&next=%2Flibrary%2Fmanage"
-                    className="mt-3 inline-flex rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-2.5 text-sm text-white transition-colors hover:bg-mystery-600"
-                  >
-                    계정 만들기
-                  </Link>
-                </>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-dark-800 bg-dark-950/70 p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Worker Key</p>
-              <p className="mt-2 text-sm leading-6 text-dark-300">
-                기존 임시 세션이나 레거시 ownerId 를 복구할 때 쓰는 작업자 키입니다.
-                계정 만들기 전에는 이 값으로 기존 작업을 다시 이어갈 수 있습니다.
-              </p>
-              <p className="mt-3 rounded-xl border border-dark-700 bg-dark-900 px-3 py-3 font-mono text-xs text-dark-100">
-                {currentUser.id}
-              </p>
-            </div>
           </div>
         </section>
 

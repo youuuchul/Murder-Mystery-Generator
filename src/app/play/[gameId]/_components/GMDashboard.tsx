@@ -1064,10 +1064,12 @@ export default function GMDashboard({
   const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
   const [selectedArrestPlayerId, setSelectedArrestPlayerId] = useState("");
   const [accessPromptSessionId, setAccessPromptSessionId] = useState<string | null>(null);
-  const [accessCodeDrafts, setAccessCodeDrafts] = useState<Record<string, string>>({});
+  const [accessPromptCode, setAccessPromptCode] = useState("");
+  const [accessPromptError, setAccessPromptError] = useState<string | null>(null);
   const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
   const [advanceConfirmKind, setAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const hasAutoCreatedSessionRef = useRef(false);
+  const accessPromptSession = sessionSummaries.find((item) => item.id === accessPromptSessionId) ?? null;
 
   useEffect(() => {
     setSession(initialSession);
@@ -1195,26 +1197,21 @@ export default function GMDashboard({
     void createSession();
   }, [autoCreateSession, session, creating]);
 
-  function handleSessionCodeDraftChange(sessionId: string, value: string) {
-    setAccessCodeDrafts((prev) => ({
-      ...prev,
-      [sessionId]: value,
-    }));
-  }
-
   async function openSessionFromList(item: GameSessionSummary) {
     if (item.canResumeDirectly) {
       router.push(buildSessionPath(item.id));
       return;
     }
 
-    setAccessPromptSessionId((prev) => prev === item.id ? null : item.id);
+    setAccessPromptSessionId(item.id);
+    setAccessPromptCode("");
+    setAccessPromptError(null);
   }
 
   async function verifySessionAccess(sessionId: string) {
-    const sessionCode = accessCodeDrafts[sessionId]?.trim();
+    const sessionCode = accessPromptCode.trim();
     if (!sessionCode) {
-      alert("세션 코드를 입력해주세요.");
+      setAccessPromptError("세션 코드를 입력해주세요.");
       return;
     }
 
@@ -1228,17 +1225,15 @@ export default function GMDashboard({
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
-        alert(errorBody.error ?? "세션 코드 확인 실패");
+        setAccessPromptError(errorBody.error ?? "세션 코드 확인 실패");
         return;
       }
 
       const data = await response.json() as { entryPath?: string };
 
       setAccessPromptSessionId(null);
-      setAccessCodeDrafts((prev) => ({
-        ...prev,
-        [sessionId]: "",
-      }));
+      setAccessPromptCode("");
+      setAccessPromptError(null);
       await refreshSessionSummaries(sessionId);
       router.push(data.entryPath ?? buildSessionPath(sessionId));
     } finally {
@@ -1515,11 +1510,8 @@ export default function GMDashboard({
             <div className="rounded-[28px] border border-dark-800 bg-dark-900 p-6 sm:p-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Select</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-dark-50">어떤 세션으로 진행할까요?</h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-dark-300">
-                    내 GM 방은 바로 이어서 열 수 있습니다. 다른 방은 세션 코드를 확인한 뒤 들어가며, GM 없는 방은 플레이어 화면으로 이동합니다.
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session List</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-dark-50">들어갈 방을 고르세요</h2>
                 </div>
                 <button
                   onClick={createSession}
@@ -1532,89 +1524,38 @@ export default function GMDashboard({
               <div className="mt-6 grid gap-3 md:grid-cols-2">
                 {sessionSummaries.map((item) => {
                   const needsCode = !item.canResumeDirectly;
-                  const isAccessPromptOpen = accessPromptSessionId === item.id;
-                  const isVerifying = verifyingSessionId === item.id;
 
                   return (
-                    <div
+                    <button
                       key={item.id}
+                      type="button"
+                      onClick={() => { void openSessionFromList(item); }}
                       className="rounded-2xl border border-dark-700 bg-dark-950/70 p-4 text-left transition-colors hover:border-mystery-700 hover:bg-dark-950"
                     >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-dark-50">{item.sessionName}</p>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-300">
-                          {item.mode === "player-consensus" ? "GM 없음" : "GM 진행"}
-                        </span>
-                        {needsCode ? (
-                          <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">
-                            코드 필요
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-dark-50">{item.sessionName}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-300">
+                            {item.mode === "player-consensus" ? "GM 없음" : "GM 진행"}
                           </span>
-                        ) : null}
-                        <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
-                          {getSessionBadgeLabel(item)}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
-                    <p className="mt-3 text-sm text-dark-300">
-                      {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      {!needsCode ? (
-                        <button
-                          type="button"
-                          onClick={() => { void openSessionFromList(item); }}
-                          className="w-full rounded-xl border border-mystery-700 bg-mystery-900/30 px-4 py-2.5 text-sm font-medium text-mystery-100 transition-colors hover:bg-mystery-800/40"
-                        >
-                          이어서 열기
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => { void openSessionFromList(item); }}
-                            className="w-full rounded-xl border border-dark-700 px-4 py-2.5 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
-                          >
-                            {isAccessPromptOpen ? "코드 입력 닫기" : "코드 입력"}
-                          </button>
-                          {isAccessPromptOpen ? (
-                            <div className="rounded-xl border border-dark-800 bg-dark-950/70 p-3 space-y-2">
-                              <p className="text-xs leading-5 text-dark-400">
-                                {item.mode === "player-consensus"
-                                  ? "세션 코드를 입력하면 플레이어 화면으로 입장합니다."
-                                  : "세션 코드를 입력하면 이 GM 방으로 들어갈 수 있습니다."}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={accessCodeDrafts[item.id] ?? ""}
-                                  onChange={(event) => handleSessionCodeDraftChange(item.id, event.target.value)}
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      event.preventDefault();
-                                      void verifySessionAccess(item.id);
-                                    }
-                                  }}
-                                  maxLength={6}
-                                  placeholder="세션 코드 입력"
-                                  className="flex-1 rounded-lg border border-dark-700 bg-dark-900 px-3 py-2 text-sm font-mono uppercase tracking-[0.2em] text-dark-100 outline-none transition focus:border-mystery-500"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => { void verifySessionAccess(item.id); }}
-                                  disabled={isVerifying}
-                                  className="rounded-lg border border-mystery-700 bg-mystery-900/30 px-3 py-2 text-xs font-medium text-mystery-100 transition-colors hover:bg-mystery-800/40 disabled:opacity-50"
-                                >
-                                  {isVerifying ? "확인 중…" : "입장"}
-                                </button>
-                              </div>
-                            </div>
+                          {needsCode ? (
+                            <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">
+                              코드 필요
+                            </span>
                           ) : null}
-                        </>
-                      )}
-                    </div>
-                  </div>
+                          <span className="rounded-full border border-dark-700 px-2 py-1 text-[11px] text-dark-400">
+                            {getSessionBadgeLabel(item)}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs text-dark-500">{formatSessionCreatedAt(item.createdAt)} 생성</p>
+                      <p className="mt-3 text-sm text-dark-300">
+                        {item.lockedPlayerCount} / {item.totalPlayerCount}명 참가 중
+                      </p>
+                      <p className="mt-4 text-xs text-dark-500">
+                        {needsCode ? "코드 확인 후 입장" : "바로 이어서 열기"}
+                      </p>
+                    </button>
                   );
                 })}
               </div>
@@ -1828,6 +1769,67 @@ export default function GMDashboard({
           </div>
         </div>
       )}
+
+      {accessPromptSession ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Code</p>
+              <h2 className="text-xl font-semibold text-dark-50">{accessPromptSession.sessionName}</h2>
+              <p className="text-sm leading-6 text-dark-300">세션 코드를 입력하세요.</p>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <input
+                type="text"
+                value={accessPromptCode}
+                onChange={(event) => {
+                  setAccessPromptCode(event.target.value.toUpperCase().slice(0, 6));
+                  setAccessPromptError(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void verifySessionAccess(accessPromptSession.id);
+                  }
+                }}
+                maxLength={6}
+                placeholder="예: ABC123"
+                autoCapitalize="characters"
+                autoComplete="off"
+                className="w-full rounded-2xl border border-dark-700 bg-dark-950 px-4 py-4 text-center text-3xl font-mono font-bold tracking-[0.24em] text-mystery-300 outline-none transition focus:border-mystery-500"
+              />
+              {accessPromptError ? (
+                <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {accessPromptError}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccessPromptSessionId(null);
+                  setAccessPromptCode("");
+                  setAccessPromptError(null);
+                }}
+                className="flex-1 rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => { void verifySessionAccess(accessPromptSession.id); }}
+                disabled={accessPromptCode.length !== 6 || verifyingSessionId === accessPromptSession.id}
+                className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+              >
+                {verifyingSessionId === accessPromptSession.id ? "확인 중…" : "입장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {session && advanceConfirmKind ? (
         <PhaseAdvanceConfirmModal

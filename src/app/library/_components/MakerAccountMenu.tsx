@@ -73,6 +73,15 @@ export default function MakerAccountMenu({
 
           {currentAccount ? (
             <>
+              {isMakerAdmin(currentUser) ? (
+                <Link
+                  href="/library/manage/sessions"
+                  className="block rounded-2xl border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-950/30"
+                >
+                  세션 관리
+                </Link>
+              ) : null}
+
               <div className="rounded-2xl border border-dark-800 bg-dark-950/70 p-4">
                 <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Login ID</p>
                 <p className="mt-3 rounded-xl border border-dark-700 bg-dark-900 px-3 py-3 font-mono text-xs text-dark-100">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface PlayerSessionEntryItem {
@@ -33,8 +33,8 @@ type PlayerSessionEntryProps = {
 };
 
 /**
- * 플레이어가 특정 게임 기준으로 방을 찾고, 코드 검증 후 입장하는 클라이언트 진입 패널.
- * 방 목록은 찾기용으로만 쓰고, 실제 입장은 세션 코드 검증을 통과해야 한다.
+ * 플레이어가 공개 게임 기준으로 방을 고르거나 코드로 바로 입장하는 진입 패널.
+ * 목록 클릭은 선택만 하는 것이 아니라, 바로 코드 확인 팝업으로 이어지게 한다.
  */
 export default function PlayerSessionEntry({
   gameId,
@@ -42,68 +42,74 @@ export default function PlayerSessionEntry({
   sessions,
 }: PlayerSessionEntryProps) {
   const router = useRouter();
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [promptSessionId, setPromptSessionId] = useState<string | null>(null);
+  const [promptCode, setPromptCode] = useState("");
+  const [promptError, setPromptError] = useState("");
+  const [promptChecking, setPromptChecking] = useState(false);
 
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
+  const promptSession = sessions.find((session) => session.id === promptSessionId) ?? null;
 
-  /**
-   * 선택된 방이 있을 때 ESC 로 빠르게 선택을 해제해
-   * 코드만으로 바로 입장하는 기본 상태로 돌아갈 수 있게 한다.
-   */
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setSelectedSessionId(null);
-        setError("");
-      }
-    }
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, []);
-
-  async function handleJoin() {
-    const upper = code.trim().toUpperCase();
+  async function verifyCodeAndEnter(nextCode: string, expectedSessionId?: string) {
+    const upper = nextCode.trim().toUpperCase();
     if (upper.length !== 6) {
-      setError("6자리 코드를 입력해주세요.");
-      return;
+      throw new Error("6자리 코드를 입력해주세요.");
     }
 
+    const response = await fetch(`/api/join/${upper}`);
+    if (!response.ok) {
+      throw new Error("세션을 찾을 수 없습니다. 코드를 다시 확인해주세요.");
+    }
+
+    const data = await response.json() as JoinLookupResponse;
+
+    if (data.session.gameId !== gameId) {
+      throw new Error("이 게임의 참가 코드가 아닙니다.");
+    }
+
+    if (expectedSessionId && data.session.id !== expectedSessionId) {
+      throw new Error("선택한 방의 코드가 아닙니다. 방을 다시 확인해주세요.");
+    }
+
+    router.push(`/join/${upper}`);
+  }
+
+  async function handleDirectJoin() {
     setChecking(true);
     setError("");
 
     try {
-      const response = await fetch(`/api/join/${upper}`);
-      if (!response.ok) {
-        setError("세션을 찾을 수 없습니다. 코드를 다시 확인해주세요.");
-        return;
-      }
-
-      const data = await response.json() as JoinLookupResponse;
-
-      if (data.session.gameId !== gameId) {
-        setError("이 게임의 참가 코드가 아닙니다.");
-        return;
-      }
-
-      if (selectedSessionId && data.session.id !== selectedSessionId) {
-        setError("선택한 방의 코드가 아닙니다. 방을 다시 확인해주세요.");
-        return;
-      }
-
-      router.push(`/join/${upper}`);
+      await verifyCodeAndEnter(code);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "세션에 들어갈 수 없습니다.");
     } finally {
       setChecking(false);
     }
   }
 
+  async function handlePromptJoin() {
+    if (!promptSession) {
+      return;
+    }
+
+    setPromptChecking(true);
+    setPromptError("");
+
+    try {
+      await verifyCodeAndEnter(promptCode, promptSession.id);
+    } catch (nextError) {
+      setPromptError(nextError instanceof Error ? nextError.message : "세션에 들어갈 수 없습니다.");
+    } finally {
+      setPromptChecking(false);
+    }
+  }
+
   /**
    * 플레이어 합의로 진행하는 방을 새로 만들고,
-   * 방을 연 사람도 곧바로 플레이어 참가 퍼널로 들어가게 한다.
+   * 만든 사람도 곧바로 플레이어 참가 퍼널로 들어가게 한다.
    */
   async function handleCreatePlayerSession() {
     setCreatingSession(true);
@@ -139,16 +145,11 @@ export default function PlayerSessionEntry({
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Player Entry</p>
             <h1 className="mt-4 text-3xl font-semibold text-dark-50">{gameTitle}</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
-              참가할 방을 확인한 뒤 세션 코드를 입력하세요. 혼자 시작하거나 GM 없이 함께 진행할 땐 직접 방을 열 수도 있습니다.
-            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">방을 고르거나 코드를 입력하세요.</p>
           </div>
 
           <div className="rounded-2xl border border-dark-800 bg-dark-950/60 p-4 lg:max-w-sm">
             <p className="text-xs uppercase tracking-[0.22em] text-dark-500">No GM</p>
-            <p className="mt-2 text-sm leading-6 text-dark-200">
-              GM 없이 플레이할 방을 직접 열고, 만든 뒤 받은 참가 코드로 바로 들어갑니다.
-            </p>
             <button
               type="button"
               onClick={handleCreatePlayerSession}
@@ -166,9 +167,7 @@ export default function PlayerSessionEntry({
           <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Session Code</p>
           <h2 className="mt-2 text-xl font-semibold text-dark-50">코드로 입장</h2>
           <p className="mt-3 text-sm leading-6 text-dark-300">
-            {selectedSession
-              ? `선택한 방은 "${selectedSession.sessionName}" 입니다. 이 방의 참가 코드를 입력하세요.`
-              : "GM에게 받은 참가 코드를 입력하면 바로 해당 방으로 입장할 수 있습니다."}
+            받은 참가 코드를 입력하면 바로 해당 방으로 입장할 수 있습니다.
           </p>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -179,36 +178,18 @@ export default function PlayerSessionEntry({
               placeholder="예: ABC123"
               maxLength={6}
               className="w-full rounded-2xl border border-dark-700 bg-dark-950 px-4 py-4 text-center text-3xl font-mono font-bold tracking-[0.24em] text-mystery-300 outline-none transition focus:border-mystery-500"
-              onKeyDown={(event) => event.key === "Enter" && handleJoin()}
+              onKeyDown={(event) => event.key === "Enter" && void handleDirectJoin()}
               autoCapitalize="characters"
               autoComplete="off"
             />
             <button
-              onClick={handleJoin}
+              onClick={() => { void handleDirectJoin(); }}
               disabled={code.length !== 6 || checking}
               className="rounded-xl border border-mystery-600 bg-mystery-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-mystery-600 disabled:opacity-40"
             >
               {checking ? "코드 확인 중…" : "입장하기"}
             </button>
           </div>
-
-          {selectedSession ? (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-mystery-700/40 bg-mystery-950/20 px-4 py-3">
-              <p className="text-sm text-mystery-100">
-                선택한 방: <span className="font-semibold">{selectedSession.sessionName}</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedSessionId(null);
-                  setError("");
-                }}
-                className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
-              >
-                선택 취소
-              </button>
-            </div>
-          ) : null}
 
           {error ? (
             <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -222,9 +203,6 @@ export default function PlayerSessionEntry({
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Room List</p>
               <h2 className="mt-2 text-xl font-semibold text-dark-50">참가 가능한 방</h2>
-              <p className="mt-2 text-sm leading-6 text-dark-400">
-                GM이 연 방과 GM 없이 함께 진행하는 방이 모두 여기에 표시됩니다.
-              </p>
             </div>
             <span className="rounded-full border border-dark-700 bg-dark-950 px-3 py-1 text-xs text-dark-300">
               활성 {sessions.length}개
@@ -233,56 +211,100 @@ export default function PlayerSessionEntry({
 
           {sessions.length > 0 ? (
             <div className="mt-5 grid gap-3">
-              {sessions.map((session) => {
-                const selected = session.id === selectedSessionId;
-
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSessionId((currentId) => (
-                        currentId === session.id ? null : session.id
-                      ));
-                      setError("");
-                    }}
-                    className={[
-                      "w-full rounded-2xl border px-4 py-4 text-left transition-colors",
-                      selected
-                        ? "border-mystery-600 bg-mystery-950/25"
-                        : "border-dark-800 bg-dark-950/70 hover:border-dark-600 hover:bg-dark-900",
-                    ].join(" ")}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-dark-50">{session.sessionName}</p>
-                          {session.modeLabel ? (
-                            <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-300">
-                              {session.modeLabel}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-xs text-dark-500">{session.createdAtLabel} 생성</p>
+              {sessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => {
+                    setPromptSessionId(session.id);
+                    setPromptCode("");
+                    setPromptError("");
+                  }}
+                  className="w-full rounded-2xl border border-dark-800 bg-dark-950/70 px-4 py-4 text-left transition-colors hover:border-dark-600 hover:bg-dark-900"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-semibold text-dark-50">{session.sessionName}</p>
+                        {session.modeLabel ? (
+                          <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-300">
+                            {session.modeLabel}
+                          </span>
+                        ) : null}
                       </div>
-                      <span className="rounded-full border border-dark-700 bg-dark-900 px-3 py-1 text-xs text-dark-300">
-                        {session.phaseLabel}
-                      </span>
+                      <p className="mt-1 text-xs text-dark-500">{session.createdAtLabel} 생성</p>
                     </div>
-                    <p className="mt-4 text-sm text-dark-300">
-                      {session.lockedPlayerCount} / {session.totalPlayerCount}명 참가 중
-                    </p>
-                  </button>
-                );
-              })}
+                    <span className="rounded-full border border-dark-700 bg-dark-900 px-3 py-1 text-xs text-dark-300">
+                      {session.phaseLabel}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-sm text-dark-300">
+                    {session.lockedPlayerCount} / {session.totalPlayerCount}명 참가 중
+                  </p>
+                </button>
+              ))}
             </div>
           ) : (
             <div className="mt-5 rounded-2xl border border-dashed border-dark-700 bg-dark-950/60 px-4 py-8 text-center text-sm text-dark-500">
-              지금은 열려 있는 방이 없습니다. GM이 먼저 방을 만든 뒤 코드를 알려주면 참가할 수 있습니다.
+              지금은 열려 있는 방이 없습니다.
             </div>
           )}
         </div>
       </section>
+
+      {promptSession ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Room Code</p>
+              <h2 className="text-xl font-semibold text-dark-50">{promptSession.sessionName}</h2>
+              <p className="text-sm leading-6 text-dark-300">참가 코드를 입력하세요.</p>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <input
+                type="text"
+                value={promptCode}
+                onChange={(event) => setPromptCode(event.target.value.toUpperCase().slice(0, 6))}
+                placeholder="예: ABC123"
+                maxLength={6}
+                className="w-full rounded-2xl border border-dark-700 bg-dark-950 px-4 py-4 text-center text-3xl font-mono font-bold tracking-[0.24em] text-mystery-300 outline-none transition focus:border-mystery-500"
+                onKeyDown={(event) => event.key === "Enter" && void handlePromptJoin()}
+                autoCapitalize="characters"
+                autoComplete="off"
+              />
+
+              {promptError ? (
+                <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {promptError}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPromptSessionId(null);
+                  setPromptCode("");
+                  setPromptError("");
+                }}
+                className="flex-1 rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handlePromptJoin(); }}
+                disabled={promptCode.length !== 6 || promptChecking}
+                className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
+              >
+                {promptChecking ? "코드 확인 중…" : "입장하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -52,9 +52,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                   noticeMessage={accountNoticeMessage}
                 />
                 {isMakerAdmin(currentUser) ? (
-                  <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
+                  <Link
+                    href="/library/manage/sessions"
+                    className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-950/70 sm:inline-flex"
+                  >
                     ADMIN
-                  </span>
+                  </Link>
                 ) : null}
                 <Link
                   href="/library/manage"

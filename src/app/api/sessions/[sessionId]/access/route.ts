@@ -8,7 +8,7 @@ import {
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getSession, isGmManagedSession } from "@/lib/session-repository";
+import { getSession, isGmManagedSession, updateSession } from "@/lib/session-repository";
 
 type Params = { params: { sessionId: string } };
 
@@ -37,30 +37,36 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const game = await getGame(session.gameId);
-  if (!game) {
+  const currentUser = await getRequestMakerUser(request);
+  if (!game || !canAccessGmPlay(game, currentUser)) {
     return NextResponse.json({ error: "이 세션에 들어갈 수 없습니다." }, { status: 403 });
   }
-
   const { sessionCode } = await request.json().catch(() => ({})) as AccessRequestBody;
 
   if (!isGmManagedSession(session)) {
     if (!sessionCode || sessionCode.trim().toUpperCase() !== session.sessionCode.trim().toUpperCase()) {
       return NextResponse.json({ error: "세션 코드가 맞지 않습니다." }, { status: 403 });
     }
+    const promotedSession = await updateSession({
+      ...session,
+      mode: "gm",
+      hostUserId: currentUser?.id,
+    });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       session: {
-        id: session.id,
-        sessionName: session.sessionName,
+        id: promotedSession.id,
+        sessionName: promotedSession.sessionName,
       },
-      entryPath: `/join/${session.sessionCode}`,
+      entryPath: `/play/${promotedSession.gameId}?session=${promotedSession.id}`,
     } satisfies AccessResponseBody);
-  }
-
-  const currentUser = await getRequestMakerUser(request);
-  if (!canAccessGmPlay(game, currentUser)) {
-    return NextResponse.json({ error: "이 세션에 들어갈 수 없습니다." }, { status: 403 });
+    applyGmSessionAccessCookie(
+      response,
+      request.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value,
+      promotedSession
+    );
+    return response;
   }
 
   if (!canResumeGmSessionDirectly(session, {

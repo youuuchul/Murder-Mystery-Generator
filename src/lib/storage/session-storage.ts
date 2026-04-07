@@ -108,3 +108,33 @@ export function listActiveSessions(gameId: string): GameSession[] {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
+
+/**
+ * 모든 게임의 활성 세션을 한 번에 읽는다.
+ * 관리자 세션 관리 화면에서만 사용한다.
+ */
+export function listAllActiveSessions(): GameSession[] {
+  ensureDir();
+  let files: string[];
+  try {
+    files = fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json"));
+  } catch {
+    return [];
+  }
+
+  const result: GameSession[] = [];
+  for (const file of files) {
+    try {
+      const session = JSON.parse(
+        fs.readFileSync(path.join(SESSIONS_DIR, file), "utf-8")
+      ) as GameSession;
+      if (!session.endedAt) {
+        result.push(session);
+      }
+    } catch {}
+  }
+
+  return result.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}

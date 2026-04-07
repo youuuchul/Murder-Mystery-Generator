@@ -21,11 +21,7 @@ import type { EndingStage, GamePhase, GameSession } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 
-async function canAccessGmSession(request: NextRequest, session: GameSession): Promise<boolean> {
-  if (!isGmManagedSession(session)) {
-    return false;
-  }
-
+async function canManageSession(request: NextRequest, session: GameSession): Promise<boolean> {
   const game = await getGame(session.gameId);
   if (!game) {
     return false;
@@ -33,6 +29,14 @@ async function canAccessGmSession(request: NextRequest, session: GameSession): P
 
   const currentUser = await getRequestMakerUser(request);
   if (!canAccessGmPlay(game, currentUser)) {
+    return false;
+  }
+
+  if (isMakerAdmin(currentUser)) {
+    return true;
+  }
+
+  if (!isGmManagedSession(session)) {
     return false;
   }
 
@@ -118,7 +122,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     });
   }
 
-  if (!(await canAccessGmSession(req, session))) {
+  if (!(await canManageSession(req, session))) {
     return NextResponse.json({ error: "이 세션을 열 권한이 없습니다." }, { status: 403 });
   }
 
@@ -148,7 +152,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  if (!(await canAccessGmSession(req, session))) {
+  if (!(await canManageSession(req, session))) {
     return NextResponse.json({ error: "이 세션을 수정할 권한이 없습니다." }, { status: 403 });
   }
 
@@ -328,7 +332,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  if (!(await canAccessGmSession(req, session))) {
+  if (!(await canManageSession(req, session))) {
     return NextResponse.json({ error: "이 세션을 삭제할 권한이 없습니다." }, { status: 403 });
   }
 

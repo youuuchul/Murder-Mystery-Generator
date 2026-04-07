@@ -9,6 +9,7 @@ import {
   deleteSession as deleteLocalSession,
   getSession as getLocalSession,
   getSessionByCode as getLocalSessionByCode,
+  listAllActiveSessions as listAllLocalActiveSessions,
   listActiveSessions as listLocalActiveSessions,
   updateSession as updateLocalSession,
 } from "@/lib/storage/session-storage";
@@ -25,6 +26,7 @@ export interface SessionRepository {
   updateSession(session: GameSession): Promise<GameSession>;
   deleteSession(sessionId: string): Promise<boolean>;
   listActiveSessions(gameId: string): Promise<GameSession[]>;
+  listAllActiveSessions(): Promise<GameSession[]>;
 }
 
 /**
@@ -96,6 +98,9 @@ const localSessionRepository: SessionRepository = {
   },
   async listActiveSessions(gameId) {
     return sortSessionsForList(listLocalActiveSessions(gameId)).map((session) => withSessionDefaults(session));
+  },
+  async listAllActiveSessions() {
+    return sortSessionsForList(listAllLocalActiveSessions()).map((session) => withSessionDefaults(session));
   },
 };
 
@@ -325,6 +330,24 @@ async function loadSupabaseActiveSessions(gameId: string): Promise<GameSession[]
   );
 }
 
+async function loadSupabaseAllActiveSessions(): Promise<GameSession[]> {
+  const supabase = createSupabasePersistenceClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(SUPABASE_SESSION_COLUMNS)
+    .is("ended_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list all Supabase sessions: ${error.message}`);
+  }
+
+  return sortSessionsForList(
+    ((data ?? []) as unknown as SupabaseSessionRow[])
+      .map((row) => hydrateSupabaseSession(row))
+  );
+}
+
 /**
  * Supabase sessions 저장소 구현.
  * 현재 세션 API는 raw token을 포함한 GameSession 전체를 한 번에 읽고 쓰므로 canonical source를 `session_json`으로 유지한다.
@@ -435,6 +458,9 @@ const supabaseSessionRepository: SessionRepository = {
   async listActiveSessions(gameId) {
     return loadSupabaseActiveSessions(gameId);
   },
+  async listAllActiveSessions() {
+    return loadSupabaseAllActiveSessions();
+  },
 };
 
 let cachedProvider: ReturnType<typeof getPersistenceProviderConfig>["provider"] | null = null;
@@ -487,4 +513,8 @@ export function deleteSession(sessionId: string): Promise<boolean> {
 
 export function listActiveSessions(gameId: string): Promise<GameSession[]> {
   return getSessionRepository().listActiveSessions(gameId);
+}
+
+export function listAllActiveSessions(): Promise<GameSession[]> {
+  return getSessionRepository().listAllActiveSessions();
 }

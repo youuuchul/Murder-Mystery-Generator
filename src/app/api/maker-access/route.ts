@@ -32,12 +32,13 @@ import {
 } from "@/lib/maker-account-recovery";
 import {
   isDuplicateMakerLoginIdError,
+  isDuplicateMakerRecoveryEmailError,
   isMakerAccountAlreadyLinkedError,
 } from "@/lib/maker-auth-errors";
 import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { buildSupabaseMakerEmail } from "@/lib/supabase/maker-auth";
+import { resolveSupabaseMakerAuthEmail } from "@/lib/supabase/maker-auth";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/ssr";
 
 type MakerAccessIntent =
@@ -193,9 +194,14 @@ async function signInWithSupabaseSession(
   loginId: string,
   password: string
 ) {
+  const account = await makerAuthGateway.findAccountByLoginId(loginId);
+  if (!account) {
+    return false;
+  }
+
   const supabase = createSupabaseRouteHandlerClient(request, response);
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: buildSupabaseMakerEmail(loginId),
+    email: resolveSupabaseMakerAuthEmail(account.loginId, account.recoveryEmail),
     password,
   });
 
@@ -430,6 +436,10 @@ export async function POST(request: NextRequest) {
         return redirectToMakerAccess(request, next, "duplicate_login_id", "signup");
       }
 
+      if (isDuplicateMakerRecoveryEmailError(error)) {
+        return redirectToMakerAccess(request, next, "duplicate_recovery_email", "signup");
+      }
+
       if (isMakerAccountAlreadyLinkedError(error)) {
         return redirectToMakerAccess(request, next, "account_already_linked", "signup");
       }
@@ -480,6 +490,12 @@ export async function POST(request: NextRequest) {
     if (result.status === "invalid_email") {
       return redirectWithFeedback(request, next, {
         error: "invalid_recovery_email",
+      });
+    }
+
+    if (result.status === "duplicate_email") {
+      return redirectWithFeedback(request, next, {
+        error: "duplicate_recovery_email",
       });
     }
 

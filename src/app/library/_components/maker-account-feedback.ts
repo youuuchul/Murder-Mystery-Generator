@@ -3,6 +3,8 @@ export function getMakerAccountErrorMessage(error: string | undefined): string |
   switch (error) {
     case "invalid_recovery_email":
       return "복구 이메일 형식이 올바르지 않습니다.";
+    case "duplicate_recovery_email":
+      return "이미 다른 계정이 쓰는 복구 이메일입니다.";
     case "invalid_account_password":
       return "새 비밀번호는 8자 이상이어야 합니다.";
     case "password_mismatch":

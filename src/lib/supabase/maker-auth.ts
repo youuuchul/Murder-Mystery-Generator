@@ -1,5 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { normalizeMakerLoginId } from "@/lib/maker-account";
+import {
+  normalizeMakerLoginId,
+  normalizeMakerRecoveryEmail,
+} from "@/lib/maker-account";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 
 export interface SupabaseMakerProfileRow {
@@ -21,6 +24,18 @@ const SUPABASE_MAKER_PROFILE_COLUMNS = "*";
  */
 export function buildSupabaseMakerEmail(loginId: string): string {
   return `${normalizeMakerLoginId(loginId)}@makers.local`;
+}
+
+/**
+ * 현재 메이커 계정이 Auth 레이어에서 실제로 쓰는 이메일을 계산한다.
+ * 복구 이메일이 있으면 Auth email도 그 값을 쓰고, 없으면 내부 전용 makers.local 주소를 쓴다.
+ */
+export function resolveSupabaseMakerAuthEmail(
+  loginId: string,
+  recoveryEmail?: string | null
+): string {
+  const normalizedRecoveryEmail = normalizeMakerRecoveryEmail(recoveryEmail ?? "");
+  return normalizedRecoveryEmail || buildSupabaseMakerEmail(loginId);
 }
 
 /** profiles 조회에 공통으로 쓰는 column 목록 문자열. */

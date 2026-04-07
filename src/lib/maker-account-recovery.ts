@@ -15,6 +15,7 @@ import {
   buildSupabaseMakerEmail,
   createSupabaseMakerAuthAdminClient,
 } from "@/lib/supabase/maker-auth";
+import { DuplicateMakerRecoveryEmailError } from "@/lib/maker-auth-errors";
 
 const LOCAL_MAKER_DATA_DIR = path.join(process.cwd(), "data", "makers");
 const LOCAL_PASSWORD_RESET_TOKENS_PATH = path.join(
@@ -587,11 +588,20 @@ export async function updateMakerRecoveryEmailForUser(options: {
     return { status: "invalid_email" as const };
   }
 
-  const account = await makerAuthGateway.updateAccountProfile({
-    userId: options.userId,
-    recoveryEmail: normalizedRecoveryEmail,
-    now: options.now ?? new Date().toISOString(),
-  });
+  let account;
+  try {
+    account = await makerAuthGateway.updateAccountProfile({
+      userId: options.userId,
+      recoveryEmail: normalizedRecoveryEmail,
+      now: options.now ?? new Date().toISOString(),
+    });
+  } catch (error) {
+    if (error instanceof DuplicateMakerRecoveryEmailError) {
+      return { status: "duplicate_email" as const };
+    }
+
+    throw error;
+  }
 
   if (!account) {
     return { status: "account_missing" as const };

@@ -74,6 +74,8 @@ function getMakerAccessErrorMessage(error: string | undefined): string | null {
       return "작업자 키 형식이 올바르지 않습니다. 현재 표시된 키를 그대로 붙여넣으세요.";
     case "invalid_recovery_email":
       return "복구 이메일 형식이 올바르지 않습니다.";
+    case "duplicate_recovery_email":
+      return "이미 다른 계정이 쓰는 복구 이메일입니다.";
     case "unknown_login_id":
       return "해당 로그인 ID를 찾을 수 없습니다.";
     case "missing_recovery_email":

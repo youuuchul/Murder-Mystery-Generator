@@ -2,7 +2,10 @@ import {
   normalizeMakerLoginId,
   normalizeMakerRecoveryEmail,
 } from "@/lib/maker-account";
-import { DuplicateMakerLoginIdError } from "@/lib/maker-auth-errors";
+import {
+  DuplicateMakerLoginIdError,
+  DuplicateMakerRecoveryEmailError,
+} from "@/lib/maker-auth-errors";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { migrateLocalGameOwnership } from "@/lib/game-ownership-migration";
 import { normalizeMakerRole } from "@/lib/maker-role";
@@ -13,10 +16,10 @@ import type {
 } from "@/lib/maker-auth-gateway";
 import { normalizeMakerDisplayName } from "@/lib/maker-user";
 import {
-  buildSupabaseMakerEmail,
   createSupabaseMakerAuthAdminClient,
   createSupabaseMakerAuthClient,
   getSupabaseMakerProfileColumns,
+  resolveSupabaseMakerAuthEmail,
   type SupabaseMakerProfileRow,
 } from "@/lib/supabase/maker-auth";
 import type { AppUser, MakerAccountIdentity, MakerUserRecord } from "@/types/auth";
@@ -95,6 +98,32 @@ function isSupabaseDuplicateLoginIdMessage(errorMessage: string): boolean {
       && normalizedMessage.includes("login_id")
     )
   );
+}
+
+/** Supabase Auth email 값이 이미 다른 계정에 묶여 있는지 대략 판별한다. */
+function isSupabaseDuplicateEmailMessage(errorMessage: string): boolean {
+  const normalizedMessage = errorMessage.toLowerCase();
+
+  return (
+    (normalizedMessage.includes("already") && normalizedMessage.includes("registered"))
+    || normalizedMessage.includes("user_already_exists")
+    || (
+      normalizedMessage.includes("duplicate key")
+      && normalizedMessage.includes("email")
+    )
+    || (
+      normalizedMessage.includes("unique constraint")
+      && normalizedMessage.includes("email")
+    )
+  );
+}
+
+/**
+ * profiles 기준으로 Auth 레이어에서 써야 하는 이메일을 찾는다.
+ * 복구 이메일을 등록한 계정은 실제 이메일을, 없으면 내부 makers.local 주소를 쓴다.
+ */
+function getProfileAuthEmail(profile: Pick<SupabaseMakerProfileRow, "login_id" | "recovery_email">): string {
+  return resolveSupabaseMakerAuthEmail(profile.login_id, profile.recovery_email);
 }
 
 function toMakerUserRecord(profile: SupabaseMakerProfileRow): MakerUserRecord {
@@ -255,9 +284,14 @@ export function createSupabaseMakerAuthGateway(
     },
 
     async authenticateAccount(loginId, password) {
+      const profile = await getSupabaseProfileByLoginId(config, loginId);
+      if (!profile) {
+        return null;
+      }
+
       const authClient = createSupabaseMakerAuthClient(config);
       const { data, error } = await authClient.auth.signInWithPassword({
-        email: buildSupabaseMakerEmail(loginId),
+        email: getProfileAuthEmail(profile),
         password,
       });
 
@@ -265,8 +299,7 @@ export function createSupabaseMakerAuthGateway(
         return null;
       }
 
-      const account = await getSupabaseProfileById(config, data.user.id);
-      return account ? toMakerAccountIdentity(account) : null;
+      return toMakerAccountIdentity(profile);
     },
 
     async createAccount({
@@ -286,8 +319,9 @@ export function createSupabaseMakerAuthGateway(
       }
 
       const adminClient = createSupabaseMakerAuthAdminClient(config);
+      const authEmail = resolveSupabaseMakerAuthEmail(normalizedLoginId, normalizedRecoveryEmail);
       const { data, error } = await adminClient.auth.admin.createUser({
-        email: buildSupabaseMakerEmail(normalizedLoginId),
+        email: authEmail,
         password,
         email_confirm: true,
         user_metadata: {
@@ -297,6 +331,14 @@ export function createSupabaseMakerAuthGateway(
       });
 
       if (error || !data.user) {
+        if (
+          normalizedRecoveryEmail
+          && error
+          && isSupabaseDuplicateEmailMessage(error.message)
+        ) {
+          throw new DuplicateMakerRecoveryEmailError(normalizedRecoveryEmail);
+        }
+
         if (error && isSupabaseDuplicateLoginIdMessage(error.message)) {
           throw new DuplicateMakerLoginIdError(normalizedLoginId);
         }
@@ -347,17 +389,69 @@ export function createSupabaseMakerAuthGateway(
         return null;
       }
 
+      const normalizedNextRecoveryEmail = normalizeMakerRecoveryEmail(recoveryEmail ?? "") || null;
+      const adminClient = createSupabaseMakerAuthAdminClient(config);
+      const { data: authUserData, error: authUserError } = await adminClient.auth.admin.getUserById(
+        existingProfile.id
+      );
+
+      if (authUserError) {
+        throw new Error(`Failed to load Supabase auth user: ${authUserError.message}`);
+      }
+
+      const previousAuthEmail = normalizeMakerRecoveryEmail(authUserData.user?.email ?? "") || null;
+      const nextAuthEmail = resolveSupabaseMakerAuthEmail(
+        existingProfile.login_id,
+        normalizedNextRecoveryEmail
+      );
+      const authEmailChanged = previousAuthEmail !== nextAuthEmail;
+
       try {
+        if (authEmailChanged) {
+          const { error: authEmailUpdateError } = await adminClient.auth.admin.updateUserById(
+            existingProfile.id,
+            {
+              email: nextAuthEmail,
+              email_confirm: true,
+            }
+          );
+
+          if (authEmailUpdateError) {
+            if (
+              normalizedNextRecoveryEmail
+              && isSupabaseDuplicateEmailMessage(authEmailUpdateError.message)
+            ) {
+              throw new DuplicateMakerRecoveryEmailError(normalizedNextRecoveryEmail);
+            }
+
+            throw new Error(`Failed to update Supabase auth email: ${authEmailUpdateError.message}`);
+          }
+        }
+
         const profile = await writeSupabaseMakerProfile(config, {
           id: existingProfile.id,
           display_name: existingProfile.display_name,
           login_id: existingProfile.login_id,
-          recovery_email: normalizeMakerRecoveryEmail(recoveryEmail ?? "") || null,
+          recovery_email: normalizedNextRecoveryEmail,
           role: existingProfile.role ?? "creator",
           updated_at: now,
         });
         return toMakerAccountIdentity(profile);
       } catch (error) {
+        if (
+          authEmailChanged
+          && previousAuthEmail
+        ) {
+          await adminClient.auth.admin.updateUserById(existingProfile.id, {
+            email: previousAuthEmail,
+            email_confirm: true,
+          }).catch(() => undefined);
+        }
+
+        if (error instanceof DuplicateMakerRecoveryEmailError) {
+          throw error;
+        }
+
         if (
           error instanceof Error
           && isMissingSupabaseRecoveryEmailColumn(error.message)

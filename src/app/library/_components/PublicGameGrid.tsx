@@ -2,7 +2,10 @@ import type { GameMetadata } from "@/types/game";
 import PublicGameCard from "./PublicGameCard";
 
 interface PublicGameGridProps {
-  games: GameMetadata[];
+  games: Array<{
+    game: GameMetadata;
+    ownerDisplayName?: string;
+  }>;
 }
 
 export default function PublicGameGrid({ games }: PublicGameGridProps) {
@@ -19,8 +22,12 @@ export default function PublicGameGrid({ games }: PublicGameGridProps) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-      {games.map((game) => (
-        <PublicGameCard key={game.id} game={game} />
+      {games.map((item) => (
+        <PublicGameCard
+          key={item.game.id}
+          game={item.game}
+          ownerDisplayName={item.ownerDisplayName}
+        />
       ))}
     </div>
   );

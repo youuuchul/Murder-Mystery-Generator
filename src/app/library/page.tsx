@@ -31,6 +31,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     ? await makerAuthGateway.getAccountById(currentUser.id)
     : null;
   const games = await listPublicGames();
+  const makerUsers = await makerAuthGateway.listUsers();
+  const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
+  const publicGameItems = games.map((game) => ({
+    game,
+    ownerDisplayName: ownerNameMap.get(game.access.ownerId),
+  }));
   const accountErrorMessage = getMakerAccountErrorMessage(resolvedSearchParams?.error);
   const accountNoticeMessage = getMakerAccountNoticeMessage(resolvedSearchParams?.notice);
 
@@ -87,7 +93,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           </p>
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-dark-300">
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
-              지금 고를 수 있는 작품 {games.length}개
+              지금 고를 수 있는 작품 {publicGameItems.length}개
             </span>
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
               GM은 방을 열고, 플레이어는 코드로 참여
@@ -97,7 +103,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         </section>
 
         <section className="mt-8">
-          <PublicGameGrid games={games} />
+          <PublicGameGrid games={publicGameItems} />
         </section>
       </main>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface PlayerSessionEntryItem {
@@ -41,6 +41,22 @@ export default function PlayerSessionEntry({
   const [checking, setChecking] = useState(false);
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
+
+  /**
+   * 선택된 방이 있을 때 ESC 로 빠르게 선택을 해제해
+   * 코드만으로 바로 입장하는 기본 상태로 돌아갈 수 있게 한다.
+   */
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedSessionId(null);
+        setError("");
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
 
   async function handleJoin() {
     const upper = code.trim().toUpperCase();
@@ -87,7 +103,62 @@ export default function PlayerSessionEntry({
         </p>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.9fr)]">
+      <section className="space-y-6">
+        <div className="rounded-[24px] border border-dark-800 bg-dark-900/90 p-5">
+          <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Session Code</p>
+          <h2 className="mt-2 text-xl font-semibold text-dark-50">코드로 입장</h2>
+          <p className="mt-3 text-sm leading-6 text-dark-300">
+            {selectedSession
+              ? `선택한 방은 "${selectedSession.sessionName}" 입니다. 이 방의 참가 코드를 입력하세요.`
+              : "GM에게 받은 참가 코드를 입력하면 바로 해당 방으로 입장할 수 있습니다."}
+          </p>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <input
+              type="text"
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))}
+              placeholder="예: ABC123"
+              maxLength={6}
+              className="w-full rounded-2xl border border-dark-700 bg-dark-950 px-4 py-4 text-center text-3xl font-mono font-bold tracking-[0.24em] text-mystery-300 outline-none transition focus:border-mystery-500"
+              onKeyDown={(event) => event.key === "Enter" && handleJoin()}
+              autoCapitalize="characters"
+              autoComplete="off"
+            />
+            <button
+              onClick={handleJoin}
+              disabled={code.length !== 6 || checking}
+              className="rounded-xl border border-mystery-600 bg-mystery-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-mystery-600 disabled:opacity-40"
+            >
+              {checking ? "코드 확인 중…" : "입장하기"}
+            </button>
+          </div>
+
+          {selectedSession ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-mystery-700/40 bg-mystery-950/20 px-4 py-3">
+              <p className="text-sm text-mystery-100">
+                선택한 방: <span className="font-semibold">{selectedSession.sessionName}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSessionId(null);
+                  setError("");
+                }}
+                className="rounded-lg border border-dark-700 px-3 py-1.5 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+              >
+                선택 취소
+              </button>
+            </div>
+          ) : null}
+
+          {error ? (
+            <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
         <div className="rounded-[24px] border border-dark-800 bg-dark-900/90 p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -108,7 +179,12 @@ export default function PlayerSessionEntry({
                   <button
                     key={session.id}
                     type="button"
-                    onClick={() => setSelectedSessionId(session.id)}
+                    onClick={() => {
+                      setSelectedSessionId((currentId) => (
+                        currentId === session.id ? null : session.id
+                      ));
+                      setError("");
+                    }}
                     className={[
                       "w-full rounded-2xl border px-4 py-4 text-left transition-colors",
                       selected
@@ -138,42 +214,6 @@ export default function PlayerSessionEntry({
             </div>
           )}
         </div>
-
-        <aside className="rounded-[24px] border border-dark-800 bg-dark-900/90 p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-dark-500">Session Code</p>
-          <h2 className="mt-2 text-xl font-semibold text-dark-50">코드로 입장</h2>
-          <p className="mt-3 text-sm leading-6 text-dark-300">
-            {selectedSession
-              ? `선택한 방은 "${selectedSession.sessionName}" 입니다. 이 방의 참가 코드를 입력하세요.`
-              : "GM에게 받은 참가 코드를 입력하면 바로 해당 방으로 입장할 수 있습니다."}
-          </p>
-
-          <div className="mt-5 space-y-3">
-            <input
-              type="text"
-              value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))}
-              placeholder="예: ABC123"
-              maxLength={6}
-              className="w-full rounded-2xl border border-dark-700 bg-dark-950 px-4 py-4 text-center text-3xl font-mono font-bold tracking-[0.24em] text-mystery-300 outline-none transition focus:border-mystery-500"
-              onKeyDown={(event) => event.key === "Enter" && handleJoin()}
-              autoCapitalize="characters"
-              autoComplete="off"
-            />
-            {error ? (
-              <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                {error}
-              </p>
-            ) : null}
-            <button
-              onClick={handleJoin}
-              disabled={code.length !== 6 || checking}
-              className="w-full rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-mystery-600 disabled:opacity-40"
-            >
-              {checking ? "코드 확인 중…" : "입장하기"}
-            </button>
-          </div>
-        </aside>
       </section>
     </div>
   );

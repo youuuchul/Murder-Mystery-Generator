@@ -1,16 +1,37 @@
 import Link from "next/link";
 import { listPublicGames } from "@/lib/game-repository";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { buildMakerAccessPath } from "@/lib/maker-user";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "./_components/GuideMenu";
+import MakerAccountMenu from "./_components/MakerAccountMenu";
 import PublicGameGrid from "./_components/PublicGameGrid";
+import {
+  getMakerAccountErrorMessage,
+  getMakerAccountNoticeMessage,
+} from "./_components/maker-account-feedback";
 
 export const dynamic = "force-dynamic"; // 항상 서버에서 최신 목록 렌더링
 
-export default async function LibraryPage() {
+const makerAuthGateway = getMakerAuthGateway();
+
+type LibraryPageProps = {
+  searchParams?: Promise<{
+    notice?: string;
+    error?: string;
+  }>;
+};
+
+export default async function LibraryPage({ searchParams }: LibraryPageProps) {
+  const resolvedSearchParams = await searchParams;
   const currentUser = await getCurrentMakerUser();
+  const currentAccount = currentUser
+    ? await makerAuthGateway.getAccountById(currentUser.id)
+    : null;
   const games = await listPublicGames();
+  const accountErrorMessage = getMakerAccountErrorMessage(resolvedSearchParams?.error);
+  const accountNoticeMessage = getMakerAccountNoticeMessage(resolvedSearchParams?.notice);
 
   return (
     <div className="min-h-screen bg-dark-950">
@@ -22,9 +43,13 @@ export default async function LibraryPage() {
             <GuideMenu />
             {currentUser ? (
               <>
-                <span className="hidden rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-xs font-medium text-dark-200 sm:inline-flex">
-                  작업자 {currentUser.displayName}
-                </span>
+                <MakerAccountMenu
+                  currentUser={currentUser}
+                  currentAccount={currentAccount}
+                  nextPath="/library"
+                  errorMessage={accountErrorMessage}
+                  noticeMessage={accountNoticeMessage}
+                />
                 {isMakerAdmin(currentUser) ? (
                   <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
                     ADMIN

@@ -13,6 +13,10 @@ import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
 import MakerAccountMenu from "../_components/MakerAccountMenu";
+import {
+  getMakerAccountErrorMessage,
+  getMakerAccountNoticeMessage,
+} from "../_components/maker-account-feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -25,38 +29,6 @@ type ManageLibraryPageProps = {
     error?: string;
   }>;
 };
-
-/** 계정 관리 영역에 띄울 오류 메시지를 query 값에서 고른다. */
-function getManageAccountErrorMessage(error: string | undefined): string | null {
-  switch (error) {
-    case "invalid_recovery_email":
-      return "복구 이메일 형식이 올바르지 않습니다.";
-    case "invalid_account_password":
-      return "새 비밀번호는 8자 이상이어야 합니다.";
-    case "password_mismatch":
-      return "비밀번호 확인이 일치하지 않습니다.";
-    case "invalid_current_password":
-      return "현재 비밀번호가 올바르지 않습니다.";
-    case "account_not_found":
-      return "계정을 다시 확인해주세요. 잠시 후 다시 시도하면 됩니다.";
-    default:
-      return null;
-  }
-}
-
-/** 계정 관리 영역에 띄울 성공 메시지를 query 값에서 고른다. */
-function getManageAccountNoticeMessage(notice: string | undefined): string | null {
-  switch (notice) {
-    case "recovery_email_saved":
-      return "복구 이메일이 저장되었습니다.";
-    case "recovery_email_removed":
-      return "복구 이메일을 지웠습니다. 이제 비밀번호를 찾을 수 없습니다.";
-    case "password_changed":
-      return "비밀번호가 변경되었습니다.";
-    default:
-      return null;
-  }
-}
 
 export default async function ManageLibraryPage({ searchParams }: ManageLibraryPageProps) {
   const resolvedSearchParams = await searchParams;
@@ -86,8 +58,8 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const privateCount = managedGames.filter((item) => item.game.access.visibility === "private").length;
   const draftCount = managedGames.filter((item) => item.game.access.visibility === "draft").length;
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
-  const accountErrorMessage = getManageAccountErrorMessage(resolvedSearchParams?.error);
-  const accountNoticeMessage = getManageAccountNoticeMessage(resolvedSearchParams?.notice);
+  const accountErrorMessage = getMakerAccountErrorMessage(resolvedSearchParams?.error);
+  const accountNoticeMessage = getMakerAccountNoticeMessage(resolvedSearchParams?.notice);
   const managePagePath = includeReadonly ? "/library/manage?scope=all" : "/library/manage";
   const pageTitle = includeReadonly ? "게임 관리" : "내 게임 관리";
   const pageDescription = includeReadonly

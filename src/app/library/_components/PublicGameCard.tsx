@@ -59,12 +59,20 @@ export default function PublicGameCard({ game }: PublicGameCardProps) {
           ))}
         </div>
 
-        <Link
-          href={`/play/${game.id}`}
-          className="inline-flex w-full items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
-        >
-          게임 시작하기
-        </Link>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link
+            href={`/play/${game.id}`}
+            className="inline-flex items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
+          >
+            GM으로 진행
+          </Link>
+          <Link
+            href={`/play/${game.id}/join`}
+            className="inline-flex items-center justify-center rounded-xl border border-dark-700 bg-dark-900 px-4 py-3 text-sm font-medium text-dark-100 transition-colors hover:border-dark-500 hover:bg-dark-800"
+          >
+            플레이어 참여
+          </Link>
+        </div>
       </div>
     </div>
   );

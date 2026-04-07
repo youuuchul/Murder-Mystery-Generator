@@ -197,6 +197,7 @@ export default function GameCard({
     ? `${game.access.ownerId.slice(0, 8)}...${game.access.ownerId.slice(-4)}`
     : "";
   const missingPublishItems = publishChecklist.filter((item) => !item.passed);
+  const playActionLabel = ownershipState === "readonly" ? "운영 열기" : "플레이";
 
   return (
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
@@ -371,7 +372,7 @@ export default function GameCard({
               href={`/play/${game.id}`}
               className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
             >
-              플레이
+              {playActionLabel}
             </Link>
           ) : (
             <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">

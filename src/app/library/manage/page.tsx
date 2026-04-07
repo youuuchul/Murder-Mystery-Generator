@@ -25,6 +25,7 @@ const makerAuthGateway = getMakerAuthGateway();
 type ManageLibraryPageProps = {
   searchParams?: Promise<{
     scope?: string;
+    owner?: string;
     notice?: string;
     error?: string;
   }>;
@@ -36,6 +37,9 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const currentAccount = await makerAuthGateway.getAccountById(currentUser.id);
   const canSeeAllGames = canViewAllGames(currentUser);
   const includeReadonly = canSeeAllGames && resolvedSearchParams?.scope === "all";
+  const ownershipFilter = includeReadonly
+    ? resolvedSearchParams?.owner ?? "all"
+    : "mine";
   const makerUsers = await makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
   const managedGames = (await listGames())
@@ -53,14 +57,33 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
     })
     .filter((item) => includeReadonly || item.ownershipState !== "readonly");
 
+  const filteredGames = managedGames.filter((item) => {
+    switch (ownershipFilter) {
+      case "mine":
+        return item.ownershipState === "owned";
+      case "others":
+        return item.ownershipState === "readonly";
+      case "claimable":
+        return item.ownershipState === "claimable";
+      default:
+        return true;
+    }
+  });
+
   const makerAccessEnabled = isMakerAccessEnabled();
-  const publicCount = managedGames.filter((item) => item.game.access.visibility === "public").length;
-  const privateCount = managedGames.filter((item) => item.game.access.visibility === "private").length;
-  const draftCount = managedGames.filter((item) => item.game.access.visibility === "draft").length;
+  const publicCount = filteredGames.filter((item) => item.game.access.visibility === "public").length;
+  const privateCount = filteredGames.filter((item) => item.game.access.visibility === "private").length;
+  const draftCount = filteredGames.filter((item) => item.game.access.visibility === "draft").length;
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
+  const ownedCount = managedGames.filter((item) => item.ownershipState === "owned").length;
+  const claimableCount = managedGames.filter((item) => item.ownershipState === "claimable").length;
   const accountErrorMessage = getMakerAccountErrorMessage(resolvedSearchParams?.error);
   const accountNoticeMessage = getMakerAccountNoticeMessage(resolvedSearchParams?.notice);
-  const managePagePath = includeReadonly ? "/library/manage?scope=all" : "/library/manage";
+  const managePagePath = includeReadonly
+    ? ownershipFilter === "all"
+      ? "/library/manage?scope=all"
+      : `/library/manage?scope=all&owner=${ownershipFilter}`
+    : "/library/manage";
   const pageTitle = includeReadonly ? "게임 관리" : "내 게임 관리";
   const pageDescription = includeReadonly
     ? "내 게임과 운영 확인이 필요한 전체 게임을 함께 관리합니다. 공개 상태를 바꾸면 공개 라이브러리에도 바로 반영됩니다."
@@ -75,7 +98,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
               ← 공개 라이브러리
             </Link>
             <span className="text-dark-700">|</span>
-            <span className="text-sm font-medium text-dark-100">내 게임 관리</span>
+            <span className="text-sm font-medium text-dark-100">{pageTitle}</span>
           </div>
 
           <nav className="flex items-center gap-2">
@@ -147,9 +170,37 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
             ) : null}
           </div>
 
+          {includeReadonly ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                { key: "all", label: `전체 보기 ${managedGames.length}개` },
+                { key: "mine", label: `내 게임 ${ownedCount}개` },
+                { key: "others", label: `다른 작업자 ${readonlyCount}개` },
+                { key: "claimable", label: `귀속 가능 ${claimableCount}개` },
+              ].map((item) => (
+                <Link
+                  key={item.key}
+                  href={
+                    item.key === "all"
+                      ? "/library/manage?scope=all"
+                      : `/library/manage?scope=all&owner=${item.key}`
+                  }
+                  className={[
+                    "rounded-full border px-3 py-1 text-xs transition-colors",
+                    ownershipFilter === item.key
+                      ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
+                      : "border-dark-700 bg-dark-950 text-dark-300 hover:border-dark-500 hover:text-dark-100",
+                  ].join(" ")}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+
           <div className="mt-6 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-dark-200">
-              전체 {managedGames.length}개
+              전체 {filteredGames.length}개
             </span>
             <span className="rounded-full border border-emerald-900 bg-emerald-950/50 px-3 py-1 text-emerald-300">
               공개 {publicCount}개
@@ -169,7 +220,7 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
         </section>
 
         <section className="mt-8">
-          <GameGrid games={managedGames} />
+          <GameGrid games={filteredGames} />
         </section>
       </main>
     </div>

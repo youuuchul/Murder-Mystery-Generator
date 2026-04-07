@@ -106,6 +106,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       gameId: session.gameId,
       game: buildGameForPlayer(game, pState.playerId),
       sessionCode: session.sessionCode,
+      sessionName: session.sessionName,
     });
   }
 

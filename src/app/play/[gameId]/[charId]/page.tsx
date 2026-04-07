@@ -31,6 +31,24 @@ const SUB_PHASE_LABEL: Record<string, string> = {
   discussion: "토론",
 };
 
+function isLocalOnlyHost(hostname: string): boolean {
+  const normalizedHost = hostname.trim().toLowerCase();
+
+  if (
+    normalizedHost === "localhost"
+    || normalizedHost === "127.0.0.1"
+    || normalizedHost === "0.0.0.0"
+    || normalizedHost === "::1"
+    || normalizedHost.endsWith(".local")
+  ) {
+    return true;
+  }
+
+  return /^10\.\d+\.\d+\.\d+$/.test(normalizedHost)
+    || /^192\.168\.\d+\.\d+$/.test(normalizedHost)
+    || /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(normalizedHost);
+}
+
 function phaseLabel(p: string, subPhase?: string) {
   if (p.startsWith("round-")) {
     const normalizedSubPhase = subPhase === "discussion" || subPhase === "briefing" ? "discussion" : "investigation";
@@ -857,6 +875,153 @@ function PlayerAdvanceConfirmModal({
   );
 }
 
+/**
+ * 플레이어가 현재 방의 참가 코드와 링크를 다시 확인할 수 있는 패널이다.
+ * 대기실에서는 기본 펼침, 게임 진행 중에는 접힌 상태에서 필요할 때만 펼친다.
+ */
+function PlayerJoinAccessPanel({
+  sessionName,
+  sessionCode,
+  isLobby,
+}: {
+  sessionName: string;
+  sessionCode: string;
+  isLobby: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(isLobby);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsExpanded(isLobby);
+  }, [isLobby]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const { origin, hostname } = window.location;
+    setPublicOrigin(isLocalOnlyHost(hostname) ? null : origin);
+  }, []);
+
+  useEffect(() => {
+    if (!isLobby || publicOrigin || tunnelUrl) return;
+
+    let cancelled = false;
+    async function fetchServerInfo() {
+      try {
+        const response = await fetch("/api/server-info");
+        if (!response.ok) return;
+        const data = await response.json() as { tunnelUrl?: string | null };
+        if (!cancelled) {
+          setTunnelUrl(data.tunnelUrl ?? null);
+        }
+      } catch {}
+    }
+
+    void fetchServerInfo();
+    const intervalId = setInterval(() => {
+      void fetchServerInfo();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [isLobby, publicOrigin, tunnelUrl]);
+
+  function copyCode() {
+    void navigator.clipboard.writeText(sessionCode);
+    setCodeCopied(true);
+    window.setTimeout(() => setCodeCopied(false), 2000);
+  }
+
+  function copyUrl(url: string) {
+    void navigator.clipboard.writeText(url);
+    setUrlCopied(true);
+    window.setTimeout(() => setUrlCopied(false), 2000);
+  }
+
+  const joinUrl = publicOrigin
+    ? `${publicOrigin}/join/${sessionCode}`
+    : tunnelUrl
+      ? `${tunnelUrl}/join/${sessionCode}`
+      : null;
+
+  if (!isLobby && !isExpanded) {
+    return (
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-dark-500">현재 방</p>
+          <p className="mt-1 text-sm font-semibold text-dark-100">{sessionName}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="rounded-xl border border-dark-700 px-3 py-2 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+        >
+          코드 확인
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-mystery-800 bg-dark-900 p-5 text-center space-y-3">
+      <div className="flex items-start justify-between gap-3 text-left">
+        <div>
+          <p className="text-xs text-dark-500">참가 코드</p>
+          <p className="mt-1 text-sm font-medium text-dark-100">{sessionName}</p>
+          {!isLobby ? (
+            <p className="mt-1 text-xs text-dark-600">진행 중에는 필요할 때만 다시 펼쳐 확인합니다.</p>
+          ) : null}
+        </div>
+        {!isLobby ? (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="rounded-xl border border-dark-700 px-3 py-2 text-xs font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+          >
+            접기
+          </button>
+        ) : null}
+      </div>
+
+      <p className="text-5xl font-mono font-black tracking-widest text-mystery-300">
+        {sessionCode}
+      </p>
+
+      <button
+        type="button"
+        onClick={copyCode}
+        className="rounded-xl border border-mystery-700 bg-mystery-900/30 px-4 py-2 text-sm font-medium text-mystery-100 transition-colors hover:bg-mystery-800/40"
+      >
+        {codeCopied ? "복사됨" : "코드 복사"}
+      </button>
+
+      {joinUrl ? (
+        <div className="border-t border-dark-800 pt-3 space-y-2">
+          <p className="text-xs text-dark-500">참가 링크</p>
+          <p className="text-xs break-all font-mono text-emerald-400">{joinUrl}</p>
+          <button
+            type="button"
+            onClick={() => copyUrl(joinUrl)}
+            className="w-full rounded-xl border border-emerald-800 bg-emerald-900/30 px-4 py-2 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-900/50"
+          >
+            {urlCopied ? "복사됨" : "링크 복사"}
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-dark-800 pt-3">
+          <p className="text-xs text-dark-600">
+            참가 링크 없음 — <span className="text-dark-500"><code>npm run dev:tunnel</code> 로 시작하면 활성화</span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function PlayerView() {
   const { gameId, charId } = useParams() as { gameId: string; charId: string };
@@ -866,6 +1031,8 @@ export default function PlayerView() {
   const [token, setToken] = useState("");
   const [game, setGame] = useState<GamePackage | null>(null);
   const [sharedState, setSharedState] = useState<SharedState | null>(null);
+  const [sessionCode, setSessionCode] = useState("");
+  const [sessionName, setSessionName] = useState("");
   const [inventory, setInventory] = useState<InventoryCard[]>([]);
   const [roundAcquired, setRoundAcquired] = useState<Record<string, number>>({});
   const [roundVisited, setRoundVisited] = useState<Record<string, string[]>>({});
@@ -899,8 +1066,10 @@ export default function PlayerView() {
         setLoading(false);
         return;
       }
-      const { sharedState: ss, playerState, game: g } = await sessionRes.json();
+      const { sharedState: ss, playerState, game: g, sessionCode: nextSessionCode, sessionName: nextSessionName } = await sessionRes.json();
       setSharedState(ss);
+      setSessionCode(nextSessionCode ?? "");
+      setSessionName(nextSessionName ?? "현재 방");
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});
       setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -945,8 +1114,10 @@ export default function PlayerView() {
       try {
         const res = await fetch(`/api/sessions/${sessionId}?token=${token}`);
         if (!res.ok) return;
-        const { sharedState: ss, playerState } = await res.json();
+        const { sharedState: ss, playerState, sessionCode: nextSessionCode, sessionName: nextSessionName } = await res.json();
         setSharedState(ss);
+        setSessionCode(nextSessionCode ?? "");
+        setSessionName(nextSessionName ?? "현재 방");
         setInventory(playerState.inventory ?? []);
         setRoundAcquired(playerState.roundAcquired ?? {});
         setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -1157,6 +1328,14 @@ export default function PlayerView() {
       </div>
 
       <div className="p-4 max-w-lg mx-auto space-y-4 pb-8">
+        {phase === "lobby" && sessionCode && (
+          <PlayerJoinAccessPanel
+            sessionName={sessionName || "현재 방"}
+            sessionCode={sessionCode}
+            isLobby={phase === "lobby"}
+          />
+        )}
+
         {phase === "lobby" && canRequestAdvance && (
           <PhaseAdvanceRequestPanel
             label={advanceRequestLabel}
@@ -1611,6 +1790,14 @@ export default function PlayerView() {
             requested={hasRequestedAdvance}
             submitting={phaseRequestSubmitting}
             onToggle={handlePhaseAdvanceToggle}
+          />
+        )}
+
+        {phase !== "lobby" && sessionCode && (
+          <PlayerJoinAccessPanel
+            sessionName={sessionName || "현재 방"}
+            sessionCode={sessionCode}
+            isLobby={false}
           />
         )}
       </div>

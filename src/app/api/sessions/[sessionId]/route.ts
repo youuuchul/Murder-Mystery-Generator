@@ -11,6 +11,7 @@ import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
   deleteSession,
   getSession,
+  isGmManagedSession,
   SessionConflictError,
   isSessionConflictError,
 } from "@/lib/session-repository";
@@ -20,6 +21,10 @@ import type { EndingStage, GamePhase, GameSession } from "@/types/session";
 type Params = { params: { sessionId: string } };
 
 async function canAccessGmSession(request: NextRequest, session: GameSession): Promise<boolean> {
+  if (!isGmManagedSession(session)) {
+    return false;
+  }
+
   const game = await getGame(session.gameId);
   if (!game) {
     return false;

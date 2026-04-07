@@ -24,10 +24,19 @@ function sessionPath(id: string): string {
 export function createSession(
   game: GamePackage,
   sessionName?: string,
-  hostUserId?: string
+  hostUserId?: string,
+  sessionMode: GameSession["mode"] = "gm"
 ): GameSession {
   ensureDir();
-  const session = buildInitialSession(game, undefined, undefined, undefined, sessionName, hostUserId);
+  const session = buildInitialSession(
+    game,
+    undefined,
+    undefined,
+    undefined,
+    sessionName,
+    hostUserId,
+    sessionMode
+  );
 
   fs.writeFileSync(sessionPath(session.id), JSON.stringify(session, null, 2), "utf-8");
   return session;

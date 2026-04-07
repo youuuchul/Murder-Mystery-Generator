@@ -7,6 +7,13 @@ export type GamePhase =
   | "vote"
   | "ending";
 
+/**
+ * 세션 진행 방식.
+ * `gm` 은 기존처럼 GM 대시보드가 있는 방이고,
+ * `player-consensus` 는 플레이어 합의로만 다음 단계가 넘어가는 GM 없는 방이다.
+ */
+export type SessionMode = "gm" | "player-consensus";
+
 /** 캐릭터 슬롯 — 게임의 Player 1개에 대응 */
 export interface CharacterSlot {
   playerId: string;          // GamePackage.players[].id
@@ -105,6 +112,7 @@ export interface GameSession {
   gameId: string;
   sessionName: string;
   sessionCode: string;
+  mode: SessionMode;
   /** 이 세션을 만든 GM 작업자 ID. 공개 게임의 익명 GM 세션은 비어 있을 수 있다. */
   hostUserId?: string;
   createdAt: string;
@@ -122,6 +130,7 @@ export interface GameSession {
 export interface GameSessionSummary {
   id: string;
   sessionName: string;
+  mode: SessionMode;
   createdAt: string;
   startedAt?: string;
   phase: GamePhase;

@@ -8,7 +8,7 @@ import {
 import { getGame, saveGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { createSession, listActiveSessions } from "@/lib/session-repository";
+import { createSession, isGmManagedSession, listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 
 /**
@@ -24,6 +24,7 @@ function toSessionSummary(
   return {
     id: session.id,
     sessionName: session.sessionName,
+    mode: session.mode,
     createdAt: session.createdAt,
     startedAt: session.startedAt,
     phase: session.sharedState.phase,
@@ -35,27 +36,40 @@ function toSessionSummary(
   };
 }
 
+interface CreateSessionRequestBody {
+  gameId?: string;
+  mode?: GameSession["mode"];
+}
+
 /** POST /api/sessions — 세션 생성 */
 export async function POST(req: NextRequest) {
-  const { gameId } = await req.json().catch(() => ({})) as { gameId?: string };
+  const { gameId, mode } = await req.json().catch(() => ({})) as CreateSessionRequestBody;
   if (!gameId) return NextResponse.json({ error: "gameId required" }, { status: 400 });
 
   const game = await getGame(gameId);
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
   const currentUser = await getRequestMakerUser(req);
+  const sessionMode = mode === "player-consensus" ? "player-consensus" : "gm";
 
-  if (!canAccessGmPlay(game, currentUser)) {
+  if (sessionMode === "gm" && !canAccessGmPlay(game, currentUser)) {
     return NextResponse.json(
       { error: "이 게임은 현재 작업자가 세션을 시작할 수 없습니다." },
       { status: 403 }
     );
   }
 
-  const sessionGame = currentUser && game.access.visibility !== "public"
+  if (sessionMode === "player-consensus" && game.access.visibility !== "public") {
+    return NextResponse.json(
+      { error: "GM 없이 직접 여는 방은 공개 게임에서만 만들 수 있습니다." },
+      { status: 403 }
+    );
+  }
+
+  const sessionGame = sessionMode === "gm" && currentUser && game.access.visibility !== "public"
     ? resolveEditableGameForUser(game, currentUser)?.game ?? game
     : game;
 
-  if (currentUser && game.access.visibility !== "public") {
+  if (sessionMode === "gm" && currentUser && game.access.visibility !== "public") {
     const editableGame = resolveEditableGameForUser(game, currentUser);
     if (editableGame?.claimed) {
       await saveGame(editableGame.game);
@@ -67,10 +81,13 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await createSession(sessionGame, {
-    hostUserId: currentUser?.id,
+    hostUserId: sessionMode === "gm" ? currentUser?.id : undefined,
+    sessionMode,
   });
   const response = NextResponse.json({ session }, { status: 201 });
-  applyGmSessionAccessCookie(response, req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value, session);
+  if (sessionMode === "gm") {
+    applyGmSessionAccessCookie(response, req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value, session);
+  }
   return response;
 }
 
@@ -91,7 +108,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const sessions = (await listActiveSessions(gameId)).map((session) => (
+  const sessions = (await listActiveSessions(gameId))
+    .filter((session) => isGmManagedSession(session))
+    .map((session) => (
     toSessionSummary(session, {
       canResumeDirectly: canResumeGmSessionDirectly(session, {
         currentUserId: currentUser?.id,

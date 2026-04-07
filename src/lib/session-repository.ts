@@ -1,5 +1,5 @@
 import type { GamePackage } from "@/types/game";
-import type { GameSession } from "@/types/session";
+import type { GameSession, SessionMode } from "@/types/session";
 import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { buildInitialSession } from "@/lib/session-factory";
 import { createSessionBackupSnapshot } from "@/lib/session-integrity";
@@ -15,6 +15,7 @@ import {
 
 export interface CreateSessionOptions {
   hostUserId?: string;
+  sessionMode?: SessionMode;
 }
 
 export interface SessionRepository {
@@ -49,7 +50,7 @@ const localSessionRepository: SessionRepository = {
   async createSession(game, options = {}) {
     const sessionName = buildAutomaticSessionName(listLocalActiveSessions(game.id));
     return withSessionDefaults(
-      createLocalSession(game, sessionName, options.hostUserId),
+      createLocalSession(game, sessionName, options.hostUserId, options.sessionMode ?? "gm"),
       { fallbackName: sessionName }
     );
   },
@@ -166,6 +167,21 @@ function normalizeSessionCode(sessionCode: string): string {
 }
 
 /**
+ * 세션 모드가 비어 있거나 손상된 오래된 데이터를 현재 기본값으로 보정한다.
+ */
+function normalizeSessionMode(value: string | undefined): SessionMode {
+  return value === "player-consensus" ? "player-consensus" : "gm";
+}
+
+/**
+ * GM 대시보드로 다루는 세션인지 판별한다.
+ * 플레이어 합의 세션은 참가 퍼널과 플레이어 화면에서만 다룬다.
+ */
+export function isGmManagedSession(session: Pick<GameSession, "mode">): boolean {
+  return normalizeSessionMode(session.mode) === "gm";
+}
+
+/**
  * 생성 시점 기준으로 사람이 구분하기 쉬운 기본 방 제목을 만든다.
  */
 function buildAutomaticSessionName(existingSessions: GameSession[]): string {
@@ -194,6 +210,7 @@ function withSessionDefaults<T extends GameSession>(
     fallbackUpdatedAt?: string;
   } = {}
 ): T {
+  const normalizedMode = normalizeSessionMode(session.mode);
   const normalizedSessionName = session.sessionName?.trim()
     || options.fallbackName
     || buildFallbackSessionName(session.createdAt);
@@ -202,7 +219,8 @@ function withSessionDefaults<T extends GameSession>(
     || session.createdAt;
 
   if (
-    normalizedSessionName === session.sessionName
+    normalizedMode === session.mode
+    && normalizedSessionName === session.sessionName
     && normalizedUpdatedAt === session.updatedAt
   ) {
     return session;
@@ -210,6 +228,7 @@ function withSessionDefaults<T extends GameSession>(
 
   return {
     ...session,
+    mode: normalizedMode,
     sessionName: normalizedSessionName,
     updatedAt: normalizedUpdatedAt,
   };
@@ -323,7 +342,8 @@ const supabaseSessionRepository: SessionRepository = {
         undefined,
         undefined,
         sessionName,
-        options.hostUserId
+        options.hostUserId,
+        options.sessionMode ?? "gm"
       );
       const row = buildSupabaseSessionRow(session);
       const { data, error } = await supabase

@@ -1,5 +1,5 @@
 import type { GamePackage } from "@/types/game";
-import type { CharacterSlot, GameSession } from "@/types/session";
+import type { CharacterSlot, GameSession, SessionMode } from "@/types/session";
 
 const SESSION_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -25,7 +25,8 @@ export function buildInitialSession(
   sessionCode = generateSessionCode(),
   now = new Date().toISOString(),
   sessionName = "새 방",
-  hostUserId?: string
+  hostUserId?: string,
+  sessionMode: SessionMode = "gm"
 ): GameSession {
   const slots: CharacterSlot[] = game.players.map((player) => ({
     playerId: player.id,
@@ -39,6 +40,7 @@ export function buildInitialSession(
     gameId: game.id,
     sessionName,
     sessionCode,
+    mode: sessionMode,
     hostUserId,
     createdAt: now,
     updatedAt: now,

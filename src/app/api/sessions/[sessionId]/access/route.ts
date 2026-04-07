@@ -8,7 +8,7 @@ import {
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { getSession } from "@/lib/session-repository";
+import { getSession, isGmManagedSession } from "@/lib/session-repository";
 
 type Params = { params: { sessionId: string } };
 
@@ -25,6 +25,13 @@ export async function POST(request: NextRequest, { params }: Params) {
   const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  if (!isGmManagedSession(session)) {
+    return NextResponse.json(
+      { error: "이 방은 GM 없는 플레이어 전용 세션입니다." },
+      { status: 403 }
+    );
   }
 
   const game = await getGame(session.gameId);

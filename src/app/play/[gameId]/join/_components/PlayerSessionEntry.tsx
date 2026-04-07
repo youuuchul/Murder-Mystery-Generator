@@ -19,6 +19,12 @@ interface JoinLookupResponse {
   };
 }
 
+interface CreateSessionResponse {
+  session: {
+    sessionCode: string;
+  };
+}
+
 type PlayerSessionEntryProps = {
   gameId: string;
   gameTitle: string;
@@ -39,6 +45,7 @@ export default function PlayerSessionEntry({
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [creatingSession, setCreatingSession] = useState(false);
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
 
@@ -93,14 +100,64 @@ export default function PlayerSessionEntry({
     }
   }
 
+  /**
+   * 플레이어 합의로 진행하는 방을 새로 만들고,
+   * 방을 연 사람도 곧바로 플레이어 참가 퍼널로 들어가게 한다.
+   */
+  async function handleCreatePlayerSession() {
+    setCreatingSession(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId,
+          mode: "player-consensus",
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        setError(data.error ?? "방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+
+      const data = await response.json() as CreateSessionResponse;
+      router.push(`/join/${data.session.sessionCode}`);
+    } finally {
+      setCreatingSession(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-dark-800 bg-[radial-gradient(circle_at_top_left,rgba(95,61,87,0.18),transparent_34%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(11,11,14,0.98))] p-6 sm:p-8">
-        <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Player Entry</p>
-        <h1 className="mt-4 text-3xl font-semibold text-dark-50">{gameTitle}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
-          참가할 방을 확인한 뒤 세션 코드를 입력하세요. 방 목록은 찾기용이고, 실제 입장은 코드가 맞아야 열립니다.
-        </p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Player Entry</p>
+            <h1 className="mt-4 text-3xl font-semibold text-dark-50">{gameTitle}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
+              참가할 방을 확인한 뒤 세션 코드를 입력하세요. 혼자 시작하거나 GM 없이 함께 진행할 땐 직접 방을 열 수도 있습니다.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-dark-800 bg-dark-950/60 p-4 lg:max-w-sm">
+            <p className="text-xs uppercase tracking-[0.22em] text-dark-500">No GM</p>
+            <p className="mt-2 text-sm leading-6 text-dark-200">
+              GM 없이 플레이할 방을 직접 열고, 만든 뒤 받은 참가 코드로 바로 들어갑니다.
+            </p>
+            <button
+              type="button"
+              onClick={handleCreatePlayerSession}
+              disabled={creatingSession}
+              className="mt-4 w-full rounded-xl border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-500 hover:text-emerald-50 disabled:opacity-50"
+            >
+              {creatingSession ? "방 만드는 중…" : "GM 없이 직접 세션 생성"}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="space-y-6">

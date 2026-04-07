@@ -59,8 +59,9 @@ export default async function PlayJoinPage({
     sessionName: session.sessionName,
     phaseLabel: formatPlayerSessionPhaseLabel({
       id: session.id,
-      sessionName: session.sessionName,
-      createdAt: session.createdAt,
+    sessionName: session.sessionName,
+    mode: session.mode,
+    createdAt: session.createdAt,
       startedAt: session.startedAt,
       phase: session.sharedState.phase,
       currentRound: session.sharedState.currentRound,

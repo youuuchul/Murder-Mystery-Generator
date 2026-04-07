@@ -6,7 +6,7 @@ import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
-import { listActiveSessions } from "@/lib/session-repository";
+import { isGmManagedSession, listActiveSessions } from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 import GMDashboard from "./_components/GMDashboard";
 
@@ -24,6 +24,7 @@ function toSessionSummary(
   return {
     id: session.id,
     sessionName: session.sessionName,
+    mode: session.mode,
     createdAt: session.createdAt,
     startedAt: session.startedAt,
     phase: session.sharedState.phase,
@@ -78,7 +79,9 @@ export default async function PlayPage({
     }
   }
 
-  const activeSessions = await listActiveSessions(params.gameId);
+  const activeSessions = (await listActiveSessions(params.gameId)).filter((session) => (
+    isGmManagedSession(session)
+  ));
   const cookieStore = cookies();
   const requestedSessionId = searchParams?.session;
   /**

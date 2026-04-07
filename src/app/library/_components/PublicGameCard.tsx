@@ -53,7 +53,7 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
         <div className="flex flex-wrap gap-2 text-xs text-dark-400">
           <span>인원 {game.settings.playerCount}인</span>
           <span>시간 {game.settings.estimatedDuration}분</span>
-          {ownerDisplayName ? <span>제작 {ownerDisplayName}</span> : null}
+          {ownerDisplayName ? <span>제작자 : {ownerDisplayName}</span> : null}
           {tags.slice(0, 3).map((tag) => (
             <span key={tag} className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-dark-300">
               #{tag}

@@ -30,6 +30,10 @@ import {
   requestMakerPasswordReset,
   updateMakerRecoveryEmailForUser,
 } from "@/lib/maker-account-recovery";
+import {
+  isDuplicateMakerLoginIdError,
+  isMakerAccountAlreadyLinkedError,
+} from "@/lib/maker-auth-errors";
 import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
@@ -405,14 +409,27 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "account_already_linked", "signup");
     }
 
-    const account = await makerAuthGateway.createAccount({
-      displayName,
-      loginId,
-      password: accountPassword,
-      recoveryEmail,
-      preferredUserId: linkedUserId,
-      migrateOwnerIdFrom: linkedUserId,
-    });
+    let account;
+    try {
+      account = await makerAuthGateway.createAccount({
+        displayName,
+        loginId,
+        password: accountPassword,
+        recoveryEmail,
+        preferredUserId: linkedUserId,
+        migrateOwnerIdFrom: linkedUserId,
+      });
+    } catch (error) {
+      if (isDuplicateMakerLoginIdError(error)) {
+        return redirectToMakerAccess(request, next, "duplicate_login_id", "signup");
+      }
+
+      if (isMakerAccountAlreadyLinkedError(error)) {
+        return redirectToMakerAccess(request, next, "account_already_linked", "signup");
+      }
+
+      throw error;
+    }
 
     if (authProvider === "supabase") {
       const response = await buildLoginSuccessResponse(request, next, gatePassword);

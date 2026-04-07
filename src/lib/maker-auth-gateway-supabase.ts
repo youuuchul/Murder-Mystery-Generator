@@ -2,6 +2,7 @@ import {
   normalizeMakerLoginId,
   normalizeMakerRecoveryEmail,
 } from "@/lib/maker-account";
+import { DuplicateMakerLoginIdError } from "@/lib/maker-auth-errors";
 import type { MakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { migrateLocalGameOwnership } from "@/lib/game-ownership-migration";
 import { normalizeMakerRole } from "@/lib/maker-role";
@@ -79,6 +80,21 @@ async function writeSupabaseMakerProfile(
   }
 
   return fallbackAttempt.data as unknown as SupabaseMakerProfileRow;
+}
+
+/** Supabase Auth / profiles 응답이 로그인 ID 중복 상황인지 판별한다. */
+function isSupabaseDuplicateLoginIdMessage(errorMessage: string): boolean {
+  const normalizedMessage = errorMessage.toLowerCase();
+
+  return (
+    (normalizedMessage.includes("already") && normalizedMessage.includes("registered"))
+    || normalizedMessage.includes("user_already_exists")
+    || normalizedMessage.includes("duplicate key")
+    || (
+      normalizedMessage.includes("unique constraint")
+      && normalizedMessage.includes("login_id")
+    )
+  );
 }
 
 function toMakerUserRecord(profile: SupabaseMakerProfileRow): MakerUserRecord {
@@ -264,6 +280,11 @@ export function createSupabaseMakerAuthGateway(
       const normalizedDisplayName = normalizeMakerDisplayName(displayName);
       const normalizedLoginId = normalizeMakerLoginId(loginId);
       const normalizedRecoveryEmail = normalizeMakerRecoveryEmail(recoveryEmail ?? "");
+      const existingProfile = await getSupabaseProfileByLoginId(config, normalizedLoginId);
+      if (existingProfile) {
+        throw new DuplicateMakerLoginIdError(normalizedLoginId);
+      }
+
       const adminClient = createSupabaseMakerAuthAdminClient(config);
       const { data, error } = await adminClient.auth.admin.createUser({
         email: buildSupabaseMakerEmail(normalizedLoginId),
@@ -276,17 +297,33 @@ export function createSupabaseMakerAuthGateway(
       });
 
       if (error || !data.user) {
+        if (error && isSupabaseDuplicateLoginIdMessage(error.message)) {
+          throw new DuplicateMakerLoginIdError(normalizedLoginId);
+        }
         throw new Error(`Failed to create Supabase maker account: ${error?.message ?? "unknown error"}`);
       }
 
-      const profileData = await writeSupabaseMakerProfile(config, {
-        id: data.user.id,
-        display_name: normalizedDisplayName,
-        login_id: normalizedLoginId,
-        recovery_email: normalizedRecoveryEmail || null,
-        role: "creator",
-        updated_at: now,
-      });
+      let profileData: SupabaseMakerProfileRow;
+
+      try {
+        profileData = await writeSupabaseMakerProfile(config, {
+          id: data.user.id,
+          display_name: normalizedDisplayName,
+          login_id: normalizedLoginId,
+          recovery_email: normalizedRecoveryEmail || null,
+          role: "creator",
+          updated_at: now,
+        });
+      } catch (profileError) {
+        if (
+          profileError instanceof Error
+          && isSupabaseDuplicateLoginIdMessage(profileError.message)
+        ) {
+          await adminClient.auth.admin.deleteUser(data.user.id);
+          throw new DuplicateMakerLoginIdError(normalizedLoginId);
+        }
+        throw profileError;
+      }
 
       if (migrateOwnerIdFrom && migrateOwnerIdFrom.trim() !== data.user.id) {
         await migrateLocalGameOwnership(migrateOwnerIdFrom, data.user.id, now);

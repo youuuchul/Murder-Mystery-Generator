@@ -4,6 +4,10 @@ import type { MakerAccountRecord } from "@/types/auth";
 import { normalizeMakerRole } from "@/lib/maker-role";
 import { normalizeMakerDisplayName } from "@/lib/maker-user";
 import { normalizeMakerLoginId, normalizeMakerRecoveryEmail } from "@/lib/maker-account";
+import {
+  DuplicateMakerLoginIdError,
+  MakerAccountAlreadyLinkedError,
+} from "@/lib/maker-auth-errors";
 
 const MAKER_DATA_DIR = path.join(process.cwd(), "data", "makers");
 const MAKER_ACCOUNTS_PATH = path.join(MAKER_DATA_DIR, "accounts.json");
@@ -87,17 +91,19 @@ export function getMakerAccountById(userId: string): MakerAccountRecord | null {
 
 /**
  * 새 계정을 저장한다.
- * 같은 loginId 또는 userId 가 이미 있으면 기존 레코드를 그대로 돌려준다.
+ * 같은 loginId 또는 userId 가 이미 있으면 충돌 오류를 던진다.
  */
 export function createMakerAccount(account: MakerAccountRecord): MakerAccountRecord {
   const normalizedAccount = normalizeMakerAccountRecord(account);
   const accounts = listMakerAccounts();
-  const existingAccount = accounts.find((record) => (
-    record.id === normalizedAccount.id || record.loginId === normalizedAccount.loginId
-  ));
+  const existingByUserId = accounts.find((record) => record.id === normalizedAccount.id);
+  if (existingByUserId) {
+    throw new MakerAccountAlreadyLinkedError(normalizedAccount.id);
+  }
 
-  if (existingAccount) {
-    return existingAccount;
+  const existingByLoginId = accounts.find((record) => record.loginId === normalizedAccount.loginId);
+  if (existingByLoginId) {
+    throw new DuplicateMakerLoginIdError(normalizedAccount.loginId);
   }
 
   const nextAccounts = accounts

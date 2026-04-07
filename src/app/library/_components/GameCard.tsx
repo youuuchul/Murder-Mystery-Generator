@@ -197,7 +197,7 @@ export default function GameCard({
     ? `${game.access.ownerId.slice(0, 8)}...${game.access.ownerId.slice(-4)}`
     : "";
   const missingPublishItems = publishChecklist.filter((item) => !item.passed);
-  const playActionLabel = ownershipState === "readonly" ? "운영 열기" : "플레이";
+  const playActionLabel = ownershipState === "readonly" ? "세션 보기" : "플레이";
 
   return (
     <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
@@ -256,6 +256,8 @@ export default function GameCard({
                 <span className="font-mono text-[11px] text-dark-500">({ownerKeyHint})</span>
               </>
             ) : null}
+            <br />
+            관리자 계정은 이 게임의 세션 화면만 열 수 있습니다.
           </p>
         ) : null}
 

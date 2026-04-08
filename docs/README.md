@@ -35,6 +35,7 @@
 - [20260319_SUPABASE_SCHEMA_DRAFT.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260319_SUPABASE_SCHEMA_DRAFT.md)
 - [20260406_POST_DEPLOY_PRODUCT_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260406_POST_DEPLOY_PRODUCT_PLAN.md)
 - [20260407_LIBRARY_PLAYER_ENTRY_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260407_LIBRARY_PLAYER_ENTRY_PLAN.md)
+- [20260408_LLM_PLAYER_AGENT_PLAN.md](/Users/youuchul/Documents/github/00_portfolio/Murder-Mystery_Generator/docs/plans/20260408_LLM_PLAYER_AGENT_PLAN.md)
 
 ## Research
 

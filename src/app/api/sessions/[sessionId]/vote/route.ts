@@ -99,6 +99,23 @@ function resolveTiedCandidates(tally: VoteTally[]): string[] {
 }
 
 /**
+ * 플레이어 합의 세션에서 동률이 나오면 안정적으로 같은 후보를 고르기 위한 해시 선택기.
+ * 세션 ID 기반이라 같은 세션에서 반복 호출해도 결과가 바뀌지 않는다.
+ */
+function pickDeterministicArrestedPlayerId(
+  sessionId: string,
+  candidatePlayerIds: string[]
+): string {
+  const sortedCandidates = [...candidatePlayerIds].sort((a, b) => a.localeCompare(b));
+  if (sortedCandidates.length <= 1) {
+    return sortedCandidates[0] ?? "";
+  }
+
+  const seed = stableHash(`${sessionId}:${sortedCandidates.join(":")}`);
+  return sortedCandidates[seed % sortedCandidates.length];
+}
+
+/**
  * 득표 결과를 엔딩 공개 상태로 바꾸거나, 동률이면 GM 선택 대기 상태로 전환한다.
  * 강제 검거 대상이 전달되면 동률 후보 중 해당 캐릭터를 최종 검거 대상으로 확정한다.
  */
@@ -119,8 +136,14 @@ async function revealVotes(
       const culpritPlayerId = game?.story.culpritPlayerId ?? "";
       const tally = buildVoteTally(latestSession as LoadedSession);
       const tiedCandidates = resolveTiedCandidates(tally);
+      const resolvedForcedArrestedPlayerId = forcedArrestedPlayerId
+        || (
+          tiedCandidates.length > 1 && latestSession.mode === "player-consensus"
+            ? pickDeterministicArrestedPlayerId(latestSession.id, tiedCandidates)
+            : undefined
+        );
 
-      if (!forcedArrestedPlayerId && tiedCandidates.length > 1) {
+      if (!resolvedForcedArrestedPlayerId && tiedCandidates.length > 1) {
         latestSession.pendingArrestOptions = tiedCandidates;
         latestSession.sharedState.eventLog.push({
           id: crypto.randomUUID(),
@@ -138,7 +161,7 @@ async function revealVotes(
       const totalVotes = Object.keys(latestSession.votes).length;
       const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
       const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
-      const arrestedPlayerId = forcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
+      const arrestedPlayerId = resolvedForcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
       const resultType = arrestedPlayerId === culpritPlayerId
         ? "culprit-captured"
         : "wrong-arrest";
@@ -179,6 +202,15 @@ async function revealVotes(
         type: "vote_revealed",
       });
 
+      if (tiedCandidates.length > 1 && latestSession.mode === "player-consensus") {
+        latestSession.sharedState.eventLog.push({
+          id: crypto.randomUUID(),
+          timestamp: now,
+          message: "최다 득표 동률이 발생해 플레이어 합의 세션 규칙으로 검거 대상을 자동 확정했습니다.",
+          type: "system",
+        });
+      }
+
       return {
         requiresTieBreak: false,
         pendingArrestOptions: [] as string[],
@@ -215,7 +247,24 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
 
         if ((latestSession.pendingArrestOptions?.length ?? 0) > 0) {
-          throw new Error("GM이 최종 검거 대상을 선택하는 중입니다.");
+          if (latestSession.mode !== "player-consensus") {
+            throw new Error("GM이 최종 검거 대상을 선택하는 중입니다.");
+          }
+
+          return {
+            allVoted: true,
+            forcedArrestedPlayerId: pickDeterministicArrestedPlayerId(
+              latestSession.id,
+              latestSession.pendingArrestOptions ?? []
+            ),
+            aiVoteOutcome: {
+              acted: false,
+              trigger: "human_vote_submitted" as const,
+              submittedCount: 0,
+              entries: [],
+              reason: "pending-tie-auto-resolve",
+            },
+          };
         }
 
         const voter = latestSession.playerStates.find((player) => player.token === token);
@@ -251,6 +300,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         const totalPlayers = latestSession.sharedState.characterSlots.filter((slot) => slot.isLocked).length;
         return {
           allVoted: latestSession.sharedState.voteCount >= totalPlayers,
+          forcedArrestedPlayerId: undefined,
           aiVoteOutcome,
         };
       }
@@ -270,7 +320,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
     if (result.allVoted) {
-      revealState = await revealVotes(sessionId, persistedSession);
+      revealState = await revealVotes(sessionId, persistedSession, result.forcedArrestedPlayerId);
     }
 
     return NextResponse.json({
@@ -301,6 +351,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     throw error;
   }
+}
+
+function stableHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
 }
 
 /** PATCH /api/sessions/[sessionId]/vote — GM 강제 공개 */

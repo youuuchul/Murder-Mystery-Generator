@@ -31,6 +31,10 @@ backups/local-data/
 .tunnel-url
 supabase/.temp/
 
+# Portfolio & study notes (personal)
+portfolio/
+study-notes/
+
 # Debug
 npm-debug.log*
 yarn-debug.log*

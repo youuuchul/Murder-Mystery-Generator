@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enablePlayerAgentSlotsForMissingPlayers } from "@/lib/ai/player-agent/core/player-agent-state";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { canAccessGmPlay } from "@/lib/game-access";
@@ -149,6 +150,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     subPhase?: string;
     playerId?: string;
     sessionName?: string;
+    fillMissingWithAi?: boolean;
   };
 
   const session = await getSession(sessionId);
@@ -176,6 +178,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
         if (body.action === "advance_phase") {
           if (sharedState.phase === "lobby") {
+            if (body.fillMissingWithAi && latestSession.playerAgentState) {
+              const lockedPlayerCount = sharedState.characterSlots.filter((slot) => slot.isLocked).length;
+              latestSession.playerAgentState = enablePlayerAgentSlotsForMissingPlayers(
+                latestSession.playerAgentState,
+                {
+                  unlockedPlayerIds: sharedState.characterSlots
+                    .filter((slot) => !slot.isLocked)
+                    .map((slot) => slot.playerId),
+                  missingPlayerCount: Math.max(0, sharedState.characterSlots.length - lockedPlayerCount),
+                }
+              );
+            }
+
             newPhase = "opening";
             message = "오프닝이 시작됩니다.";
             latestSession.startedAt = now;

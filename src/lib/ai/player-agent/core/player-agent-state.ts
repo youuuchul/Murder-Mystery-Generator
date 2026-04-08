@@ -1,4 +1,5 @@
 import type {
+  PlayerAgentRuntimeStatus,
   PlayerAgentSessionState,
   PlayerAgentSlotState,
   SessionMode,
@@ -73,5 +74,49 @@ export function normalizePlayerAgentSessionState(
         actionState: existingSlot.actionState ?? {},
       };
     }),
+  };
+}
+
+/**
+ * 사람이 아직 들어오지 않은 슬롯 중 일부를 AI 플레이어 슬롯으로 켠다.
+ * 대기실 시작 직전에만 사용하며, 이미 켜진 슬롯과 기존 기억 상태는 유지한다.
+ */
+export function enablePlayerAgentSlotsForMissingPlayers(
+  state: PlayerAgentSessionState,
+  options: {
+    unlockedPlayerIds: string[];
+    missingPlayerCount: number;
+  }
+): PlayerAgentSessionState {
+  const missingPlayerCount = Math.max(0, options.missingPlayerCount);
+  if (missingPlayerCount === 0) {
+    return state;
+  }
+
+  const unlockedPlayerIds = new Set(options.unlockedPlayerIds);
+  let remainingToEnable = missingPlayerCount;
+  let changed = false;
+
+  const nextSlots = state.slots.map((slot) => {
+    if (remainingToEnable <= 0 || !unlockedPlayerIds.has(slot.playerId) || slot.enabled) {
+      return slot;
+    }
+
+    remainingToEnable -= 1;
+    changed = true;
+    return {
+      ...slot,
+      enabled: true,
+      runtimeStatus: "idle" as PlayerAgentRuntimeStatus,
+    };
+  });
+
+  if (!changed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    slots: nextSlots,
   };
 }

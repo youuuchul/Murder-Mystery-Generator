@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enablePlayerAgentSlotsForMissingPlayers } from "@/lib/ai/player-agent/core/player-agent-state";
 import { getGame } from "@/lib/game-repository";
 import {
   applySessionAdvanceStep,
@@ -14,6 +15,7 @@ type Params = { params: { sessionId: string } };
 interface PhaseRequestBody {
   token?: string;
   action?: SessionAdvanceRequestAction;
+  fillMissingWithAi?: boolean;
 }
 
 /**
@@ -22,7 +24,11 @@ interface PhaseRequestBody {
  */
 export async function POST(req: Request, { params }: Params) {
   const { sessionId } = params;
-  const { token, action = "request" } = await req.json().catch(() => ({})) as PhaseRequestBody;
+  const {
+    token,
+    action = "request",
+    fillMissingWithAi = false,
+  } = await req.json().catch(() => ({})) as PhaseRequestBody;
 
   if (!token) {
     return NextResponse.json({ error: "token이 필요합니다." }, { status: 400 });
@@ -73,6 +79,18 @@ export async function POST(req: Request, { params }: Params) {
           && joinedPlayerIds.every((playerId) => requestedPlayerIds.has(playerId));
 
         if (allJoinedPlayersRequested && action === "request") {
+          if (fillMissingWithAi && latestSession.sharedState.phase === "lobby" && latestSession.playerAgentState) {
+            latestSession.playerAgentState = enablePlayerAgentSlotsForMissingPlayers(
+              latestSession.playerAgentState,
+              {
+                unlockedPlayerIds: latestSession.sharedState.characterSlots
+                  .filter((item) => !item.isLocked)
+                  .map((item) => item.playerId),
+                missingPlayerCount: Math.max(0, latestSession.sharedState.characterSlots.length - joinedPlayerIds.length),
+              }
+            );
+          }
+
           applySessionAdvanceStep(latestSession, game);
           return {
             advanced: true,

@@ -865,12 +865,14 @@ function PlayerAdvanceConfirmModal({
   kind: SessionAdvanceConfirmKind;
   joinedPlayerCount: number;
   totalPlayerCount: number;
-  onConfirm: () => void;
+  onConfirm: (options: { fillMissingWithAi: boolean }) => void;
   onCancel: () => void;
   confirming: boolean;
 }) {
   const isOpening = kind === "opening";
   const isFull = joinedPlayerCount >= totalPlayerCount;
+  const missingPlayerCount = Math.max(0, totalPlayerCount - joinedPlayerCount);
+  const [fillMissingWithAi, setFillMissingWithAi] = useState(false);
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
@@ -890,17 +892,33 @@ function PlayerAdvanceConfirmModal({
         </div>
 
         {isOpening ? (
-          <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
-            <p className="text-xs text-dark-500">현재 참가 인원</p>
-            <p className="mt-2 text-3xl font-bold text-mystery-300">
-              {joinedPlayerCount}
-              <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
-            </p>
-            <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
-              {isFull
-                ? "설정된 인원이 모두 입장했습니다."
-                : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
-            </p>
+          <div className="mt-5 space-y-3">
+            <div className="rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+              <p className="text-xs text-dark-500">현재 참가 인원</p>
+              <p className="mt-2 text-3xl font-bold text-mystery-300">
+                {joinedPlayerCount}
+                <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
+              </p>
+              <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
+                {isFull
+                  ? "설정된 인원이 모두 입장했습니다."
+                  : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
+              </p>
+            </div>
+
+            {!isFull ? (
+              <label className="flex items-start gap-3 rounded-xl border border-dark-800 bg-dark-950/60 p-4 text-sm text-dark-200">
+                <input
+                  type="checkbox"
+                  checked={fillMissingWithAi}
+                  onChange={(event) => setFillMissingWithAi(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500 focus:ring-mystery-500"
+                />
+                <span className="leading-6">
+                  부족한 인원 {missingPlayerCount}명을 AI 플레이어로 채우기
+                </span>
+              </label>
+            ) : null}
           </div>
         ) : (
           <div className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4">
@@ -921,7 +939,7 @@ function PlayerAdvanceConfirmModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm({ fillMissingWithAi })}
             disabled={confirming}
             className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
           >
@@ -1520,13 +1538,20 @@ export default function PlayerView() {
     setAcquiring(null);
   }
 
-  async function submitPhaseAdvanceRequest(action: "request" | "withdraw") {
+  async function submitPhaseAdvanceRequest(
+    action: "request" | "withdraw",
+    options?: { fillMissingWithAi?: boolean }
+  ) {
     setPhaseRequestSubmitting(true);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/phase-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, action }),
+        body: JSON.stringify({
+          token,
+          action,
+          fillMissingWithAi: options?.fillMissingWithAi === true,
+        }),
       });
 
       if (!res.ok) {
@@ -1617,8 +1642,10 @@ export default function PlayerView() {
     void submitPhaseAdvanceRequest("request");
   }
 
-  async function confirmPhaseAdvanceRequest() {
-    const ok = await submitPhaseAdvanceRequest("request");
+  async function confirmPhaseAdvanceRequest(options: { fillMissingWithAi: boolean }) {
+    const ok = await submitPhaseAdvanceRequest("request", {
+      fillMissingWithAi: options.fillMissingWithAi,
+    });
     if (ok) {
       setPhaseAdvanceConfirmKind(null);
     }
@@ -2220,7 +2247,7 @@ export default function PlayerView() {
           joinedPlayerCount={joinedSlots.length}
           totalPlayerCount={game.players.length}
           onCancel={() => setPhaseAdvanceConfirmKind(null)}
-          onConfirm={() => { void confirmPhaseAdvanceRequest(); }}
+          onConfirm={(options) => { void confirmPhaseAdvanceRequest(options); }}
           confirming={phaseRequestSubmitting}
         />
       )}

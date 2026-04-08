@@ -1051,12 +1051,14 @@ function PhaseAdvanceConfirmModal({
   kind: SessionAdvanceConfirmKind;
   joinedPlayerCount: number;
   totalPlayerCount: number;
-  onConfirm: () => void;
+  onConfirm: (options: { fillMissingWithAi: boolean }) => void;
   onCancel: () => void;
   confirming: boolean;
 }) {
   const isFull = joinedPlayerCount >= totalPlayerCount;
   const isOpening = kind === "opening";
+  const missingPlayerCount = Math.max(0, totalPlayerCount - joinedPlayerCount);
+  const [fillMissingWithAi, setFillMissingWithAi] = useState(false);
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
@@ -1076,17 +1078,33 @@ function PhaseAdvanceConfirmModal({
         </div>
 
         {isOpening ? (
-          <div className="mt-5 rounded-xl border border-dark-800 bg-dark-950/60 p-4">
-            <p className="text-xs text-dark-500">현재 참가 인원</p>
-            <p className="mt-2 text-3xl font-bold text-mystery-300">
-              {joinedPlayerCount}
-              <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
-            </p>
-            <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
-              {isFull
-                ? "설정된 인원이 모두 입장했습니다."
-                : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
-            </p>
+          <div className="mt-5 space-y-3">
+            <div className="rounded-xl border border-dark-800 bg-dark-950/60 p-4">
+              <p className="text-xs text-dark-500">현재 참가 인원</p>
+              <p className="mt-2 text-3xl font-bold text-mystery-300">
+                {joinedPlayerCount}
+                <span className="ml-2 text-lg font-medium text-dark-500">/ {totalPlayerCount}명</span>
+              </p>
+              <p className={`mt-3 text-sm ${isFull ? "text-emerald-300" : "text-amber-300"}`}>
+                {isFull
+                  ? "설정된 인원이 모두 입장했습니다."
+                  : "설정된 인원보다 적습니다. 이 상태로 시작할지 다시 확인해주세요."}
+              </p>
+            </div>
+
+            {!isFull ? (
+              <label className="flex items-start gap-3 rounded-xl border border-dark-800 bg-dark-950/60 p-4 text-sm text-dark-200">
+                <input
+                  type="checkbox"
+                  checked={fillMissingWithAi}
+                  onChange={(event) => setFillMissingWithAi(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500 focus:ring-mystery-500"
+                />
+                <span className="leading-6">
+                  부족한 인원 {missingPlayerCount}명을 AI 플레이어로 채우기
+                </span>
+              </label>
+            ) : null}
           </div>
         ) : (
           <div className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4">
@@ -1107,7 +1125,7 @@ function PhaseAdvanceConfirmModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm({ fillMissingWithAi })}
             disabled={confirming}
             className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600 disabled:opacity-50"
           >
@@ -1314,7 +1332,7 @@ export default function GMDashboard({
     }
   }
 
-  async function advancePhase(options?: { skipConfirm?: boolean }) {
+  async function advancePhase(options?: { skipConfirm?: boolean; fillMissingWithAi?: boolean }) {
     if (!session) return false;
     const confirmKind = getAdvanceConfirmKind(session, game);
     if (!options?.skipConfirm && confirmKind) {
@@ -1327,7 +1345,10 @@ export default function GMDashboard({
       const res = await fetch(`/api/sessions/${session.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "advance_phase" }),
+        body: JSON.stringify({
+          action: "advance_phase",
+          fillMissingWithAi: options?.fillMissingWithAi === true,
+        }),
       });
 
       if (!res.ok) {
@@ -1349,8 +1370,11 @@ export default function GMDashboard({
     }
   }
 
-  async function confirmAdvancePhase() {
-    const ok = await advancePhase({ skipConfirm: true });
+  async function confirmAdvancePhase(options: { fillMissingWithAi: boolean }) {
+    const ok = await advancePhase({
+      skipConfirm: true,
+      fillMissingWithAi: options.fillMissingWithAi,
+    });
     if (ok) {
       setAdvanceConfirmKind(null);
     }
@@ -1915,7 +1939,7 @@ export default function GMDashboard({
           joinedPlayerCount={session.sharedState.characterSlots.filter((slot) => slot.isLocked).length}
           totalPlayerCount={session.sharedState.characterSlots.length}
           onCancel={() => setAdvanceConfirmKind(null)}
-          onConfirm={() => { void confirmAdvancePhase(); }}
+          onConfirm={(options) => { void confirmAdvancePhase(options); }}
           confirming={advancing}
         />
       ) : null}

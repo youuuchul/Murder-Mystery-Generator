@@ -1,13 +1,7 @@
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { buildPlayerSharedBoardContent, type PlayerSharedBoardContent } from "@/lib/player-shared-board";
 import type { GamePackage, Player } from "@/types/game";
-import type { GameSession, InventoryCard, PlayerState } from "@/types/session";
-
-export interface PlayerAgentConversationTurn {
-  role: "user" | "assistant" | "system";
-  content: string;
-  createdAt: string;
-}
+import type { GameSession, PlayerAgentConversationTurn, PlayerState } from "@/types/session";
 
 export interface PlayerAgentVisibleCard {
   cardId: string;

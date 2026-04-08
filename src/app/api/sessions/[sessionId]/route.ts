@@ -135,6 +135,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         playerName: p.playerName,
         inventoryCount: p.inventory.length,
       })),
+      playerAgentState: undefined,
+      votes: undefined,
     },
   });
 }

@@ -14,6 +14,36 @@ export type GamePhase =
  */
 export type SessionMode = "gm" | "player-consensus";
 
+export type PlayerAgentRuntimeStatus = "idle" | "thinking" | "responding" | "acting" | "cooldown";
+
+export interface PlayerAgentActionState {
+  lastClueAcquiredAt?: string;
+  lastVoteSubmittedAt?: string;
+  lastTradeDecisionAt?: string;
+  deferredReason?: string;
+}
+
+export interface PlayerAgentConversationTurn {
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+}
+
+export interface PlayerAgentSlotState {
+  playerId: string;
+  enabled: boolean;
+  runtimeStatus: PlayerAgentRuntimeStatus;
+  conversationHistory: PlayerAgentConversationTurn[];
+  knownCardIds: string[];
+  actionState: PlayerAgentActionState;
+}
+
+export interface PlayerAgentSessionState {
+  sessionId: string;
+  sessionMode: SessionMode;
+  slots: PlayerAgentSlotState[];
+}
+
 /** 캐릭터 슬롯 — 게임의 Player 1개에 대응 */
 export interface CharacterSlot {
   playerId: string;          // GamePackage.players[].id
@@ -126,6 +156,8 @@ export interface GameSession {
   sharedState: SharedState;
   playerStates: PlayerState[];
   votes: Record<string, string>; // token → targetPlayerId (비공개, 서버 전용)
+  /** AI 플레이어 내부 상태 — 세션 저장에는 포함되지만 플레이어 응답에는 직접 노출하지 않는다. */
+  playerAgentState?: PlayerAgentSessionState;
 }
 
 /** 세션 목록/선택 UI에서 사용하는 경량 요약 정보 */

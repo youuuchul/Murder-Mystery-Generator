@@ -1,5 +1,6 @@
 import type { GamePackage } from "@/types/game";
 import type { GameSession, SessionMode } from "@/types/session";
+import { normalizePlayerAgentSessionState } from "@/lib/ai/player-agent/core/player-agent-state";
 import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { buildInitialSession } from "@/lib/session-factory";
 import { createSessionBackupSnapshot } from "@/lib/session-integrity";
@@ -222,11 +223,18 @@ function withSessionDefaults<T extends GameSession>(
   const normalizedUpdatedAt = session.updatedAt?.trim()
     || options.fallbackUpdatedAt
     || session.createdAt;
+  const normalizedPlayerAgentState = normalizePlayerAgentSessionState(
+    session.playerAgentState,
+    session.id,
+    normalizedMode,
+    session.sharedState.characterSlots.map((slot) => slot.playerId)
+  );
 
   if (
     normalizedMode === session.mode
     && normalizedSessionName === session.sessionName
     && normalizedUpdatedAt === session.updatedAt
+    && normalizedPlayerAgentState === session.playerAgentState
   ) {
     return session;
   }
@@ -236,6 +244,7 @@ function withSessionDefaults<T extends GameSession>(
     mode: normalizedMode,
     sessionName: normalizedSessionName,
     updatedAt: normalizedUpdatedAt,
+    playerAgentState: normalizedPlayerAgentState,
   };
 }
 

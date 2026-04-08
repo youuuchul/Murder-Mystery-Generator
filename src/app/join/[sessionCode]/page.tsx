@@ -3,14 +3,19 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
+import type { JoinSessionPreview } from "@/lib/session-sanitizer";
 import type { GamePackage } from "@/types/game";
-import type { GameSession } from "@/types/session";
 
 interface ResumeSessionResponse {
   gameId: string;
   playerState: {
     playerId: string;
   };
+}
+
+interface JoinLookupResponse {
+  session: JoinSessionPreview;
+  game: GamePackage;
 }
 
 interface JoinActionResponse {
@@ -24,7 +29,7 @@ export default function JoinPage() {
   const { sessionCode } = useParams() as { sessionCode: string };
   const router = useRouter();
 
-  const [session, setSession] = useState<GameSession | null>(null);
+  const [session, setSession] = useState<JoinSessionPreview | null>(null);
   const [game, setGame] = useState<GamePackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,7 +50,7 @@ export default function JoinPage() {
         setLoading(false);
         return;
       }
-      const data = await res.json();
+      const data = await res.json() as JoinLookupResponse;
       setSession(data.session);
       setGame(data.game);
 

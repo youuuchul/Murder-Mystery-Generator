@@ -1,5 +1,6 @@
 import type { GamePackage } from "@/types/game";
 import type { CharacterSlot, GameSession, SessionMode } from "@/types/session";
+import { createInitialPlayerAgentSessionState } from "@/lib/ai/player-agent/core/player-agent-state";
 
 const SESSION_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -28,6 +29,7 @@ export function buildInitialSession(
   hostUserId?: string,
   sessionMode: SessionMode = "gm"
 ): GameSession {
+  const nextSessionId = sessionId;
   const slots: CharacterSlot[] = game.players.map((player) => ({
     playerId: player.id,
     playerName: null,
@@ -36,7 +38,7 @@ export function buildInitialSession(
   }));
 
   return {
-    id: sessionId,
+    id: nextSessionId,
     gameId: game.id,
     sessionName,
     sessionCode,
@@ -64,5 +66,10 @@ export function buildInitialSession(
     },
     playerStates: [],
     votes: {},
+    playerAgentState: createInitialPlayerAgentSessionState(
+      nextSessionId,
+      sessionMode,
+      slots.map((slot) => slot.playerId)
+    ),
   };
 }

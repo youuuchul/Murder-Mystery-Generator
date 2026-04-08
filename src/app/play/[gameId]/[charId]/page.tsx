@@ -1170,8 +1170,10 @@ function LeaveSessionConfirmModal({
  */
 function SharedBoardPanel({
   content,
+  accessPanel,
 }: {
   content: PlayerSharedBoardContent;
+  accessPanel?: ReactNode;
 }) {
   const videoSource = resolveVideoSource(content.videoUrl);
   const hasMedia = Boolean(content.imageUrl || videoSource || content.backgroundMusic?.trim());
@@ -1189,6 +1191,8 @@ function SharedBoardPanel({
           </span>
         </div>
       </div>
+
+      {accessPanel}
 
       {content.narrationBlocks.map((block) => (
         <div key={block.label} className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
@@ -1690,13 +1694,29 @@ export default function PlayerView() {
 
         {tab === "shared" && sessionMode === "player-consensus" && sharedBoard && (
           <div className="space-y-4">
-            <SharedBoardPanel content={sharedBoard} />
+            <SharedBoardPanel
+              content={sharedBoard}
+              accessPanel={sessionCode ? (
+                <PlayerJoinAccessPanel
+                  sessionName={sessionName || "현재 방"}
+                  sessionCode={sessionCode}
+                  isLobby={false}
+                />
+              ) : null}
+            />
             <PlayerRoomRosterPanel slots={sharedState.characterSlots} />
           </div>
         )}
 
         {tab === "shared" && sessionMode === "player-consensus" && !sharedBoard && (
           <div className="space-y-4">
+            {sessionCode ? (
+              <PlayerJoinAccessPanel
+                sessionName={sessionName || "현재 방"}
+                sessionCode={sessionCode}
+                isLobby={false}
+              />
+            ) : null}
             <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
               현재 단계에서 볼 공통 화면이 없습니다.
             </div>
@@ -2091,14 +2111,6 @@ export default function PlayerView() {
             requested={hasRequestedAdvance}
             submitting={phaseRequestSubmitting}
             onToggle={handlePhaseAdvanceToggle}
-          />
-        )}
-
-        {phase !== "lobby" && sessionCode && (
-          <PlayerJoinAccessPanel
-            sessionName={sessionName || "현재 방"}
-            sessionCode={sessionCode}
-            isLobby={false}
           />
         )}
       </div>

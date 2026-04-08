@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
+import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import {
   ENDING_STAGE_LABELS,
   normalizeEndingStage,
@@ -1124,7 +1125,9 @@ function PlayerRoomRosterPanel({
                   {slot.isAiControlled ? "AI 플레이어" : (slot.playerName || "이름 없음")}
                 </p>
                 <p className="mt-1 text-xs text-dark-500">
-                  {slot.isAiControlled ? "자동 참여" : slot.playerId}
+                  {slot.isAiControlled
+                    ? `자동 참여 · ${getPlayerAgentRuntimeStatusLabel(slot.aiRuntimeStatus)}`
+                    : slot.playerId}
                 </p>
               </div>
               <span

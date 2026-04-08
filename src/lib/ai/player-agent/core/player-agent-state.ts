@@ -1,5 +1,6 @@
 import type {
   CharacterSlot,
+  GameSession,
   PlayerAgentRuntimeStatus,
   PlayerAgentSessionState,
   PlayerAgentSlotState,
@@ -122,6 +123,71 @@ export function enablePlayerAgentSlotsForMissingPlayers(
   };
 }
 
+const AI_RUNTIME_STATUS_LABELS: Record<PlayerAgentRuntimeStatus, string> = {
+  idle: "대기",
+  thinking: "추론 중",
+  responding: "응답 중",
+  acting: "행동 중",
+  cooldown: "정리 중",
+};
+
+/**
+ * AI 슬롯 상태값을 사용자 화면에 표시할 짧은 라벨로 변환한다.
+ */
+export function getPlayerAgentRuntimeStatusLabel(status?: PlayerAgentRuntimeStatus): string {
+  return AI_RUNTIME_STATUS_LABELS[status ?? "idle"];
+}
+
+/**
+ * 현재 세션 페이즈를 기준으로 AI 슬롯 런타임 상태를 동기화한다.
+ * 아직 실제 LLM 행동 루프는 없으므로 단계별 상태만 먼저 고정한다.
+ */
+export function syncPlayerAgentRuntimeStatusForSharedPhase(
+  state: PlayerAgentSessionState,
+  sharedState: Pick<GameSession["sharedState"], "phase" | "currentSubPhase">
+): PlayerAgentSessionState {
+  function resolveRuntimeStatus(): PlayerAgentRuntimeStatus {
+    if (sharedState.phase.startsWith("round-")) {
+      return sharedState.currentSubPhase === "discussion"
+        ? "responding"
+        : "thinking";
+    }
+
+    if (sharedState.phase === "vote") {
+      return "acting";
+    }
+
+    if (sharedState.phase === "ending") {
+      return "cooldown";
+    }
+
+    return "idle";
+  }
+
+  const nextStatus = resolveRuntimeStatus();
+  let changed = false;
+  const nextSlots = state.slots.map((slot) => {
+    if (!slot.enabled || slot.runtimeStatus === nextStatus) {
+      return slot;
+    }
+
+    changed = true;
+    return {
+      ...slot,
+      runtimeStatus: nextStatus,
+    };
+  });
+
+  if (!changed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    slots: nextSlots,
+  };
+}
+
 /**
  * AI 슬롯 활성화 상태를 공개 세션 슬롯 정보에 반영한다.
  * 사람이 점유한 슬롯은 유지하고, AI가 맡은 자리는 참가 목록과 조인 화면에서 보이게 맞춘다.
@@ -130,10 +196,10 @@ export function applyPlayerAgentOccupancyToCharacterSlots(
   slots: CharacterSlot[],
   state: PlayerAgentSessionState
 ): CharacterSlot[] {
-  const aiEnabledPlayerIds = new Set(
+  const aiSlotStateByPlayerId = new Map(
     state.slots
       .filter((slot) => slot.enabled)
-      .map((slot) => slot.playerId)
+      .map((slot) => [slot.playerId, slot])
   );
 
   return slots.map((slot) => {
@@ -141,26 +207,30 @@ export function applyPlayerAgentOccupancyToCharacterSlots(
       return {
         ...slot,
         isAiControlled: false,
+        aiRuntimeStatus: undefined,
       };
     }
 
-    if (aiEnabledPlayerIds.has(slot.playerId)) {
+    const aiSlotState = aiSlotStateByPlayerId.get(slot.playerId);
+    if (aiSlotState) {
       return {
         ...slot,
         playerName: "AI 플레이어",
         token: null,
         isLocked: true,
         isAiControlled: true,
+        aiRuntimeStatus: aiSlotState.runtimeStatus,
       };
     }
 
-    if (slot.isAiControlled) {
+    if (slot.isAiControlled || slot.aiRuntimeStatus) {
       return {
         ...slot,
         playerName: null,
         token: null,
         isLocked: false,
         isAiControlled: false,
+        aiRuntimeStatus: undefined,
       };
     }
 

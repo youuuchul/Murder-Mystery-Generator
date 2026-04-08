@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  applyPlayerAgentOccupancyToCharacterSlots,
+  syncPlayerAgentRuntimeStatusForSharedPhase,
+} from "@/lib/ai/player-agent/core/player-agent-state";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
@@ -151,6 +155,16 @@ async function revealVotes(
       latestSession.sharedState.phase = "ending";
       latestSession.sharedState.endingStage = "branch";
       markPhaseStarted(latestSession.sharedState, now);
+      if (latestSession.playerAgentState) {
+        latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+          latestSession.playerAgentState,
+          latestSession.sharedState
+        );
+        latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+          latestSession.sharedState.characterSlots,
+          latestSession.playerAgentState
+        );
+      }
 
       latestSession.sharedState.eventLog.push({
         id: crypto.randomUUID(),

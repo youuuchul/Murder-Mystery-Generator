@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
+  syncPlayerAgentRuntimeStatusForSharedPhase,
 } from "@/lib/ai/player-agent/core/player-agent-state";
 import { getGame } from "@/lib/game-repository";
 import {
@@ -92,13 +93,19 @@ export async function POST(req: Request, { params }: Params) {
                 missingPlayerCount: Math.max(0, latestSession.sharedState.characterSlots.length - joinedPlayerIds.length),
               }
             );
+          }
+
+          applySessionAdvanceStep(latestSession, game);
+          if (latestSession.playerAgentState) {
+            latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+              latestSession.playerAgentState,
+              latestSession.sharedState
+            );
             latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
               latestSession.sharedState.characterSlots,
               latestSession.playerAgentState
             );
           }
-
-          applySessionAdvanceStep(latestSession, game);
           return {
             advanced: true,
             requested: false,

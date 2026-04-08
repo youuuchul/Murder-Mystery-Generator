@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
+import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import type { JoinSessionPreview } from "@/lib/session-sanitizer";
 import type { GamePackage } from "@/types/game";
 
@@ -195,7 +196,9 @@ export default function JoinPage() {
                       </div>
                     </div>
                     {aiTaken ? (
-                      <span className="text-xs text-sky-300 shrink-0">AI 참여</span>
+                      <span className="text-xs text-sky-300 shrink-0">
+                        AI {getPlayerAgentRuntimeStatusLabel(slot.aiRuntimeStatus)}
+                      </span>
                     ) : taken ? (
                       <span className="text-xs text-amber-400 shrink-0">복귀 가능</span>
                     ) : selected ? (

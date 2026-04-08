@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { GuidePolicySection } from "../_components/GuidePolicySection";
+
 /**
  * 제작자용 빠른 사용 가이드.
  */
@@ -10,8 +12,8 @@ export default function CreateGuidePage() {
         <p className="text-sm uppercase tracking-[0.3em] text-mystery-300/70">Maker Guide</p>
         <h2 className="mt-4 text-3xl font-semibold text-dark-50 sm:text-4xl">게임 만들기</h2>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-dark-300 sm:text-base">
-          라이브러리에서 새 게임을 만들고, 단계별로 저장하면서 시나리오를 완성하는 흐름입니다.
-          지금 버전은 로컬 서버에 저장되며, 같은 서버에 접속한 다른 제작자와 테스트할 수 있습니다.
+          새 게임을 만들고, 단계별로 내용을 채워 공개 전까지 다듬는 흐름입니다.
+          작업 중인 게임은 저장 후 다시 열어 이어서 편집할 수 있습니다.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -34,10 +36,10 @@ export default function CreateGuidePage() {
           <p className="text-xs uppercase tracking-[0.24em] text-mystery-300/70">01</p>
           <h3 className="mt-3 text-xl font-semibold text-dark-50">기본 제작 흐름</h3>
           <ol className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
-            <li>1. `내 게임 관리`에서 `+ 새 게임 만들기`를 눌러 기본 정보를 만든다.</li>
-            <li>2. 편집 화면에서 Step 1~6을 순서대로 채운다.</li>
-            <li>3. 각 단계의 내용은 하단 저장 바에서 저장 상태를 확인한다.</li>
-            <li>4. 이후에는 관리 카드의 `편집` 버튼으로 다시 들어와 이어서 작업한다.</li>
+            <li>1. `내 게임 관리`에서 `+ 새 게임 만들기`를 눌러 기본 정보를 만듭니다.</li>
+            <li>2. 편집 화면에서 Step 1~6을 순서대로 채워 시나리오를 완성합니다.</li>
+            <li>3. 각 단계에서 저장 상태를 확인하며 필요한 부분을 다시 다듬습니다.</li>
+            <li>4. 완성 전에는 비공개로 점검하고, 준비가 되면 공개로 전환합니다.</li>
           </ol>
         </article>
 
@@ -45,9 +47,9 @@ export default function CreateGuidePage() {
           <p className="text-xs uppercase tracking-[0.24em] text-mystery-300/70">02</p>
           <h3 className="mt-3 text-xl font-semibold text-dark-50">저장과 다시 편집</h3>
           <div className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
-            <p>저장은 현재 네 로컬 서버의 `data/` 폴더에 기록됩니다.</p>
-            <p>브라우저를 닫아도 서버가 살아 있으면 라이브러리에서 다시 열어 수정할 수 있습니다.</p>
-            <p>같은 게임을 여러 명이 동시에 만지면 마지막 저장 내용이 덮일 수 있으니, 테스트 중에는 담당 게임을 나눠서 작업하는 편이 안전합니다.</p>
+            <p>브라우저를 닫아도 저장된 게임은 `내 게임 관리`에서 다시 열어 이어서 작업할 수 있습니다.</p>
+            <p>공개 전에는 직접 플레이해보면서 인원 수, 카드, 엔딩 분기, 공통화면 노출을 함께 점검하는 편이 안전합니다.</p>
+            <p>중요한 시나리오는 별도로 백업해두는 것을 권장합니다.</p>
           </div>
         </article>
 
@@ -56,8 +58,8 @@ export default function CreateGuidePage() {
           <h3 className="mt-3 text-xl font-semibold text-dark-50">AI 제작도우미 활용</h3>
           <div className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
             <p>우하단 `제작도우미`에서 `자동 / 가이드 / 문안` 모드로 질문할 수 있습니다.</p>
-            <p>`가이드`는 구조 조언과 점검용, `문안`은 실제 입력칸에 붙일 초안용으로 생각하면 됩니다.</p>
-            <p>스토리 계열 입력은 산문형, 설명 계열 입력은 안내문형으로 답하도록 조정돼 있습니다.</p>
+            <p>`가이드`는 구조 점검과 다음 작업 정리에, `문안`은 실제 입력 초안이 필요할 때 쓰면 편합니다.</p>
+            <p>답변은 참고용이니, 공개 전에는 시나리오 맥락과 톤을 한 번 더 직접 확인해주세요.</p>
           </div>
         </article>
 
@@ -65,21 +67,14 @@ export default function CreateGuidePage() {
           <p className="text-xs uppercase tracking-[0.24em] text-mystery-300/70">04</p>
           <h3 className="mt-3 text-xl font-semibold text-dark-50">외부 제작 테스트</h3>
           <div className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
-            <p>공개 플레이 테스트는 `/library` 주소를, 제작자 테스트는 `/library/manage` 주소를 공유하면 됩니다.</p>
-            <p>`MAKER_ACCESS_PASSWORD`를 설정하면 제작/관리 경로에만 비밀번호 게이트가 걸립니다.</p>
-            <p>메이커 전체 공통 비밀번호와 작업자 세션을 함께 써서 편집 권한을 구분합니다.</p>
+            <p>플레이 테스트는 공개 라이브러리에서 실제 참가 흐름까지 같이 확인하는 편이 좋습니다.</p>
+            <p>운영 중인 방과 테스트용 방이 섞이지 않도록 방 제목을 분명하게 적어두세요.</p>
+            <p>관리자 계정은 운영 점검용으로만 쓰고, 실제 제작은 작업자 계정 기준으로 진행하는 편이 안전합니다.</p>
           </div>
         </article>
       </section>
 
-      <section className="rounded-[24px] border border-amber-900/70 bg-amber-950/20 p-6">
-        <p className="text-xs uppercase tracking-[0.24em] text-amber-300/80">현재 상태</p>
-        <h3 className="mt-3 text-xl font-semibold text-dark-50">공개/비공개, 게임별 비밀번호</h3>
-        <p className="mt-4 text-sm leading-relaxed text-dark-300">
-          지금은 `공개 라이브러리`와 `내 게임 관리`가 분리돼 있고,
-          공개 상태 전환은 관리 화면에서 조정할 수 있습니다. 다만 협업자 초대나 게임별 비밀번호 같은 세부 권한 모델은 아직 구현 전입니다.
-        </p>
-      </section>
+      <GuidePolicySection />
     </div>
   );
 }

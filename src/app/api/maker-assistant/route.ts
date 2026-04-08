@@ -15,6 +15,7 @@ import {
   getOpenAIClient,
   isMakerAssistantEnabled,
 } from "@/lib/ai/openai";
+import { startLangfuseTracing } from "@/lib/ai/langfuse";
 import { buildMakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import { resolveMakerAssistantResponseMode } from "@/lib/ai/maker-assistant-response-mode";
 import {
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await startLangfuseTracing();
 
     const context = buildMakerAssistantContext(payload.game, payload.task, payload.currentStep);
     const responseMode = resolveMakerAssistantResponseMode({

@@ -389,6 +389,12 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                   ? game.story
                   : { ...game.story, culpritPlayerId: "" },
               })}
+              onChangeTimeline={(timeline) => updateGame({
+                story: {
+                  ...game.story,
+                  timeline,
+                },
+              })}
               onChangeCulprit={(culpritPlayerId) => updateGame({
                 story: {
                   ...game.story,

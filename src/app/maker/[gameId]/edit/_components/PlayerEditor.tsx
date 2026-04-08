@@ -13,6 +13,7 @@ import type {
   RelatedClueRef,
   Relationship,
   StoryTimeline,
+  TimelineSlot,
 } from "@/types/game";
 
 interface PlayerEditorProps {
@@ -23,6 +24,7 @@ interface PlayerEditorProps {
   story: Story;
   timeline: StoryTimeline;
   onChange: (players: Player[]) => void;
+  onChangeTimeline: (timeline: StoryTimeline) => void;
   onChangeCulprit: (playerId: string) => void;
   focusTarget?: string | null;
   focusToken?: number;
@@ -57,6 +59,39 @@ function createPlayer(): Player {
     timelineEntries: [],
     relatedClues: [],
     relationships: [],
+  };
+}
+
+/** 플레이어 탭에서 새 시간대 슬롯을 만들 때 쓰는 기본값이다. */
+function createTimelineSlot(label = ""): TimelineSlot {
+  return {
+    id: crypto.randomUUID(),
+    label,
+  };
+}
+
+/**
+ * select value 형태의 `targetType:targetId` 문자열을 관계 데이터 구조로 풀어낸다.
+ * 관계 추가 버튼과 드롭다운 변경이 같은 기준을 쓰도록 공용화한다.
+ */
+function parseRelationTargetValue(value?: string): Pick<Relationship, "targetType" | "targetId" | "playerId"> {
+  if (!value) {
+    return {
+      targetType: "player",
+      targetId: "",
+      playerId: "",
+    };
+  }
+
+  const [targetTypeRaw, targetId = ""] = value.split(":");
+  const targetType = targetTypeRaw === "victim" || targetTypeRaw === "npc"
+    ? targetTypeRaw
+    : "player";
+
+  return {
+    targetType,
+    targetId,
+    playerId: targetType === "player" ? targetId : undefined,
   };
 }
 
@@ -180,6 +215,111 @@ function TimelineMatrixEditor({
   );
 }
 
+/**
+ * 플레이어 행동 입력과 같은 문맥에서 시간대 슬롯도 바로 다루도록 돕는 관리 패널이다.
+ * 슬롯 순서를 바꾸면 아래 행동 입력 순서도 같은 기준으로 따라간다.
+ */
+function TimelineSlotManager({
+  timeline,
+  onChange,
+}: {
+  timeline: StoryTimeline;
+  onChange: (timeline: StoryTimeline) => void;
+}) {
+  function updateSlots(slots: TimelineSlot[]) {
+    onChange({ ...timeline, slots });
+  }
+
+  function updateSlotLabel(slotId: string, label: string) {
+    updateSlots(timeline.slots.map((slot) => (
+      slot.id === slotId ? { ...slot, label } : slot
+    )));
+  }
+
+  function moveSlot(slotId: string, direction: -1 | 1) {
+    const currentIndex = timeline.slots.findIndex((slot) => slot.id === slotId);
+    const nextIndex = currentIndex + direction;
+
+    if (currentIndex === -1 || nextIndex < 0 || nextIndex >= timeline.slots.length) {
+      return;
+    }
+
+    const nextSlots = [...timeline.slots];
+    const [targetSlot] = nextSlots.splice(currentIndex, 1);
+    nextSlots.splice(nextIndex, 0, targetSlot);
+    updateSlots(nextSlots);
+  }
+
+  return (
+    <div className="rounded-xl border border-dark-700 bg-dark-900/50 p-4 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-dark-100">시간대 슬롯 관리</p>
+          <p className="mt-1 text-xs text-dark-500">
+            추가, 삭제, 순서 변경을 여기서 바로 처리합니다. 순서를 바꾸면 아래 행동 입력 순서도 같이 바뀝니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => updateSlots([...timeline.slots, createTimelineSlot()])}
+          className="shrink-0 text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+        >
+          + 시간대 슬롯 추가
+        </button>
+      </div>
+
+      {timeline.slots.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
+          <p className="text-xs text-dark-600">아직 정의된 시간대 슬롯이 없습니다. 첫 슬롯을 추가하세요.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {timeline.slots.map((slot, index) => (
+            <div key={slot.id} className="rounded-xl border border-dark-700/70 bg-dark-950/40 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-dark-300">슬롯 {index + 1}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveSlot(slot.id, -1)}
+                    disabled={index === 0}
+                    className="rounded-lg border border-dark-700 px-2 py-1 text-[11px] text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100 disabled:opacity-30"
+                  >
+                    위로
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveSlot(slot.id, 1)}
+                    disabled={index === timeline.slots.length - 1}
+                    className="rounded-lg border border-dark-700 px-2 py-1 text-[11px] text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100 disabled:opacity-30"
+                  >
+                    아래로
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateSlots(timeline.slots.filter((item) => item.id !== slot.id))}
+                    className="text-xs text-dark-500 hover:text-red-400 transition-colors"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={slot.label}
+                onChange={(event) => updateSlotLabel(slot.id, event.target.value)}
+                placeholder="예: 20:00 ~ 20:30"
+                className={inp}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlayerForm({
   gameId,
   player,
@@ -252,9 +392,13 @@ function PlayerForm({
 
   /** 관계 1개를 현재 캐릭터 카드에 추가한다. */
   function addRelationship() {
+    const defaultTarget = filteredRelationTargets[0]?.value;
     update("relationships", [
       ...player.relationships,
-      { targetType: "player", targetId: "", playerId: "", description: "" },
+      {
+        ...parseRelationTargetValue(defaultTarget),
+        description: "",
+      },
     ]);
   }
 
@@ -516,47 +660,55 @@ function PlayerForm({
 
           {tab === "rel" && (
             <div className="space-y-2">
-              {player.relationships.map((rel, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <select
-                    value={
-                      rel.targetType && rel.targetId
-                        ? `${rel.targetType}:${rel.targetId}`
-                        : rel.playerId
-                          ? `player:${rel.playerId}`
-                          : ""
-                    }
-                    onChange={(e) => {
-                      const [targetType, targetId] = e.target.value.split(":");
-                      updateRel(idx, {
-                        targetType: (targetType as Relationship["targetType"]) || "player",
-                        targetId: targetId ?? "",
-                        playerId: targetType === "player" ? targetId ?? "" : undefined,
-                      });
-                    }}
-                    className="w-44 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
-                  >
-                    <option value="">대상 선택</option>
-                    {filteredRelationTargets.map((target) => (
-                      <option key={target.value} value={target.value}>{target.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={rel.description}
-                    onChange={(e) => updateRel(idx, { description: e.target.value })}
-                    placeholder="관계 설명"
-                    className="flex-1 bg-dark-800 border border-dark-600 rounded px-2 py-1.5 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-1 focus:ring-mystery-500 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => update("relationships", player.relationships.filter((_, i) => i !== idx))}
-                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors"
-                  >
-                    삭제
-                  </button>
+              <p className="text-xs text-dark-500">
+                피해자, 다른 캐릭터, NPC와의 관계를 적습니다. 새로 추가한 항목이 바로 보이도록 카드 형태로 표시합니다.
+              </p>
+              {player.relationships.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
+                  <p className="text-xs text-dark-600">등록된 관계가 없습니다. 아래 버튼으로 첫 관계를 추가하세요.</p>
                 </div>
-              ))}
+              ) : (
+                player.relationships.map((rel, idx) => (
+                  <div key={idx} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium text-dark-300">관계 {idx + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => update("relationships", player.relationships.filter((_, i) => i !== idx))}
+                        className="text-xs text-dark-500 hover:text-red-400 transition-colors"
+                      >
+                        삭제
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
+                      <select
+                        value={
+                          rel.targetType && rel.targetId
+                            ? `${rel.targetType}:${rel.targetId}`
+                            : rel.playerId
+                              ? `player:${rel.playerId}`
+                              : ""
+                        }
+                        onChange={(e) => updateRel(idx, parseRelationTargetValue(e.target.value))}
+                        className="w-full bg-dark-700 border border-dark-600 rounded px-2 py-2 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
+                      >
+                        <option value="">대상 선택</option>
+                        {filteredRelationTargets.map((target) => (
+                          <option key={target.value} value={target.value}>{target.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={rel.description}
+                        onChange={(e) => updateRel(idx, { description: e.target.value })}
+                        placeholder="예: 오래된 동업자였지만 최근 크게 다퉜다."
+                        className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-1 focus:ring-mystery-500 transition"
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
               <button
                 type="button"
                 onClick={addRelationship}
@@ -580,6 +732,7 @@ export default function PlayerEditor({
   story,
   timeline,
   onChange,
+  onChangeTimeline,
   onChangeCulprit,
   focusTarget,
   focusToken,
@@ -692,7 +845,11 @@ export default function PlayerEditor({
       </div>
 
       {view === "timeline" && timeline.enabled ? (
-        <div data-maker-anchor="step-3-timeline">
+        <div data-maker-anchor="step-3-timeline" className="space-y-4">
+          <TimelineSlotManager
+            timeline={timeline}
+            onChange={onChangeTimeline}
+          />
           <TimelineMatrixEditor
             players={syncedPlayers}
             timeline={timeline}

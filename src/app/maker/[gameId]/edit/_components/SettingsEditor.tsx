@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { canUsePrivateChat, normalizePrivateChatConfig } from "@/lib/game-rules";
 import ImageAssetField from "./ImageAssetField";
 import type { GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
@@ -45,16 +46,27 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   const [tagInput, setTagInput] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
 
-  const privateChat = rules?.privateChat ?? {
-    enabled: true,
-    maxGroupSize: Math.min(3, settings.playerCount - 1),
-    durationMinutes: 5,
-  };
+  const privateChat = normalizePrivateChatConfig(settings.playerCount, rules?.privateChat);
   const cardTradingEnabled = rules?.cardTrading?.enabled ?? true;
+  const canConfigurePrivateChat = canUsePrivateChat(settings.playerCount);
 
   function updateSettings<K extends keyof GameSettings>(key: K, value: GameSettings[K]) {
     if (key === "playerCount") {
       setShowPlayerCountWarning(true);
+      const nextPlayerCount = value as number;
+      onChange({
+        settings: { ...settings, [key]: value },
+        rules: {
+          ...rules,
+          phases: rules.phases.map((phase) => (
+            phase.type === "discussion" && nextPlayerCount <= 1
+              ? { ...phase, durationMinutes: 0 }
+              : phase
+          )),
+          privateChat: normalizePrivateChatConfig(nextPlayerCount, privateChat),
+        },
+      });
+      return;
     }
     onChange({ settings: { ...settings, [key]: value } });
   }
@@ -70,7 +82,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   }
 
   function updatePrivateChat(partial: Partial<GameRules["privateChat"]>) {
-    updateRules({ privateChat: { ...privateChat, ...partial } });
+    updateRules({ privateChat: normalizePrivateChatConfig(settings.playerCount, { ...privateChat, ...partial }) });
   }
 
   function addTag(raw: string) {
@@ -118,6 +130,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   const roundTotalMin = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
   const totalMin = rules.openingDurationMinutes + roundTotalMin * rules.roundCount;
   const playerCountMismatch = characterCount > 0 && characterCount !== settings.playerCount;
+
+  function formatDuration(minutes: number): string {
+    return minutes === 0 ? "없음" : `${minutes}분`;
+  }
 
   return (
     <div className="space-y-10">
@@ -304,7 +320,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => updateSettings("playerCount", Math.max(4, settings.playerCount - 1))}
+              onClick={() => updateSettings("playerCount", Math.max(1, settings.playerCount - 1))}
               className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors"
             >
               −
@@ -321,7 +337,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               +
             </button>
           </div>
-          <p className="text-xs text-dark-500 text-center mt-2">4 ~ 8명 (피해자 제외)</p>
+          <p className="text-xs text-dark-500 text-center mt-2">1 ~ 8명 (피해자 제외)</p>
 
           {characterCount > 0 && (
             <div
@@ -426,7 +442,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               {rules.phases.map((phase) => (
                 <div key={phase.type} className="flex justify-between">
                   <span>{phase.label}</span>
-                  <span className="text-dark-300">{phase.durationMinutes}분</span>
+                  <span className="text-dark-300">{formatDuration(phase.durationMinutes)}</span>
                 </div>
               ))}
               <div className="flex justify-between">
@@ -471,17 +487,20 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                 <span className="text-sm font-medium text-dark-200 w-20">{PHASE_LABELS[phase.type]}</span>
                 <input
                   type="range"
-                  min={3}
+                  min={phase.type === "discussion" ? 0 : 3}
                   max={60}
                   step={1}
                   value={phase.durationMinutes}
                   onChange={(e) => updatePhase(idx, { durationMinutes: Number(e.target.value) })}
                   className="flex-1 accent-mystery-500"
                 />
-                <span className="text-dark-300 text-sm w-12 text-right">{phase.durationMinutes}분</span>
+                <span className="text-dark-300 text-sm w-12 text-right">{formatDuration(phase.durationMinutes)}</span>
               </div>
             ))}
           </div>
+          <p className="mt-2 text-xs text-dark-500">
+            토론을 0분으로 두면 조사 후 바로 다음 라운드 또는 투표로 넘어갑니다.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -493,19 +512,28 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               </div>
               <button
                 type="button"
-                onClick={() => updatePrivateChat({ enabled: !privateChat.enabled })}
-                className={["relative w-11 h-6 rounded-full transition-colors", privateChat.enabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
+                onClick={() => canConfigurePrivateChat && updatePrivateChat({ enabled: !privateChat.enabled })}
+                disabled={!canConfigurePrivateChat}
+                className={[
+                  "relative w-11 h-6 rounded-full transition-colors",
+                  privateChat.enabled && canConfigurePrivateChat ? "bg-mystery-600" : "bg-dark-600",
+                  !canConfigurePrivateChat ? "cursor-not-allowed opacity-60" : "",
+                ].join(" ")}
               >
                 <span
                   className={[
                     "absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
-                    privateChat.enabled ? "translate-x-6" : "translate-x-1",
+                    privateChat.enabled && canConfigurePrivateChat ? "translate-x-6" : "translate-x-1",
                   ].join(" ")}
                 />
               </button>
             </div>
 
-            {privateChat.enabled && (
+            {!canConfigurePrivateChat ? (
+              <p className="rounded-lg border border-dark-700 bg-dark-900/40 px-3 py-2 text-xs text-dark-500">
+                밀담은 플레이어 3명 이상일 때만 사용할 수 있습니다.
+              </p>
+            ) : privateChat.enabled && (
               <div className="space-y-3 pt-1 border-t border-dark-700">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-dark-400">최대 인원</span>
@@ -520,7 +548,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                     <span className="text-dark-100 font-medium w-8 text-center">{privateChat.maxGroupSize}인</span>
                     <button
                       type="button"
-                      onClick={() => updatePrivateChat({ maxGroupSize: Math.min(settings.playerCount - 1, privateChat.maxGroupSize + 1) })}
+                      onClick={() => updatePrivateChat({ maxGroupSize: Math.min(Math.max(2, settings.playerCount - 1), privateChat.maxGroupSize + 1) })}
                       className="w-7 h-7 rounded border border-dark-600 bg-dark-700 text-dark-200 hover:bg-dark-600 flex items-center justify-center text-sm font-bold transition-colors"
                     >
                       +

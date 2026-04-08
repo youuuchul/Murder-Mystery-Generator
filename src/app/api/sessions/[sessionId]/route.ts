@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
+  syncPlayerAgentRuntimeStatusForSharedPhase,
 } from "@/lib/ai/player-agent/core/player-agent-state";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
@@ -11,7 +12,14 @@ import { buildPlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { clearPhaseAdvanceRequests, markPhaseStarted } from "@/lib/session-phase";
+import {
+  clearPhaseAdvanceRequests,
+  getCurrentRoundSubPhase,
+  getEnabledRoundSubPhases,
+  getNextRoundSubPhase,
+  getRoundSubPhaseLabel,
+  markPhaseStarted,
+} from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
   deleteSession,
@@ -192,10 +200,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                   missingPlayerCount: Math.max(0, sharedState.characterSlots.length - lockedPlayerCount),
                 }
               );
-              sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
-                sharedState.characterSlots,
-                latestSession.playerAgentState
-              );
             }
 
             newPhase = "opening";
@@ -205,12 +209,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           } else if (sharedState.phase === "opening") {
             newPhase = "round-1";
             sharedState.currentRound = 1;
-            sharedState.currentSubPhase = "investigation";
-            message = "Round 1 조사 페이즈가 시작됩니다.";
+            sharedState.currentSubPhase = getCurrentRoundSubPhase(game?.rules);
+            message = `Round 1 ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`;
             markPhaseStarted(sharedState, now);
           } else if (sharedState.phase.startsWith("round-")) {
             const cur = sharedState.currentRound;
-            if (cur >= maxRound) {
+            const nextSubPhase = getNextRoundSubPhase(game?.rules, sharedState.currentSubPhase);
+
+            if (nextSubPhase) {
+              sharedState.currentSubPhase = nextSubPhase;
+              message = `${getRoundSubPhaseLabel(nextSubPhase)} 페이즈가 시작됩니다.`;
+            } else if (cur >= maxRound) {
               newPhase = "vote";
               sharedState.currentSubPhase = undefined;
               message = "투표 페이즈가 시작됩니다.";
@@ -218,8 +227,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             } else {
               newPhase = `round-${cur + 1}` as GamePhase;
               sharedState.currentRound = cur + 1;
-              sharedState.currentSubPhase = "investigation";
-              message = `Round ${cur + 1} 조사 페이즈가 시작됩니다.`;
+              sharedState.currentSubPhase = getCurrentRoundSubPhase(game?.rules);
+              message = `Round ${cur + 1} ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`;
               markPhaseStarted(sharedState, now);
             }
           } else if (sharedState.phase === "vote") {
@@ -229,10 +238,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           clearPhaseAdvanceRequests(sharedState);
         } else if (body.action === "set_subphase") {
           const sub = normalizeSubPhase(body.subPhase);
-          if (sub && sharedState.phase.startsWith("round-")) {
+          const enabledSubPhases = getEnabledRoundSubPhases(game?.rules);
+          if (sub && enabledSubPhases.includes(sub) && sharedState.phase.startsWith("round-")) {
             sharedState.currentSubPhase = sub;
-            const labels: Record<string, string> = { investigation: "조사", discussion: "토론" };
-            message = `${labels[sub]} 페이즈가 시작됩니다.`;
+            message = `${getRoundSubPhaseLabel(sub)} 페이즈가 시작됩니다.`;
             clearPhaseAdvanceRequests(sharedState);
           }
         } else if (body.action === "advance_ending_stage") {
@@ -281,6 +290,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           slot.token = null;
           slot.isLocked = false;
           slot.isAiControlled = false;
+          slot.aiRuntimeStatus = undefined;
 
           if (latestSession.playerAgentState) {
             latestSession.playerAgentState = {
@@ -319,6 +329,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
 
         sharedState.phase = newPhase;
+        if (
+          latestSession.playerAgentState
+          && (
+            body.action === "advance_phase"
+            || body.action === "set_subphase"
+            || body.action === "advance_ending_stage"
+            || body.action === "unlock_slot"
+          )
+        ) {
+          latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+            latestSession.playerAgentState,
+            sharedState
+          );
+          sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+            sharedState.characterSlots,
+            latestSession.playerAgentState
+          );
+        }
+
         if (message) {
           sharedState.eventLog.push({
             id: crypto.randomUUID(),

@@ -11,7 +11,6 @@ import type {
   GameRules,
   GameSettings,
   Location,
-  PhaseConfig,
   Player,
   PlayerTimelineEntry,
   Relationship,
@@ -24,6 +23,7 @@ import type {
   TimelineEvent,
   TimelineSlot,
 } from "@/types/game";
+import { buildDefaultPhases, normalizePrivateChatConfig } from "@/lib/game-rules";
 import { getGamePublishReadiness } from "@/lib/game-publish";
 
 const LEGACY_TAG_MAP: Record<string, string> = {
@@ -430,21 +430,6 @@ function normalizeTags(settings: Partial<GameSettings> & { theme?: string; tone?
   return Array.from(new Set(normalized));
 }
 
-function defaultPhases(playerCount: number): PhaseConfig[] {
-  return [
-    {
-      type: "investigation",
-      label: "조사",
-      durationMinutes: playerCount >= 6 ? 20 : 15,
-    },
-    {
-      type: "discussion",
-      label: "토론",
-      durationMinutes: 10,
-    },
-  ];
-}
-
 function clampCoverAxis(value: unknown): number {
   if (typeof value !== "number" || Number.isFinite(value) === false) {
     return 50;
@@ -477,7 +462,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     coverImagePosition: normalizeCoverImagePosition(game.settings?.coverImagePosition),
   };
 
-  const fallbackPhases = defaultPhases(settings.playerCount);
+  const fallbackPhases = buildDefaultPhases(settings.playerCount);
   const rules: GameRules = {
     roundCount: game.rules?.roundCount ?? 4,
     openingDurationMinutes: game.rules?.openingDurationMinutes ?? 5,
@@ -485,14 +470,12 @@ export function normalizeGame(game: GamePackage): GamePackage {
       const saved = game.rules?.phases?.find((item) => item.type === phase.type);
       return {
         ...phase,
-        durationMinutes: saved?.durationMinutes ?? phase.durationMinutes,
+        durationMinutes: Number.isFinite(saved?.durationMinutes)
+          ? Number(saved?.durationMinutes)
+          : phase.durationMinutes,
       };
     }),
-    privateChat: {
-      enabled: game.rules?.privateChat?.enabled ?? true,
-      maxGroupSize: game.rules?.privateChat?.maxGroupSize ?? Math.min(3, settings.playerCount - 1),
-      durationMinutes: game.rules?.privateChat?.durationMinutes ?? 5,
-    },
+    privateChat: normalizePrivateChatConfig(settings.playerCount, game.rules?.privateChat),
     cardTrading: {
       enabled: game.rules?.cardTrading?.enabled ?? true,
     },

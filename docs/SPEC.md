@@ -17,7 +17,7 @@
 ```
 [기본 설정 입력]
   → 테마 (저택/도시/판타지 등)
-  → 플레이어 수 (4~8명)
+  → 플레이어 수 (1~8명)
   → 난이도 (쉬움/보통/어려움)
   → 분위기 (진지/코믹/공포)
 
@@ -84,7 +84,7 @@ interface GamePackage {
 }
 
 interface GameSettings {
-  playerCount: number;          // 4~8
+  playerCount: number;          // 1~8
   difficulty: "easy" | "normal" | "hard";
   theme: string;                // "gothic-mansion" | "city-noir" | ...
   tone: "serious" | "comedy" | "horror";

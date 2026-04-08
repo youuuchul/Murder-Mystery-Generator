@@ -29,7 +29,7 @@ export interface GamePackage {
 // ─── 설정 ────────────────────────────────────────────────────
 
 export interface GameSettings {
-  playerCount: number; // 4~8
+  playerCount: number; // 1~8
   difficulty: "easy" | "normal" | "hard";
   tags: string[];
   summary?: string; // 라이브러리 카드에 노출할 소개글

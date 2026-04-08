@@ -1,38 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { canReadGameSource, canViewAllGames } from "@/lib/game-access";
+import { buildDefaultGameRules } from "@/lib/game-rules";
 import { listGames, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import type { GamePackage, GameRules } from "@/types/game";
 
-/** 플레이어 수에 따른 기본 게임 규칙 생성 */
-function buildDefaultRules(playerCount: number): GameRules {
-  // 6인 이상이면 조사 페이즈를 더 길게
-  const investigationMin = playerCount >= 6 ? 20 : 15;
-  return {
-    roundCount: 4,
-    openingDurationMinutes: 5,
-    phases: [
-      { type: "investigation", label: "조사", durationMinutes: investigationMin },
-      { type: "discussion", label: "토론", durationMinutes: 10 },
-    ],
-    privateChat: {
-      enabled: true,
-      maxGroupSize: Math.min(3, playerCount - 1),
-      durationMinutes: 5,
-    },
-    cardTrading: {
-      enabled: true,
-    },
-    cluesPerRound: 2,
-    allowLocationRevisit: false,
-  };
-}
-
 const CreateGameSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(100),
   settings: z.object({
-    playerCount: z.number().int().min(4).max(8),
+    playerCount: z.number().int().min(1).max(8),
     difficulty: z.enum(["easy", "normal", "hard"]),
     tags: z.array(z.string().min(1)).min(1),
     estimatedDuration: z.number().int().min(30).max(300),
@@ -102,7 +79,7 @@ export async function POST(request: NextRequest) {
         publishedAt: undefined,
       },
       settings,
-      rules: incomingRules ?? buildDefaultRules(settings.playerCount),
+      rules: incomingRules ?? buildDefaultGameRules(settings.playerCount),
       story: {
         synopsis: "",
         victim: { name: "", background: "", imageUrl: undefined },

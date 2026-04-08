@@ -4,13 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import Button from "@/components/ui/Button";
+import {
+  buildDefaultGameRules,
+  canUsePrivateChat,
+  normalizePrivateChatConfig,
+} from "@/lib/game-rules";
 import { buildMakerAccessPath } from "@/lib/maker-user";
 import type { GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
 const SettingsSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(100, "제목은 100자 이내로 입력하세요"),
   summary: z.string().max(220, "소개글은 220자 이내로 입력하세요"),
-  playerCount: z.number().int().min(4, "최소 4명").max(8, "최대 8명"),
+  playerCount: z.number().int().min(1, "최소 1명").max(8, "최대 8명"),
   difficulty: z.enum(["easy", "normal", "hard"]),
   tags: z.array(z.string().min(1)).min(1, "태그를 1개 이상 추가하세요"),
   estimatedDuration: z.number().int().min(30, "최소 30분").max(300, "최대 300분"),
@@ -42,26 +47,6 @@ const PHASE_LABELS: Record<string, string> = {
   discussion: "토론",
 };
 
-function buildDefaultRules(playerCount: number): GameRules {
-  const investigationMin = playerCount >= 6 ? 20 : 15;
-  return {
-    roundCount: 4,
-    openingDurationMinutes: 5,
-    phases: [
-      { type: "investigation", label: "조사", durationMinutes: investigationMin },
-      { type: "discussion", label: "토론", durationMinutes: 10 },
-    ],
-    privateChat: {
-      enabled: true,
-      maxGroupSize: Math.min(3, playerCount - 1),
-      durationMinutes: 5,
-    },
-    cardTrading: { enabled: true },
-    cluesPerRound: 2,
-    allowLocationRevisit: false,
-  };
-}
-
 const inputClass =
   "bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
@@ -84,7 +69,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
     estimatedDuration: 120,
   });
 
-  const [rules, setRules] = useState<GameRules>(() => buildDefaultRules(5));
+  const [rules, setRules] = useState<GameRules>(() => buildDefaultGameRules(5));
   const [tagInput, setTagInput] = useState("");
 
   function updateForm<K extends keyof SettingsFormData>(key: K, value: SettingsFormData[K]) {
@@ -92,7 +77,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
       const next = { ...prev, [key]: value };
       // 플레이어 수 변경 시 규칙 기본값 재계산
       if (key === "playerCount") {
-        setRules(buildDefaultRules(value as number));
+        setRules(buildDefaultGameRules(value as number));
       }
       return next;
     });
@@ -107,7 +92,10 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
   }
 
   function updatePrivateChat(partial: Partial<GameRules["privateChat"]>) {
-    setRules((prev) => ({ ...prev, privateChat: { ...prev.privateChat, ...partial } }));
+    setRules((prev) => ({
+      ...prev,
+      privateChat: normalizePrivateChatConfig(form.playerCount, { ...prev.privateChat, ...partial }),
+    }));
   }
 
   function addTag(raw: string) {
@@ -177,6 +165,11 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
   // 라운드당 총 시간 계산
   const roundTotalMin = rules.phases.reduce((s, p) => s + p.durationMinutes, 0);
   const totalMin = rules.openingDurationMinutes + roundTotalMin * rules.roundCount;
+  const canConfigurePrivateChat = canUsePrivateChat(form.playerCount);
+
+  function formatDuration(minutes: number): string {
+    return minutes === 0 ? "없음" : `${minutes}분`;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">
@@ -283,7 +276,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-3">플레이어 수</label>
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => updateForm("playerCount", Math.max(4, form.playerCount - 1))}
+            <button type="button" onClick={() => updateForm("playerCount", Math.max(1, form.playerCount - 1))}
               className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors">−</button>
             <span className="flex-1 text-center text-xl font-bold text-dark-50">
               {form.playerCount}<span className="text-sm font-normal text-dark-400 ml-1">명</span>
@@ -291,7 +284,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
             <button type="button" onClick={() => updateForm("playerCount", Math.min(8, form.playerCount + 1))}
               className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors">+</button>
           </div>
-          <p className="text-xs text-dark-500 text-center mt-2">4 ~ 8명 (피해자 제외)</p>
+          <p className="text-xs text-dark-500 text-center mt-2">1 ~ 8명 (피해자 제외)</p>
         </div>
 
         {/* 난이도 */}
@@ -356,7 +349,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
               {rules.phases.map((p) => (
                 <div key={p.type} className="flex justify-between">
                   <span>{p.label}</span>
-                  <span className="text-dark-300">{p.durationMinutes}분</span>
+                  <span className="text-dark-300">{formatDuration(p.durationMinutes)}</span>
                 </div>
               ))}
               <div className="flex justify-between">
@@ -399,15 +392,21 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
               <div key={phase.type} className="flex items-center gap-3 bg-dark-800/50 border border-dark-700 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-dark-200 w-20">{PHASE_LABELS[phase.type]}</span>
                 <input
-                  type="range" min={3} max={60} step={1}
+                  type="range"
+                  min={phase.type === "discussion" ? 0 : 3}
+                  max={60}
+                  step={1}
                   value={phase.durationMinutes}
                   onChange={(e) => updatePhase(idx, { durationMinutes: Number(e.target.value) })}
                   className="flex-1 accent-mystery-500"
                 />
-                <span className="text-dark-300 text-sm w-12 text-right">{phase.durationMinutes}분</span>
+                <span className="text-dark-300 text-sm w-12 text-right">{formatDuration(phase.durationMinutes)}</span>
               </div>
             ))}
           </div>
+          <p className="mt-2 text-xs text-dark-500">
+            토론을 0분으로 두면 조사 후 바로 다음 라운드 또는 투표로 넘어갑니다.
+          </p>
         </div>
 
         {/* 밀담 설정 */}
@@ -420,15 +419,23 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
               </div>
               <button
                 type="button"
-                onClick={() => updatePrivateChat({ enabled: !rules.privateChat.enabled })}
-                className={["relative w-11 h-6 rounded-full transition-colors",
-                  rules.privateChat.enabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
+                onClick={() => canConfigurePrivateChat && updatePrivateChat({ enabled: !rules.privateChat.enabled })}
+                disabled={!canConfigurePrivateChat}
+                className={[
+                  "relative w-11 h-6 rounded-full transition-colors",
+                  rules.privateChat.enabled && canConfigurePrivateChat ? "bg-mystery-600" : "bg-dark-600",
+                  !canConfigurePrivateChat ? "cursor-not-allowed opacity-60" : "",
+                ].join(" ")}
               >
                 <span className={["absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
-                  rules.privateChat.enabled ? "translate-x-6" : "translate-x-1"].join(" ")} />
+                  rules.privateChat.enabled && canConfigurePrivateChat ? "translate-x-6" : "translate-x-1"].join(" ")} />
               </button>
             </div>
-            {rules.privateChat.enabled && (
+            {!canConfigurePrivateChat ? (
+              <p className="rounded-lg border border-dark-700 bg-dark-900/40 px-3 py-2 text-xs text-dark-500">
+                밀담은 플레이어 3명 이상일 때만 사용할 수 있습니다.
+              </p>
+            ) : rules.privateChat.enabled && (
               <div className="space-y-3 pt-1 border-t border-dark-700">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-dark-400">최대 인원</span>
@@ -436,7 +443,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
                     <button type="button" onClick={() => updatePrivateChat({ maxGroupSize: Math.max(2, rules.privateChat.maxGroupSize - 1) })}
                       className="w-7 h-7 rounded border border-dark-600 bg-dark-700 text-dark-200 hover:bg-dark-600 flex items-center justify-center text-sm font-bold transition-colors">−</button>
                     <span className="text-dark-100 font-medium w-8 text-center">{rules.privateChat.maxGroupSize}인</span>
-                    <button type="button" onClick={() => updatePrivateChat({ maxGroupSize: Math.min(form.playerCount - 1, rules.privateChat.maxGroupSize + 1) })}
+                    <button type="button" onClick={() => updatePrivateChat({ maxGroupSize: Math.min(Math.max(2, form.playerCount - 1), rules.privateChat.maxGroupSize + 1) })}
                       className="w-7 h-7 rounded border border-dark-600 bg-dark-700 text-dark-200 hover:bg-dark-600 flex items-center justify-center text-sm font-bold transition-colors">+</button>
                   </div>
                 </div>

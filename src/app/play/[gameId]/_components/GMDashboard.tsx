@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
+import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import {
   ENDING_STAGE_LABELS,
   getNextEndingStage,
@@ -13,6 +14,10 @@ import {
 } from "@/lib/ending-flow";
 import {
   getAdvanceConfirmKind,
+  getCurrentRoundSubPhase,
+  getEnabledRoundSubPhases,
+  getNextRoundSubPhase,
+  getRoundSubPhaseLabel,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
 import {
@@ -42,12 +47,7 @@ function phaseLabel(phase: string): string {
   return PHASE_LABELS[phase] ?? phase;
 }
 
-const SUB_PHASE_ORDER = ["investigation", "discussion"] as const;
-type ActiveSubPhase = (typeof SUB_PHASE_ORDER)[number];
-const SUB_PHASE_LABELS: Record<ActiveSubPhase, string> = {
-  investigation: "조사",
-  discussion: "토론",
-};
+type ActiveSubPhase = "investigation" | "discussion";
 
 const DIFFICULTY_LABELS: Record<string, string> = {
   easy: "쉬움",
@@ -65,7 +65,7 @@ function normalizeSubPhase(subPhase?: string): ActiveSubPhase {
 function getSessionBadgeLabel(session: GameSessionSummary): string {
   if (session.phase.startsWith("round-")) {
     const subPhase = normalizeSubPhase(session.currentSubPhase);
-    return `Round ${session.currentRound} · ${SUB_PHASE_LABELS[subPhase]}`;
+    return `Round ${session.currentRound} · ${getRoundSubPhaseLabel(subPhase)}`;
   }
 
   return phaseLabel(session.phase);
@@ -166,7 +166,7 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
     const subPhase = normalizeSubPhase(sharedState.currentSubPhase);
     return {
       title: `Round ${roundNum}`,
-      badge: SUB_PHASE_LABELS[subPhase],
+      badge: getRoundSubPhaseLabel(subPhase),
       narrationBlocks: roundScript?.narration
         ? [{ label: `Round ${roundNum} 이벤트`, text: roundScript.narration }]
         : [],
@@ -447,11 +447,19 @@ function AuthorNotesOverview({ game }: { game: GamePackage }) {
   );
 }
 
-function advanceLabel(phase: string, maxRound: number): string {
+function advanceLabel(phase: string, currentSubPhase: string | undefined, rules: GameRules): string {
+  const maxRound = rules?.roundCount ?? 4;
+
   if (phase === "lobby") return "게임 시작";
   if (phase === "opening") return "Round 1 시작";
   if (phase.startsWith("round-")) {
     const n = parseInt(phase.split("-")[1]);
+    const nextSubPhase = getNextRoundSubPhase(rules, currentSubPhase);
+
+    if (nextSubPhase) {
+      return `${getRoundSubPhaseLabel(nextSubPhase)} 시작`;
+    }
+
     return n >= maxRound ? "투표 시작" : `Round ${n + 1} 시작`;
   }
   if (phase === "vote") return "결과 공개";
@@ -549,26 +557,25 @@ function PhaseTimer({
   const [timerRunning, setTimerRunning] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
 
-  const subPhaseRef = useRef<ActiveSubPhase>(normalizeSubPhase(currentSubPhase));
+  const subPhaseRef = useRef<ActiveSubPhase>(getCurrentRoundSubPhase(rules, currentSubPhase));
   const autoAdvanceRef = useRef(false);
   const resumeTimerAfterSyncRef = useRef(false);
 
-  const subPhase = normalizeSubPhase(currentSubPhase);
+  const subPhaseOrder = getEnabledRoundSubPhases(rules);
+  const subPhase = getCurrentRoundSubPhase(rules, currentSubPhase);
 
   useEffect(() => { autoAdvanceRef.current = autoAdvance; }, [autoAdvance]);
 
   function getDuration(type: ActiveSubPhase): number {
     const cfg = rules?.phases?.find((p) => p.type === type);
-    return (cfg?.durationMinutes ?? 10) * 60;
+    return Math.max(0, cfg?.durationMinutes ?? 10) * 60;
   }
 
   async function doAdvance() {
-    const sp = subPhaseRef.current;
-    const idx = SUB_PHASE_ORDER.indexOf(sp);
-    if (idx < SUB_PHASE_ORDER.length - 1) {
-      const next = SUB_PHASE_ORDER[idx + 1];
+    const nextSubPhase = getNextRoundSubPhase(rules, subPhaseRef.current);
+    if (nextSubPhase) {
       resumeTimerAfterSyncRef.current = autoAdvanceRef.current;
-      const advanced = await onSubPhaseChange(next);
+      const advanced = await onSubPhaseChange(nextSubPhase);
       if (!advanced) {
         resumeTimerAfterSyncRef.current = false;
       }
@@ -585,7 +592,7 @@ function PhaseTimer({
       return;
     }
 
-    const nextSubPhase = normalizeSubPhase(currentSubPhase);
+    const nextSubPhase = getCurrentRoundSubPhase(rules, currentSubPhase);
     subPhaseRef.current = nextSubPhase;
     setSecondsLeft(getDuration(nextSubPhase));
     setTimerRunning(resumeTimerAfterSyncRef.current);
@@ -616,7 +623,7 @@ function PhaseTimer({
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   const isExpired = secondsLeft === 0;
-  const isLastSubPhase = subPhase === "discussion";
+  const isLastSubPhase = getNextRoundSubPhase(rules, subPhase) === null;
 
   return (
     <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
@@ -636,9 +643,9 @@ function PhaseTimer({
 
       {/* Sub-phase 진행 표시 */}
       <div className="flex gap-1">
-        {SUB_PHASE_ORDER.map((sp) => {
-          const idx = SUB_PHASE_ORDER.indexOf(subPhase);
-          const spIdx = SUB_PHASE_ORDER.indexOf(sp);
+        {subPhaseOrder.map((sp) => {
+          const idx = subPhaseOrder.indexOf(subPhase);
+          const spIdx = subPhaseOrder.indexOf(sp);
           const isDone = spIdx < idx;
           const isCurrent = sp === subPhase;
           return (
@@ -652,7 +659,7 @@ function PhaseTimer({
                   : "border-dark-700 text-dark-700"
               }`}
             >
-              {SUB_PHASE_LABELS[sp]}
+              {getRoundSubPhaseLabel(sp)}
             </div>
           );
         })}
@@ -668,7 +675,7 @@ function PhaseTimer({
           {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
         </div>
         <p className="text-xs text-dark-600 mt-1">
-          {SUB_PHASE_LABELS[subPhase]} — {Math.round(getDuration(subPhase) / 60)}분 배정
+          {getRoundSubPhaseLabel(subPhase)} — {Math.round(getDuration(subPhase) / 60)}분 배정
         </p>
       </div>
 
@@ -714,7 +721,7 @@ function PhaseTimer({
 
       {isExpired && (
         <p className="text-xs text-red-400 text-center">
-          ⏰ {SUB_PHASE_LABELS[subPhase]} 시간 종료
+          ⏰ {getRoundSubPhaseLabel(subPhase)} 시간 종료
           {!autoAdvance && " — 다음 페이즈로 이동하세요"}
         </p>
       )}
@@ -974,7 +981,9 @@ function SlotCard({
           <p className="font-semibold text-dark-100 text-sm">{playerName}</p>
           {slot.isLocked ? (
             <p className="text-xs text-mystery-400 mt-0.5">
-              {slot.isAiControlled ? "AI 플레이어 참여 중" : `${slot.playerName} 참가 중`}
+              {slot.isAiControlled
+                ? `AI 플레이어 ${getPlayerAgentRuntimeStatusLabel(slot.aiRuntimeStatus)}`
+                : `${slot.playerName} 참가 중`}
             </p>
           ) : (
             <p className="text-xs text-dark-600 mt-0.5">대기 중…</p>
@@ -1553,7 +1562,7 @@ export default function GMDashboard({
     : null;
   const currentSubPhaseLabel =
     session && phase.startsWith("round-")
-      ? SUB_PHASE_LABELS[normalizeSubPhase(session.sharedState.currentSubPhase)]
+      ? getRoundSubPhaseLabel(normalizeSubPhase(session.sharedState.currentSubPhase))
       : null;
   const phaseSteps = [
     "lobby",
@@ -1766,7 +1775,7 @@ export default function GMDashboard({
                   disabled={advancing}
                   className="w-full py-2.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {advancing ? "처리 중…" : advanceLabel(phase, game.rules?.roundCount ?? 4)}
+                  {advancing ? "처리 중…" : advanceLabel(phase, session.sharedState.currentSubPhase, game.rules)}
                 </button>
               ) : (
                 <div className="space-y-3">

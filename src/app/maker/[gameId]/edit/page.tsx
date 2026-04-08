@@ -68,19 +68,19 @@ export default async function EditGamePage({ params }: Props) {
             ? "border-amber-800/70 bg-amber-950/20"
             : "border-dark-700/80 bg-dark-900/60"
         }`}>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Save Source</p>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Save Status</p>
           <p className="mt-2 text-sm text-dark-100">
             {sourceStatus.primaryProvider === "supabase"
-              ? "지금 보고 있는 내용은 Supabase에 저장된 버전입니다."
-              : "지금 보고 있는 내용은 이 기기에 저장된 버전입니다."}
+              ? "지금 보고 있는 내용은 온라인에 저장된 편집본입니다."
+              : "지금 보고 있는 내용은 이 기기에 저장된 편집본입니다."}
           </p>
           {sourceStatus.primaryProvider === "supabase" && sourceStatus.localBackupAvailable && (
             <p className={`mt-2 text-xs ${
               sourceStatus.localBackupDiffers ? "text-amber-200" : "text-dark-400"
             }`}>
               {sourceStatus.localBackupDiffers
-                ? "같은 게임의 로컬 백업본과 내용이 다릅니다. 예전 엔딩이나 스크립트를 찾는 중이면 저장 전에 먼저 확인하세요."
-                : "로컬 백업본과 현재 저장본이 같습니다."}
+                ? "이 기기에 남아 있는 백업본과 내용이 다릅니다. 예전 내용이 필요하면 저장 전에 먼저 확인하세요."
+                : "이 기기 백업과 현재 편집본이 같습니다."}
             </p>
           )}
         </div>

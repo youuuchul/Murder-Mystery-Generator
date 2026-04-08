@@ -1,10 +1,14 @@
-import type { GamePackage } from "@/types/game";
+import type { GamePackage, GameRules } from "@/types/game";
 import type { GameSession, SharedState } from "@/types/session";
 
 export type SessionAdvanceConfirmKind = "opening" | "vote";
 export type SessionAdvanceRequestAction = "request" | "withdraw";
 export type ActiveSessionSubPhase = "investigation" | "discussion";
 type SessionAdvanceState = Pick<GameSession, "sharedState">;
+const ROUND_SUB_PHASE_LABELS: Record<ActiveSessionSubPhase, string> = {
+  investigation: "조사",
+  discussion: "토론",
+};
 
 /**
  * 세션 서브페이즈 값을 현재 앱 기준의 조사 / 토론 2단계로 정규화한다.
@@ -14,6 +18,77 @@ export function normalizeSessionSubPhase(subPhase?: string): ActiveSessionSubPha
   return subPhase === "discussion" || subPhase === "briefing"
     ? "discussion"
     : "investigation";
+}
+
+/**
+ * 게임 규칙에서 실제로 사용할 라운드 서브페이즈 목록만 추린다.
+ * 0분으로 설정한 페이즈는 진행 순서에서 제외해 1인 플레이를 자연스럽게 처리한다.
+ */
+export function getEnabledRoundSubPhases(
+  rules: Pick<GameRules, "phases"> | undefined
+): ActiveSessionSubPhase[] {
+  const configuredPhases = (rules?.phases ?? [])
+    .map((phase) => phase.type)
+    .filter((type, index, array): type is ActiveSessionSubPhase => (
+      (type === "investigation" || type === "discussion") && array.indexOf(type) === index
+    ));
+
+  const enabledPhases = configuredPhases.filter((type) => {
+    const durationMinutes = rules?.phases.find((phase) => phase.type === type)?.durationMinutes;
+    return Number.isFinite(durationMinutes) ? Number(durationMinutes) > 0 : true;
+  });
+
+  if (enabledPhases.length > 0) {
+    return enabledPhases;
+  }
+
+  if (configuredPhases.length > 0) {
+    return [configuredPhases[0]];
+  }
+
+  return ["investigation"];
+}
+
+/**
+ * 현재 세션이 속해야 할 라운드 서브페이즈를 규칙 기준으로 정규화한다.
+ * 저장본이 오래됐거나 0분 페이즈가 비활성화돼도 첫 활성 페이즈로 안전하게 복구한다.
+ */
+export function getCurrentRoundSubPhase(
+  rules: Pick<GameRules, "phases"> | undefined,
+  subPhase?: string
+): ActiveSessionSubPhase {
+  const enabledPhases = getEnabledRoundSubPhases(rules);
+  const normalizedSubPhase = normalizeSessionSubPhase(subPhase);
+
+  return enabledPhases.includes(normalizedSubPhase)
+    ? normalizedSubPhase
+    : enabledPhases[0];
+}
+
+/**
+ * 현재 서브페이즈 다음에 이어질 활성 서브페이즈가 있는지 계산한다.
+ * 없으면 라운드 종료 후 다음 라운드 또는 투표로 넘어가야 한다.
+ */
+export function getNextRoundSubPhase(
+  rules: Pick<GameRules, "phases"> | undefined,
+  subPhase?: string
+): ActiveSessionSubPhase | null {
+  const enabledPhases = getEnabledRoundSubPhases(rules);
+  const currentSubPhase = getCurrentRoundSubPhase(rules, subPhase);
+  const currentIndex = enabledPhases.indexOf(currentSubPhase);
+
+  if (currentIndex === -1 || currentIndex >= enabledPhases.length - 1) {
+    return null;
+  }
+
+  return enabledPhases[currentIndex + 1];
+}
+
+/**
+ * 라운드 서브페이즈 라벨을 한곳에서 관리한다.
+ */
+export function getRoundSubPhaseLabel(subPhase: ActiveSessionSubPhase): string {
+  return ROUND_SUB_PHASE_LABELS[subPhase];
 }
 
 /**
@@ -59,26 +134,26 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
   if (sharedState.phase === "opening") {
     sharedState.phase = "round-1";
     sharedState.currentRound = 1;
-    sharedState.currentSubPhase = "investigation";
+    sharedState.currentSubPhase = getCurrentRoundSubPhase(game.rules);
     markPhaseStarted(sharedState, now);
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: now,
-      message: "Round 1 조사 페이즈가 시작됩니다.",
+      message: `Round 1 ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`,
       type: "phase_changed",
     });
     return;
   }
 
   if (sharedState.phase.startsWith("round-")) {
-    const currentSubPhase = normalizeSessionSubPhase(sharedState.currentSubPhase);
+    const nextSubPhase = getNextRoundSubPhase(game.rules, sharedState.currentSubPhase);
 
-    if (currentSubPhase === "investigation") {
-      sharedState.currentSubPhase = "discussion";
+    if (nextSubPhase) {
+      sharedState.currentSubPhase = nextSubPhase;
       sharedState.eventLog.push({
         id: crypto.randomUUID(),
         timestamp: now,
-        message: "토론 페이즈가 시작됩니다.",
+        message: `${getRoundSubPhaseLabel(nextSubPhase)} 페이즈가 시작됩니다.`,
         type: "phase_changed",
       });
       return;
@@ -99,12 +174,12 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
 
     sharedState.phase = `round-${sharedState.currentRound + 1}`;
     sharedState.currentRound += 1;
-    sharedState.currentSubPhase = "investigation";
+    sharedState.currentSubPhase = getCurrentRoundSubPhase(game.rules);
     markPhaseStarted(sharedState, now);
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: now,
-      message: `Round ${sharedState.currentRound} 조사 페이즈가 시작됩니다.`,
+      message: `Round ${sharedState.currentRound} ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`,
       type: "phase_changed",
     });
     return;
@@ -124,8 +199,8 @@ export function getPlayerAdvanceRequestLabel(session: SessionAdvanceState, game:
   if (phase === "opening") return "Round 1 시작 요청";
 
   if (phase.startsWith("round-")) {
-    const currentSubPhase = normalizeSessionSubPhase(session.sharedState.currentSubPhase);
-    if (currentSubPhase === "investigation") return "토론 시작 요청";
+    const nextSubPhase = getNextRoundSubPhase(game.rules, session.sharedState.currentSubPhase);
+    if (nextSubPhase) return `${getRoundSubPhaseLabel(nextSubPhase)} 시작 요청`;
     return currentRound >= maxRound ? "투표 시작 요청" : `Round ${currentRound + 1} 시작 요청`;
   }
 
@@ -144,7 +219,11 @@ export function getAdvanceConfirmKind(session: SessionAdvanceState, game: GamePa
     return "opening";
   }
 
-  if (phase.startsWith("round-") && currentRound >= maxRound) {
+  if (
+    phase.startsWith("round-")
+    && currentRound >= maxRound
+    && getNextRoundSubPhase(game.rules, session.sharedState.currentSubPhase) === null
+  ) {
     return "vote";
   }
 

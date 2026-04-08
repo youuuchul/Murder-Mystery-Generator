@@ -378,7 +378,7 @@ export default function StoryEditor({
           <div>
             <h3 className="text-sm font-semibold text-dark-100">행동 타임라인</h3>
             <p className="mt-1 text-xs text-dark-500">
-              시간대 슬롯은 여기서 관리하고, 캐릭터별 행동 입력은 Step 3(플레이어)에서 연결합니다.
+              사용 여부는 여기서 켜고, 시간대 슬롯 추가/순서 변경과 캐릭터별 행동 입력은 Step 3(플레이어)에서 함께 관리할 수 있습니다.
             </p>
           </div>
           <div className="flex gap-2 shrink-0">

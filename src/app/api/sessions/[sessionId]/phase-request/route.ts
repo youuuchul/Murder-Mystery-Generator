@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import {
+  applyPlayerAgentAutoVotes,
+  tracePlayerAgentAutoVoteOutcome,
+} from "@/lib/ai/player-agent/actions/auto-actions";
+import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
   syncPlayerAgentRuntimeStatusForSharedPhase,
 } from "@/lib/ai/player-agent/core/player-agent-state";
+import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { getGame } from "@/lib/game-repository";
 import {
   applySessionAdvanceStep,
@@ -52,7 +57,7 @@ export async function POST(req: Request, { params }: Params) {
     const { session: persistedSession, result } = await mutateSessionWithRetry(
       sessionId,
       (latestSession) => {
-        if (latestSession.sharedState.phase === "vote" || latestSession.sharedState.phase === "ending") {
+        if (latestSession.sharedState.phase === "vote") {
           throw new Error("이 단계에서는 진행 요청을 사용할 수 없습니다.");
         }
 
@@ -83,32 +88,64 @@ export async function POST(req: Request, { params }: Params) {
           && joinedPlayerIds.every((playerId) => requestedPlayerIds.has(playerId));
 
         if (allJoinedPlayersRequested && action === "request") {
-          if (fillMissingWithAi && latestSession.sharedState.phase === "lobby" && latestSession.playerAgentState) {
-            latestSession.playerAgentState = enablePlayerAgentSlotsForMissingPlayers(
-              latestSession.playerAgentState,
-              {
-                unlockedPlayerIds: latestSession.sharedState.characterSlots
-                  .filter((item) => !item.isLocked)
-                  .map((item) => item.playerId),
-                missingPlayerCount: Math.max(0, latestSession.sharedState.characterSlots.length - joinedPlayerIds.length),
-              }
-            );
+          if (latestSession.sharedState.phase === "ending") {
+            if (latestSession.mode !== "player-consensus") {
+              throw new Error("GM이 있는 세션은 플레이어 요청으로 엔딩 단계를 넘길 수 없습니다.");
+            }
+
+            if (!game || !latestSession.sharedState.voteReveal) {
+              throw new Error("엔딩 결과 데이터가 없습니다.");
+            }
+
+            const currentStage = normalizeEndingStage(latestSession.sharedState.endingStage);
+            const nextStage = getNextEndingStage(game, currentStage, latestSession.sharedState.voteReveal);
+
+            if (!nextStage) {
+              throw new Error("더 진행할 엔딩 단계가 없습니다.");
+            }
+
+            latestSession.sharedState.endingStage = nextStage;
+            clearPhaseAdvanceRequests(latestSession.sharedState);
+            latestSession.sharedState.eventLog.push({
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              message: `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`,
+              type: "phase_changed",
+            });
+          } else {
+            if (fillMissingWithAi && latestSession.sharedState.phase === "lobby" && latestSession.playerAgentState) {
+              latestSession.playerAgentState = enablePlayerAgentSlotsForMissingPlayers(
+                latestSession.playerAgentState,
+                {
+                  unlockedPlayerIds: latestSession.sharedState.characterSlots
+                    .filter((item) => !item.isLocked)
+                    .map((item) => item.playerId),
+                  missingPlayerCount: Math.max(0, latestSession.sharedState.characterSlots.length - joinedPlayerIds.length),
+                }
+              );
+            }
+
+            applySessionAdvanceStep(latestSession, game);
+            if (latestSession.playerAgentState) {
+              latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+                latestSession.playerAgentState,
+                latestSession.sharedState
+              );
+              latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+                latestSession.sharedState.characterSlots,
+                latestSession.playerAgentState
+              );
+            }
           }
 
-          applySessionAdvanceStep(latestSession, game);
-          if (latestSession.playerAgentState) {
-            latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
-              latestSession.playerAgentState,
-              latestSession.sharedState
-            );
-            latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
-              latestSession.sharedState.characterSlots,
-              latestSession.playerAgentState
-            );
-          }
+          const aiVoteOutcome = applyPlayerAgentAutoVotes(latestSession, game, {
+            trigger: "phase_request_advance",
+          });
+
           return {
             advanced: true,
             requested: false,
+            aiVoteOutcome,
           };
         }
 
@@ -119,11 +156,28 @@ export async function POST(req: Request, { params }: Params) {
         return {
           advanced: false,
           requested: action === "request",
+          aiVoteOutcome: {
+            acted: false,
+            trigger: "phase_request_advance" as const,
+            submittedCount: 0,
+            entries: [],
+            reason: "not-advanced",
+          },
         };
       }
     );
 
     broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+
+    await tracePlayerAgentAutoVoteOutcome({
+      session: {
+        id: persistedSession.id,
+        gameId: persistedSession.gameId,
+        mode: persistedSession.mode,
+        sharedState: persistedSession.sharedState,
+      },
+      outcome: result.aiVoteOutcome,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -138,6 +192,9 @@ export async function POST(req: Request, { params }: Params) {
         error.message === "token이 필요합니다."
         || error.message === "이 단계에서는 진행 요청을 사용할 수 없습니다."
         || error.message === "현재 참가 중인 플레이어만 요청할 수 있습니다."
+        || error.message === "GM이 있는 세션은 플레이어 요청으로 엔딩 단계를 넘길 수 없습니다."
+        || error.message === "엔딩 결과 데이터가 없습니다."
+        || error.message === "더 진행할 엔딩 단계가 없습니다."
       )
     ) {
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -3,6 +3,10 @@ import {
   applyPlayerAgentOccupancyToCharacterSlots,
   syncPlayerAgentRuntimeStatusForSharedPhase,
 } from "@/lib/ai/player-agent/core/player-agent-state";
+import {
+  applyPlayerAgentAutoVotes,
+  tracePlayerAgentAutoVoteOutcome,
+} from "@/lib/ai/player-agent/actions/auto-actions";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
@@ -205,7 +209,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { session: persistedSession, result } = await mutateSessionWithRetry(
       sessionId,
-      (latestSession) => {
+      async (latestSession) => {
         if (latestSession.sharedState.phase !== "vote") {
           throw new Error("투표 페이즈가 아닙니다");
         }
@@ -235,16 +239,34 @@ export async function POST(req: NextRequest, { params }: Params) {
           });
         }
 
-        const totalPlayers = latestSession.sharedState.characterSlots.filter(
-          (slot) => slot.isLocked && !slot.isAiControlled
-        ).length;
+        const game = await getGame(latestSession.gameId);
+        if (!game) {
+          throw new Error("Game not found");
+        }
+
+        const aiVoteOutcome = applyPlayerAgentAutoVotes(latestSession, game, {
+          trigger: "human_vote_submitted",
+        });
+
+        const totalPlayers = latestSession.sharedState.characterSlots.filter((slot) => slot.isLocked).length;
         return {
           allVoted: latestSession.sharedState.voteCount >= totalPlayers,
+          aiVoteOutcome,
         };
       }
     );
 
     broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+
+    await tracePlayerAgentAutoVoteOutcome({
+      session: {
+        id: persistedSession.id,
+        gameId: persistedSession.gameId,
+        mode: persistedSession.mode,
+        sharedState: persistedSession.sharedState,
+      },
+      outcome: result.aiVoteOutcome,
+    });
 
     let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
     if (result.allVoted) {
@@ -257,6 +279,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       requiresTieBreak: revealState?.requiresTieBreak ?? false,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Game not found") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+
     if (error instanceof Error && error.message === "투표 페이즈가 아닙니다") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -24,7 +24,14 @@ import {
   getSessionTimerSnapshot,
 } from "@/lib/session-timer";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
-import type { EndingStage, SharedState, InventoryCard, VoteReveal, SessionMode } from "@/types/session";
+import type {
+  CharacterSlot,
+  EndingStage,
+  SharedState,
+  InventoryCard,
+  VoteReveal,
+  SessionMode,
+} from "@/types/session";
 
 const PHASE_LABEL: Record<string, string> = {
   lobby: "대기 중",
@@ -405,7 +412,7 @@ function CardDetailModal({
   sessionId: string;
   token: string;
   myPlayerId: string;
-  joinedSlots: { playerId: string; playerName: string | null }[];
+  joinedSlots: CharacterSlot[];
   onClose: () => void;
   onTransferred: (cardId: string) => void;
 }) {
@@ -414,11 +421,26 @@ function CardDetailModal({
   const [transferring, setTransferring] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
 
-  const candidates = joinedSlots.filter((s) => s.playerId !== myPlayerId);
+  const candidates = joinedSlots
+    .filter((slot) => slot.playerId !== myPlayerId)
+    .map((slot) => {
+      const scenarioCharacterName = game.players.find((player) => player.id === slot.playerId)?.name ?? "이름 없음";
+      const participantName = slot.isAiControlled
+        ? "AI 플레이어"
+        : (slot.playerName?.trim() || "참가자");
+
+      return {
+        playerId: slot.playerId,
+        scenarioCharacterName,
+        participantName,
+        label: `${scenarioCharacterName} · ${participantName}`,
+      };
+    });
 
   async function handleTransfer() {
     if (!transferTarget) return;
-    if (!confirm(`${candidates.find((c) => c.playerId === transferTarget)?.playerName}에게 카드를 양도하시겠습니까?\n양도 후 이 카드는 당신 인벤토리에서 사라집니다.`)) return;
+    const selectedCandidate = candidates.find((candidate) => candidate.playerId === transferTarget);
+    if (!confirm(`${selectedCandidate?.label ?? "선택한 대상"}에게 카드를 양도하시겠습니까?\n양도 후 이 카드는 당신 인벤토리에서 사라집니다.`)) return;
     setTransferring(true);
     const res = await fetch(`/api/sessions/${sessionId}/cards`, {
       method: "POST",
@@ -490,7 +512,7 @@ function CardDetailModal({
                 >
                   <option value="">— 선택 —</option>
                   {candidates.map((c) => (
-                    <option key={c.playerId} value={c.playerId}>{c.playerName}</option>
+                    <option key={c.playerId} value={c.playerId}>{c.label}</option>
                   ))}
                 </select>
                 <div className="flex gap-2">
@@ -563,11 +585,13 @@ function VoteResultScreen({
   game,
   myPlayerId,
   endingStage,
+  sessionMode,
 }: {
   reveal: VoteReveal;
   game: GamePackage;
   myPlayerId: string;
   endingStage: EndingStage;
+  sessionMode: SessionMode;
 }) {
   const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
   const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
@@ -664,7 +688,11 @@ function VoteResultScreen({
 
       {endingStage === "branch" && hasPersonalEndingForPlayer && (
         <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 text-center">
-          <p className="text-xs text-dark-500">GM이 다음 단계를 공개하면 개인 엔딩이 열립니다.</p>
+          <p className="text-xs text-dark-500">
+            {sessionMode === "player-consensus"
+              ? "참가자 합의로 다음 단계를 열면 개인 엔딩이 공개됩니다."
+              : "GM이 다음 단계를 공개하면 개인 엔딩이 열립니다."}
+          </p>
         </div>
       )}
     </div>
@@ -1500,7 +1528,7 @@ export default function PlayerView() {
         setRoundAcquired(playerState.roundAcquired ?? {});
         setRoundVisited(playerState.roundVisitedLocations ?? {});
       } catch {}
-    }, 3000);
+    }, 1200);
     return () => clearInterval(id);
   }, [token, sessionId]);
 
@@ -1642,8 +1670,17 @@ export default function PlayerView() {
   const joinedSlots = sharedState.characterSlots.filter((s) => s.isLocked);
   const requestedPlayerIds = sharedState.phaseAdvanceRequestPlayerIds ?? [];
   const hasRequestedAdvance = requestedPlayerIds.includes(charId);
-  const canRequestAdvance = phase !== "vote" && phase !== "ending";
+  const canAdvanceEndingByConsensus =
+    sessionMode === "player-consensus"
+    && phase === "ending"
+    && endingStage !== "complete";
+  const canRequestAdvance = phase !== "vote" && (phase !== "ending" || canAdvanceEndingByConsensus);
   const advanceRequestLabel = getPlayerAdvanceRequestLabel({ sharedState }, game);
+  const endingAdvanceRequestLabel = endingStage === "branch"
+    ? "개인 엔딩 공개 요청"
+    : endingStage === "personal"
+      ? "작가 노트 공개 요청"
+      : "엔딩 종료 요청";
   const leavePath = game.access.visibility === "public" ? `/play/${gameId}/join` : "/join";
   const leaveLabel = game.access.visibility === "public" ? "세션 목록" : "코드 입장";
 
@@ -1680,7 +1717,14 @@ export default function PlayerView() {
     return (
       <div className="min-h-screen bg-dark-950 text-dark-100">
         <div className="sticky top-0 z-10 bg-dark-950/95 backdrop-blur border-b border-dark-800 px-4 py-2.5 flex items-center justify-between">
-          <div>
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={() => setShowLeaveConfirm(true)}
+              className="text-xs text-dark-500 transition-colors hover:text-dark-300"
+            >
+              ← {leaveLabel}
+            </button>
             <p className="text-xs text-dark-500 truncate max-w-[140px]">{game.title}</p>
             <p className="text-sm font-semibold text-dark-100">{character.name}</p>
           </div>
@@ -1699,8 +1743,29 @@ export default function PlayerView() {
             game={game}
             myPlayerId={charId}
             endingStage={endingStage}
+            sessionMode={sessionMode}
           />
+          {canAdvanceEndingByConsensus && (
+            <PhaseAdvanceRequestPanel
+              label={endingAdvanceRequestLabel}
+              requestedCount={requestedPlayerIds.length}
+              totalCount={joinedSlots.length}
+              requested={hasRequestedAdvance}
+              submitting={phaseRequestSubmitting}
+              onToggle={handlePhaseAdvanceToggle}
+            />
+          )}
         </div>
+        {showLeaveConfirm && (
+          <LeaveSessionConfirmModal
+            destinationLabel={leaveLabel}
+            onCancel={() => setShowLeaveConfirm(false)}
+            onConfirm={() => {
+              setShowLeaveConfirm(false);
+              router.push(leavePath);
+            }}
+          />
+        )}
       </div>
     );
   }

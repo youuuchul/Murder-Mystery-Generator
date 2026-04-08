@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  applyPlayerAgentAutoVotes,
+  tracePlayerAgentAutoVoteOutcome,
+} from "@/lib/ai/player-agent/actions/auto-actions";
+import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
   syncPlayerAgentRuntimeStatusForSharedPhase,
@@ -175,7 +179,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const maxRound = game?.rules?.roundCount ?? 4;
   const expectedBaseState = buildSessionMutationBaseState(session);
   try {
-    const { session: persistedSession } = await mutateSessionWithRetry(
+    const { session: persistedSession, result } = await mutateSessionWithRetry(
       sessionId,
       (latestSession, attempt) => {
         if (attempt > 1 && !canRetryActionOnLatestSession(body.action, latestSession, expectedBaseState)) {
@@ -186,6 +190,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         const now = new Date().toISOString();
         let newPhase: GamePhase = sharedState.phase;
         let message = "";
+        let aiVoteOutcome = null;
 
         if (body.action === "advance_phase") {
           if (sharedState.phase === "lobby") {
@@ -348,6 +353,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           );
         }
 
+        if (body.action === "advance_phase" && sharedState.phase === "vote" && game) {
+          aiVoteOutcome = applyPlayerAgentAutoVotes(latestSession, game, {
+            trigger: "gm_advance_phase",
+          });
+        }
+
         if (message) {
           sharedState.eventLog.push({
             id: crypto.randomUUID(),
@@ -357,11 +368,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           });
         }
 
-        return null;
+        return { aiVoteOutcome };
       }
     );
 
     broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+
+    if (result.aiVoteOutcome) {
+      await tracePlayerAgentAutoVoteOutcome({
+        session: {
+          id: persistedSession.id,
+          gameId: persistedSession.gameId,
+          mode: persistedSession.mode,
+          sharedState: persistedSession.sharedState,
+        },
+        outcome: result.aiVoteOutcome,
+      });
+    }
 
     return NextResponse.json({
       session: {

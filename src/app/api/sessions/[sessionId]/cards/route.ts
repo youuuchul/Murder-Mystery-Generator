@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  applyPlayerAgentAutoAcquireReaction,
+  tracePlayerAgentAutoAcquireOutcome,
+} from "@/lib/ai/player-agent/actions/auto-actions";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
@@ -232,7 +236,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
 
     try {
-      const { session: persistedSession } = await mutateSessionWithRetry(
+      const { session: persistedSession, result } = await mutateSessionWithRetry(
         sessionId,
         (latestSession) => {
           const latestPlayerState = latestSession.playerStates.find((player) => player.playerId === pState.playerId);
@@ -302,7 +306,16 @@ export async function POST(req: NextRequest, { params }: Params) {
             type: "card_received",
           });
 
-          return null;
+          const autoAcquireOutcome = applyPlayerAgentAutoAcquireReaction(
+            latestSession,
+            game,
+            {
+              triggerPlayerId: latestPlayerState.playerId,
+              trigger: "human_clue_acquired",
+            }
+          );
+
+          return { autoAcquireOutcome };
         }
       );
 
@@ -317,6 +330,16 @@ export async function POST(req: NextRequest, { params }: Params) {
         inventory: persistedPlayerState.inventory,
         roundAcquired: persistedPlayerState.roundAcquired,
         roundVisitedLocations: persistedPlayerState.roundVisitedLocations,
+      });
+
+      await tracePlayerAgentAutoAcquireOutcome({
+        session: {
+          id: persistedSession.id,
+          gameId: persistedSession.gameId,
+          mode: persistedSession.mode,
+          sharedState: persistedSession.sharedState,
+        },
+        outcome: result.autoAcquireOutcome,
       });
 
       return NextResponse.json({ card: persistedCard });

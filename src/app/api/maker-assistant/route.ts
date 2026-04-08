@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  propagateAttributes,
+  startActiveObservation,
+  updateActiveObservation,
+} from "@langfuse/tracing";
 import type {
   Response as OpenAIResponse,
   ResponseCreateParamsNonStreaming,
@@ -12,6 +17,14 @@ import {
 } from "@/lib/ai/openai";
 import { buildMakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import { resolveMakerAssistantResponseMode } from "@/lib/ai/maker-assistant-response-mode";
+import {
+  buildMakerAssistantTraceInput,
+  buildMakerAssistantTraceOutput,
+  getMakerAssistantGenerationName,
+  getMakerAssistantTraceName,
+  getMakerAssistantTraceSessionId,
+  getMakerAssistantTraceTags,
+} from "@/lib/ai/maker-assistant-tracing";
 import {
   buildMakerAssistantSystemPrompt,
   buildMakerAssistantUserPrompt,
@@ -30,6 +43,10 @@ const REPAIR_RESPONSE_RETRY_MAX_OUTPUT_TOKENS = 2200;
 
 type ResponseTextSource = Pick<OpenAIResponse, "output_text" | "output" | "incomplete_details">;
 type MakerAssistantResponseRequest = Omit<ResponseCreateParamsNonStreaming, "max_output_tokens">;
+type MakerAssistantResolvedResult = {
+  result: MakerAssistantResult;
+  repairAttempts: number;
+};
 
 /** POST /api/maker-assistant — 메이커 편집 화면용 LLM 제작 도우미 */
 export async function POST(request: NextRequest) {
@@ -59,42 +76,107 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getOpenAIClient();
     const context = buildMakerAssistantContext(payload.game, payload.task, payload.currentStep);
     const responseMode = resolveMakerAssistantResponseMode({
       task: payload.task,
       message: payload.message,
       requestedMode: payload.responseMode,
     });
+    const traceName = getMakerAssistantTraceName(payload.task, responseMode);
+    const sessionId = getMakerAssistantTraceSessionId(currentUser.id, payload.game.id);
+    const tags = getMakerAssistantTraceTags(payload.task, responseMode, payload.currentStep);
 
-    const response = await createResponseWithTokenRetry(client, {
-      model: getMakerAssistantModel(),
-      store: false,
-      instructions: buildMakerAssistantSystemPrompt(payload.task, responseMode),
-      input: buildMakerAssistantUserPrompt({
-        task: payload.task,
-        responseMode,
-        context,
-        message: payload.message,
-        conversationHistory: payload.conversationHistory,
-        clueSuggestionContext: payload.clueSuggestionContext,
-      }),
-      reasoning: {
-        effort: getMakerAssistantReasoningEffort(),
-      },
-    }, {
-      initialMaxOutputTokens: PRIMARY_RESPONSE_MAX_OUTPUT_TOKENS,
-      retryMaxOutputTokens: PRIMARY_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
+    const body = await startActiveObservation(traceName, async () => {
+      return propagateAttributes({
+        userId: currentUser.id,
+        sessionId,
+        tags,
+        traceName,
+        metadata: {
+          feature: "maker-assistant",
+          gameId: payload.game.id,
+          currentStep: String(payload.currentStep),
+          responseMode,
+        },
+      }, async () => {
+        updateActiveObservation({
+          input: buildMakerAssistantTraceInput({
+            currentUser,
+            payload,
+            responseMode,
+          }),
+          metadata: {
+            task: payload.task,
+            route: "/api/maker-assistant",
+            gameTitle: payload.game.title.slice(0, 200),
+          },
+        });
+
+        try {
+          const response = await createResponseWithTokenRetry(
+            getOpenAIClient({
+              generationName: getMakerAssistantGenerationName(
+                "primary",
+                payload.task,
+                responseMode
+              ),
+            }),
+            {
+              model: getMakerAssistantModel(),
+              store: false,
+              instructions: buildMakerAssistantSystemPrompt(payload.task, responseMode),
+              input: buildMakerAssistantUserPrompt({
+                task: payload.task,
+                responseMode,
+                context,
+                message: payload.message,
+                conversationHistory: payload.conversationHistory,
+                clueSuggestionContext: payload.clueSuggestionContext,
+              }),
+              reasoning: {
+                effort: getMakerAssistantReasoningEffort(),
+              },
+            },
+            {
+              initialMaxOutputTokens: PRIMARY_RESPONSE_MAX_OUTPUT_TOKENS,
+              retryMaxOutputTokens: PRIMARY_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
+            }
+          );
+
+          const rawText = extractResponseText(response);
+          const resolved = await resolveMakerAssistantResult(rawText, responseMode, payload.task);
+
+          updateActiveObservation({
+            output: buildMakerAssistantTraceOutput({
+              result: resolved.result,
+              repairAttempts: resolved.repairAttempts,
+            }),
+            metadata: {
+              task: payload.task,
+              responseMode,
+              repairAttempts: String(resolved.repairAttempts),
+            },
+          });
+
+          return {
+            task: payload.task,
+            previousResponseId: null,
+            result: resolved.result,
+          } satisfies MakerAssistantResponse;
+        } catch (error) {
+          updateActiveObservation({
+            level: "ERROR",
+            statusMessage:
+              error instanceof Error ? error.message : "maker assistant request failed",
+            metadata: {
+              task: payload.task,
+              route: "/api/maker-assistant",
+            },
+          });
+          throw error;
+        }
+      });
     });
-
-    const rawText = extractResponseText(response);
-    const result = await resolveMakerAssistantResult(client, rawText, responseMode);
-
-    const body: MakerAssistantResponse = {
-      task: payload.task,
-      previousResponseId: null,
-      result,
-    };
 
     return NextResponse.json(body);
   } catch (error) {
@@ -127,36 +209,50 @@ export async function POST(request: NextRequest) {
  * 형식이 깨졌다면 2차 정규화 패스로 구조화된 결과만 다시 추출한다.
  */
 async function resolveMakerAssistantResult(
-  client: ReturnType<typeof getOpenAIClient>,
   rawText: string,
-  responseMode: "guide" | "draft"
-): Promise<MakerAssistantResult> {
+  responseMode: "guide" | "draft",
+  task: MakerAssistantResponse["task"]
+): Promise<MakerAssistantResolvedResult> {
   try {
-    return parseMakerAssistantResult(rawText, responseMode);
+    return {
+      result: parseMakerAssistantResult(rawText, responseMode),
+      repairAttempts: 0,
+    };
   } catch (parseError) {
     console.warn("[maker-assistant] repairing malformed JSON output", parseError);
   }
 
   let repairSource = rawText;
+  let repairAttempts = 0;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const repaired = await createResponseWithTokenRetry(client, {
-      model: getMakerAssistantModel(),
-      store: false,
-      instructions: buildRepairInstructions(responseMode),
-      input: repairSource,
-      reasoning: {
-        effort: "low",
+    const repaired = await createResponseWithTokenRetry(
+      getOpenAIClient({
+        generationName: getMakerAssistantGenerationName("repair", task, responseMode),
+      }),
+      {
+        model: getMakerAssistantModel(),
+        store: false,
+        instructions: buildRepairInstructions(responseMode),
+        input: repairSource,
+        reasoning: {
+          effort: "low",
+        },
       },
-    }, {
-      initialMaxOutputTokens: REPAIR_RESPONSE_MAX_OUTPUT_TOKENS,
-      retryMaxOutputTokens: REPAIR_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
-    });
+      {
+        initialMaxOutputTokens: REPAIR_RESPONSE_MAX_OUTPUT_TOKENS,
+        retryMaxOutputTokens: REPAIR_RESPONSE_RETRY_MAX_OUTPUT_TOKENS,
+      }
+    );
 
     const repairedText = extractResponseText(repaired);
 
     try {
-      return parseMakerAssistantResult(repairedText, responseMode);
+      repairAttempts = attempt;
+      return {
+        result: parseMakerAssistantResult(repairedText, responseMode),
+        repairAttempts,
+      };
     } catch (repairError) {
       console.warn(`[maker-assistant] repair attempt ${attempt} failed`, repairError);
       repairSource = repairedText;

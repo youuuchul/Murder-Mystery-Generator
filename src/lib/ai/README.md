@@ -99,6 +99,25 @@ flowchart LR
 - `OPENAI_MODEL`
 - `OPENAI_REASONING_EFFORT`
 - `OPENAI_ASSISTANT_ENABLED`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+- `LANGFUSE_BASE_URL`
+- `LANGFUSE_TRACING_ENVIRONMENT`
+- `LANGFUSE_RELEASE`
+
+### Langfuse tracing
+
+- 메이커 도우미 요청은 Langfuse trace 로 남긴다.
+- OpenAI SDK 호출은 `@langfuse/openai` wrapper 로 generation 을 자동 수집한다.
+- 요청 단위 trace 이름, 사용자, 세션, 태그는 `/api/maker-assistant` 에서 직접 붙인다.
+- trace input/output 에는 전체 게임 JSON 대신 요약 정보만 남긴다.
+
+관련 파일:
+
+- [`langfuse.ts`](./langfuse.ts)
+- [`maker-assistant-tracing.ts`](./maker-assistant-tracing.ts)
+- [`openai.ts`](./openai.ts)
+- [`../../app/api/maker-assistant/route.ts`](../../app/api/maker-assistant/route.ts)
 
 ## 6. 프롬프트 수정 위치
 

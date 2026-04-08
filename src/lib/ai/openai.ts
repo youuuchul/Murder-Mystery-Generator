@@ -1,27 +1,44 @@
 import "server-only";
 
+import { observeOpenAI, type LangfuseConfig } from "@langfuse/openai";
 import OpenAI from "openai";
+import { warmLangfuseTracing } from "@/lib/ai/langfuse";
 
 type ReasoningEffort = "low" | "medium" | "high";
 
-let client: OpenAI | null = null;
+let rawClient: OpenAI | null = null;
+let observedClient: OpenAI | null = null;
 
 /**
  * 서버 전역에서 재사용할 OpenAI client를 지연 생성한다.
  * Route Handler가 여러 번 호출돼도 같은 프로세스 안에서는 1회만 만든다.
  */
-export function getOpenAIClient(): OpenAI {
+export function getOpenAIClient(
+  tracingConfig?: Pick<LangfuseConfig, "generationName">
+): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY가 설정되지 않았습니다.");
   }
 
-  if (!client) {
-    client = new OpenAI({ apiKey });
+  warmLangfuseTracing();
+
+  if (!rawClient) {
+    rawClient = new OpenAI({ apiKey });
   }
 
-  return client;
+  if (tracingConfig?.generationName) {
+    return observeOpenAI(rawClient, {
+      generationName: tracingConfig.generationName,
+    });
+  }
+
+  if (!observedClient) {
+    observedClient = observeOpenAI(rawClient);
+  }
+
+  return observedClient;
 }
 
 /** 제작 도우미 기본 모델명을 반환한다. */

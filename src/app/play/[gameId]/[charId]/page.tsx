@@ -1105,43 +1105,53 @@ function PlayerJoinAccessPanel({
  */
 function PlayerRoomRosterPanel({
   slots,
+  players,
 }: {
   slots: SharedState["characterSlots"];
+  players: Player[];
 }) {
   const joinedSlots = slots.filter((slot) => slot.isLocked);
   const waitingCount = Math.max(slots.length - joinedSlots.length, 0);
+  const playerNameById = new Map(players.map((player) => [player.id, player.name]));
 
   return (
     <CollapsibleSection title={`플레이어 참여 현황 (${joinedSlots.length}/${slots.length})`}>
       <div className="space-y-3">
         {joinedSlots.length > 0 ? (
-          joinedSlots.map((slot) => (
-            <div
-              key={slot.playerId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-950/50 px-3 py-3"
-            >
-              <div>
-                <p className="text-sm font-medium text-dark-100">
-                  {slot.isAiControlled ? "AI 플레이어" : (slot.playerName || "이름 없음")}
-                </p>
-                <p className="mt-1 text-xs text-dark-500">
-                  {slot.isAiControlled
-                    ? `자동 참여 · ${getPlayerAgentRuntimeStatusLabel(slot.aiRuntimeStatus)}`
-                    : slot.playerId}
-                </p>
-              </div>
-              <span
-                className={[
-                  "rounded-full border px-2 py-1 text-[11px]",
-                  slot.isAiControlled
-                    ? "border-sky-800/60 text-sky-300"
-                    : "border-emerald-800/60 text-emerald-300",
-                ].join(" ")}
+          joinedSlots.map((slot) => {
+            const scenarioCharacterName = playerNameById.get(slot.playerId) ?? slot.playerId;
+            const participantName = slot.isAiControlled
+              ? "AI 플레이어"
+              : (slot.playerName?.trim() || "참가자");
+
+            return (
+              <div
+                key={slot.playerId}
+                className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-950/50 px-3 py-3"
               >
-                {slot.isAiControlled ? "AI 참여" : "참여 중"}
-              </span>
-            </div>
-          ))
+                <div>
+                  <p className="text-sm font-medium text-dark-100">
+                    {scenarioCharacterName}
+                  </p>
+                  <p className="mt-1 text-xs text-dark-500">
+                    {slot.isAiControlled
+                      ? `${participantName} · ${getPlayerAgentRuntimeStatusLabel(slot.aiRuntimeStatus)}`
+                      : participantName}
+                  </p>
+                </div>
+                <span
+                  className={[
+                    "rounded-full border px-2 py-1 text-[11px]",
+                    slot.isAiControlled
+                      ? "border-sky-800/60 text-sky-300"
+                      : "border-emerald-800/60 text-emerald-300",
+                  ].join(" ")}
+                >
+                  {slot.isAiControlled ? "AI 참여" : "참여 중"}
+                </span>
+              </div>
+            );
+          })
         ) : (
           <p className="text-sm text-dark-500">아직 입장한 플레이어가 없습니다.</p>
         )}
@@ -1820,7 +1830,7 @@ export default function PlayerView() {
                 />
               ) : null}
             />
-            <PlayerRoomRosterPanel slots={sharedState.characterSlots} />
+            <PlayerRoomRosterPanel slots={sharedState.characterSlots} players={game.players} />
           </div>
         )}
 
@@ -1836,7 +1846,7 @@ export default function PlayerView() {
             <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
               현재 단계에서 볼 공통 화면이 없습니다.
             </div>
-            <PlayerRoomRosterPanel slots={sharedState.characterSlots} />
+            <PlayerRoomRosterPanel slots={sharedState.characterSlots} players={game.players} />
           </div>
         )}
 

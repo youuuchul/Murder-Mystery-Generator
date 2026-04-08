@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  applyPlayerAgentAutoVotes,
-  tracePlayerAgentAutoVoteOutcome,
-} from "@/lib/ai/player-agent/actions/auto-actions";
-import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
   syncPlayerAgentRuntimeStatusForSharedPhase,
@@ -138,14 +134,9 @@ export async function POST(req: Request, { params }: Params) {
             }
           }
 
-          const aiVoteOutcome = applyPlayerAgentAutoVotes(latestSession, game, {
-            trigger: "phase_request_advance",
-          });
-
           return {
             advanced: true,
             requested: false,
-            aiVoteOutcome,
           };
         }
 
@@ -156,28 +147,11 @@ export async function POST(req: Request, { params }: Params) {
         return {
           advanced: false,
           requested: action === "request",
-          aiVoteOutcome: {
-            acted: false,
-            trigger: "phase_request_advance" as const,
-            submittedCount: 0,
-            entries: [],
-            reason: "not-advanced",
-          },
         };
       }
     );
 
     broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
-
-    await tracePlayerAgentAutoVoteOutcome({
-      session: {
-        id: persistedSession.id,
-        gameId: persistedSession.gameId,
-        mode: persistedSession.mode,
-        sharedState: persistedSession.sharedState,
-      },
-      outcome: result.aiVoteOutcome,
-    });
 
     return NextResponse.json({
       ok: true,

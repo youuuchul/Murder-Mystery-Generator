@@ -40,7 +40,8 @@ export default function JoinPage() {
   const [joining, setJoining] = useState(false);
 
   const selectedSlot = session?.sharedState.characterSlots.find((slot) => slot.playerId === selectedPlayerId) ?? null;
-  const isRejoinFlow = Boolean(selectedSlot?.isLocked);
+  const isAiSlot = Boolean(selectedSlot?.isAiControlled);
+  const isRejoinFlow = Boolean(selectedSlot?.isLocked && !selectedSlot?.isAiControlled);
 
   useEffect(() => {
     async function fetchSession() {
@@ -148,15 +149,20 @@ export default function JoinPage() {
               const player = game.players.find((p) => p.id === slot.playerId);
               if (!player) return null;
               const taken = slot.isLocked;
+              const aiTaken = slot.isAiControlled === true;
               const selected = selectedPlayerId === slot.playerId;
 
               return (
                 <button
                   key={slot.playerId}
                   type="button"
+                  disabled={aiTaken}
                   onClick={() => setSelectedPlayerId(slot.playerId)}
                   className={[
                     "w-full text-left p-4 rounded-xl border transition-all",
+                    aiTaken
+                      ? "border-dark-700 bg-dark-900/40 opacity-70 cursor-not-allowed"
+                      : "",
                     selected
                       ? taken
                         ? "border-amber-700 bg-amber-950/20 ring-1 ring-amber-700"
@@ -188,7 +194,9 @@ export default function JoinPage() {
                         )}
                       </div>
                     </div>
-                    {taken ? (
+                    {aiTaken ? (
+                      <span className="text-xs text-sky-300 shrink-0">AI 참여</span>
+                    ) : taken ? (
                       <span className="text-xs text-amber-400 shrink-0">복귀 가능</span>
                     ) : selected ? (
                       <span className="text-xs text-mystery-400 shrink-0">선택됨</span>
@@ -201,7 +209,7 @@ export default function JoinPage() {
         </div>
 
         {/* 이름 입력 + 참가 */}
-        {selectedPlayerId && (
+        {selectedPlayerId && !isAiSlot && (
           <div className="bg-dark-900 border border-mystery-800 rounded-xl p-4 space-y-3">
             <p className="text-sm font-medium text-dark-300">
               {game.players.find((p) => p.id === selectedPlayerId)?.name} {isRejoinFlow ? "복귀" : "로 참가"}
@@ -227,6 +235,12 @@ export default function JoinPage() {
             >
               {joining ? (isRejoinFlow ? "복귀 중…" : "참가 중…") : (isRejoinFlow ? "복귀하기" : "참가하기")}
             </button>
+          </div>
+        )}
+
+        {selectedPlayerId && isAiSlot && (
+          <div className="bg-dark-900 border border-sky-900/50 rounded-xl p-4 text-sm text-sky-200">
+            이 자리는 현재 AI 플레이어가 맡고 있습니다.
           </div>
         )}
 

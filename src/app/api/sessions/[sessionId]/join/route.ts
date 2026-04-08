@@ -35,6 +35,10 @@ export async function POST(req: Request, { params }: Params) {
           throw new Error("해당 캐릭터 슬롯 없음");
         }
 
+        if (slot.isAiControlled) {
+          throw new Error("AI가 맡은 자리입니다.");
+        }
+
         if (slot.isLocked) {
           throw new Error("이미 참가한 슬롯입니다.");
         }
@@ -46,6 +50,7 @@ export async function POST(req: Request, { params }: Params) {
         slot.playerName = normalizedPlayerName;
         slot.token = token;
         slot.isLocked = true;
+        slot.isAiControlled = false;
 
         if (existingPlayerState) {
           existingPlayerState.token = token;
@@ -97,6 +102,10 @@ export async function POST(req: Request, { params }: Params) {
     }
 
     if (error instanceof Error && error.message === "이미 참가한 슬롯입니다.") {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+
+    if (error instanceof Error && error.message === "AI가 맡은 자리입니다.") {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
 

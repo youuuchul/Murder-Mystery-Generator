@@ -221,7 +221,9 @@ export async function POST(req: NextRequest, { params }: Params) {
           });
         }
 
-        const totalPlayers = latestSession.sharedState.characterSlots.filter((slot) => slot.isLocked).length;
+        const totalPlayers = latestSession.sharedState.characterSlots.filter(
+          (slot) => slot.isLocked && !slot.isAiControlled
+        ).length;
         return {
           allVoted: latestSession.sharedState.voteCount >= totalPlayers,
         };

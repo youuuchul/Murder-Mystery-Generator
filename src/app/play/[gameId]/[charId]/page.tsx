@@ -1120,11 +1120,22 @@ function PlayerRoomRosterPanel({
               className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-950/50 px-3 py-3"
             >
               <div>
-                <p className="text-sm font-medium text-dark-100">{slot.playerName || "이름 없음"}</p>
-                <p className="mt-1 text-xs text-dark-500">{slot.playerId}</p>
+                <p className="text-sm font-medium text-dark-100">
+                  {slot.isAiControlled ? "AI 플레이어" : (slot.playerName || "이름 없음")}
+                </p>
+                <p className="mt-1 text-xs text-dark-500">
+                  {slot.isAiControlled ? "자동 참여" : slot.playerId}
+                </p>
               </div>
-              <span className="rounded-full border border-emerald-800/60 px-2 py-1 text-[11px] text-emerald-300">
-                참여 중
+              <span
+                className={[
+                  "rounded-full border px-2 py-1 text-[11px]",
+                  slot.isAiControlled
+                    ? "border-sky-800/60 text-sky-300"
+                    : "border-emerald-800/60 text-emerald-300",
+                ].join(" ")}
+              >
+                {slot.isAiControlled ? "AI 참여" : "참여 중"}
               </span>
             </div>
           ))

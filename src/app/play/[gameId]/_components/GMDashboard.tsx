@@ -974,7 +974,7 @@ function SlotCard({
           <p className="font-semibold text-dark-100 text-sm">{playerName}</p>
           {slot.isLocked ? (
             <p className="text-xs text-mystery-400 mt-0.5">
-              {slot.playerName} 참가 중
+              {slot.isAiControlled ? "AI 플레이어 참여 중" : `${slot.playerName} 참가 중`}
             </p>
           ) : (
             <p className="text-xs text-dark-600 mt-0.5">대기 중…</p>
@@ -983,11 +983,13 @@ function SlotCard({
         <span
           className={`text-xs px-2 py-0.5 rounded-full border ${
             slot.isLocked
-              ? "border-mystery-700 text-mystery-400"
+              ? slot.isAiControlled
+                ? "border-sky-700 text-sky-300"
+                : "border-mystery-700 text-mystery-400"
               : "border-dark-700 text-dark-600"
           }`}
         >
-          {slot.isLocked ? "참가" : "미참가"}
+          {slot.isLocked ? (slot.isAiControlled ? "AI" : "참가") : "미참가"}
         </span>
       </div>
 
@@ -998,7 +1000,7 @@ function SlotCard({
           disabled={unlocking}
           className="w-full rounded-lg border border-orange-900/50 px-3 py-2 text-xs text-orange-300 hover:bg-orange-950/20 transition-colors disabled:opacity-50"
         >
-          {unlocking ? "해제 중…" : "재참가 허용"}
+          {unlocking ? "해제 중…" : slot.isAiControlled ? "AI 해제" : "재참가 허용"}
         </button>
       )}
     </div>

@@ -35,6 +35,7 @@ export function buildInitialSession(
     playerName: null,
     token: null,
     isLocked: false,
+    isAiControlled: false,
   }));
 
   return {

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { enablePlayerAgentSlotsForMissingPlayers } from "@/lib/ai/player-agent/core/player-agent-state";
+import {
+  applyPlayerAgentOccupancyToCharacterSlots,
+  enablePlayerAgentSlotsForMissingPlayers,
+} from "@/lib/ai/player-agent/core/player-agent-state";
 import { getGame } from "@/lib/game-repository";
 import {
   applySessionAdvanceStep,
@@ -72,7 +75,7 @@ export async function POST(req: Request, { params }: Params) {
         latestSession.sharedState.phaseAdvanceRequestPlayerIds = [...requestedPlayerIds];
 
         const joinedPlayerIds = latestSession.sharedState.characterSlots
-          .filter((item) => item.isLocked)
+          .filter((item) => item.isLocked && !item.isAiControlled)
           .map((item) => item.playerId);
 
         const allJoinedPlayersRequested = joinedPlayerIds.length > 0
@@ -88,6 +91,10 @@ export async function POST(req: Request, { params }: Params) {
                   .map((item) => item.playerId),
                 missingPlayerCount: Math.max(0, latestSession.sharedState.characterSlots.length - joinedPlayerIds.length),
               }
+            );
+            latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+              latestSession.sharedState.characterSlots,
+              latestSession.playerAgentState
             );
           }
 

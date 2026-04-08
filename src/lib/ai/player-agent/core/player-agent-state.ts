@@ -1,4 +1,5 @@
 import type {
+  CharacterSlot,
   PlayerAgentRuntimeStatus,
   PlayerAgentSessionState,
   PlayerAgentSlotState,
@@ -119,4 +120,50 @@ export function enablePlayerAgentSlotsForMissingPlayers(
     ...state,
     slots: nextSlots,
   };
+}
+
+/**
+ * AI 슬롯 활성화 상태를 공개 세션 슬롯 정보에 반영한다.
+ * 사람이 점유한 슬롯은 유지하고, AI가 맡은 자리는 참가 목록과 조인 화면에서 보이게 맞춘다.
+ */
+export function applyPlayerAgentOccupancyToCharacterSlots(
+  slots: CharacterSlot[],
+  state: PlayerAgentSessionState
+): CharacterSlot[] {
+  const aiEnabledPlayerIds = new Set(
+    state.slots
+      .filter((slot) => slot.enabled)
+      .map((slot) => slot.playerId)
+  );
+
+  return slots.map((slot) => {
+    if (slot.token) {
+      return {
+        ...slot,
+        isAiControlled: false,
+      };
+    }
+
+    if (aiEnabledPlayerIds.has(slot.playerId)) {
+      return {
+        ...slot,
+        playerName: "AI 플레이어",
+        token: null,
+        isLocked: true,
+        isAiControlled: true,
+      };
+    }
+
+    if (slot.isAiControlled) {
+      return {
+        ...slot,
+        playerName: null,
+        token: null,
+        isLocked: false,
+        isAiControlled: false,
+      };
+    }
+
+    return slot;
+  });
 }

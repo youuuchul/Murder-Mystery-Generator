@@ -50,6 +50,7 @@ export interface CharacterSlot {
   playerName: string | null; // 실제 참여자 이름
   token: string | null;      // 참여자 인증 토큰 (localStorage)
   isLocked: boolean;         // 슬롯 점유 여부
+  isAiControlled?: boolean;  // AI 플레이어가 맡고 있는 슬롯인지 여부
 }
 
 export interface EventLogEntry {

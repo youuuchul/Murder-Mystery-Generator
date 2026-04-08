@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { enablePlayerAgentSlotsForMissingPlayers } from "@/lib/ai/player-agent/core/player-agent-state";
+import {
+  applyPlayerAgentOccupancyToCharacterSlots,
+  enablePlayerAgentSlotsForMissingPlayers,
+} from "@/lib/ai/player-agent/core/player-agent-state";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { canAccessGmPlay } from "@/lib/game-access";
@@ -189,6 +192,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                   missingPlayerCount: Math.max(0, sharedState.characterSlots.length - lockedPlayerCount),
                 }
               );
+              sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+                sharedState.characterSlots,
+                latestSession.playerAgentState
+              );
             }
 
             newPhase = "opening";
@@ -273,6 +280,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           slot.playerName = null;
           slot.token = null;
           slot.isLocked = false;
+          slot.isAiControlled = false;
+
+          if (latestSession.playerAgentState) {
+            latestSession.playerAgentState = {
+              ...latestSession.playerAgentState,
+              slots: latestSession.playerAgentState.slots.map((item) => (
+                item.playerId === body.playerId
+                  ? {
+                      ...item,
+                      enabled: false,
+                      runtimeStatus: "idle",
+                    }
+                  : item
+              )),
+            };
+          }
 
           if (playerState && standbyToken) {
             playerState.token = standbyToken;

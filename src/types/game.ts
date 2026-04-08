@@ -55,6 +55,7 @@ export interface PhaseConfig {
 
 export interface GameRules {
   roundCount: number;
+  openingDurationMinutes: number;
   phases: PhaseConfig[];
   privateChat: {
     enabled: boolean;

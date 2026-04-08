@@ -4,6 +4,7 @@ import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
+import { markPhaseStarted } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
@@ -105,6 +106,7 @@ async function revealVotes(
   const { session: persistedSession, result } = await mutateSessionWithRetry(
     sessionId,
     async (latestSession) => {
+      const now = new Date().toISOString();
       const game = await getGame(latestSession.gameId);
       const culpritPlayerId = game?.story.culpritPlayerId ?? "";
       const tally = buildVoteTally(latestSession as LoadedSession);
@@ -114,7 +116,7 @@ async function revealVotes(
         latestSession.pendingArrestOptions = tiedCandidates;
         latestSession.sharedState.eventLog.push({
           id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           message: "최다 득표 동률입니다. GM이 최종 검거 대상을 선택해야 합니다.",
           type: "system",
         });
@@ -148,10 +150,11 @@ async function revealVotes(
       latestSession.sharedState.voteReveal = reveal;
       latestSession.sharedState.phase = "ending";
       latestSession.sharedState.endingStage = "branch";
+      markPhaseStarted(latestSession.sharedState, now);
 
       latestSession.sharedState.eventLog.push({
         id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         message: resultType === "culprit-captured"
           ? "범인이 검거됐습니다."
           : "검거된 인물은 있었지만 진범은 아니었습니다.",

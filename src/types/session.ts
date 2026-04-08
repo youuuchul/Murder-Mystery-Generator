@@ -63,6 +63,8 @@ export interface VoteReveal {
 /** 세션 공개 상태 — 모든 참여자에게 브로드캐스트 */
 export interface SharedState {
   phase: GamePhase;
+  /** 현재 메인 페이즈가 시작된 시각. 오프닝 제한시간 계산에 사용한다. */
+  phaseStartedAt?: string;
   currentRound: number;
   /** 현재 라운드의 서브 페이즈 — round-N 페이즈에서만 유효 */
   currentSubPhase?: "investigation" | "discussion";

@@ -7,7 +7,7 @@ import { buildPlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { clearPhaseAdvanceRequests } from "@/lib/session-phase";
+import { clearPhaseAdvanceRequests, markPhaseStarted } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
   deleteSession,
@@ -168,6 +168,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
 
         const { sharedState } = latestSession;
+        const now = new Date().toISOString();
         let newPhase: GamePhase = sharedState.phase;
         let message = "";
 
@@ -175,23 +176,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           if (sharedState.phase === "lobby") {
             newPhase = "opening";
             message = "오프닝이 시작됩니다.";
-            latestSession.startedAt = new Date().toISOString();
+            latestSession.startedAt = now;
+            markPhaseStarted(sharedState, now);
           } else if (sharedState.phase === "opening") {
             newPhase = "round-1";
             sharedState.currentRound = 1;
             sharedState.currentSubPhase = "investigation";
             message = "Round 1 조사 페이즈가 시작됩니다.";
+            markPhaseStarted(sharedState, now);
           } else if (sharedState.phase.startsWith("round-")) {
             const cur = sharedState.currentRound;
             if (cur >= maxRound) {
               newPhase = "vote";
               sharedState.currentSubPhase = undefined;
               message = "투표 페이즈가 시작됩니다.";
+              markPhaseStarted(sharedState, now);
             } else {
               newPhase = `round-${cur + 1}` as GamePhase;
               sharedState.currentRound = cur + 1;
               sharedState.currentSubPhase = "investigation";
               message = `Round ${cur + 1} 조사 페이즈가 시작됩니다.`;
+              markPhaseStarted(sharedState, now);
             }
           } else if (sharedState.phase === "vote") {
             throw new Error("투표 결과를 먼저 공개하세요.");
@@ -277,7 +282,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         if (message) {
           sharedState.eventLog.push({
             id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
+            timestamp: now,
             message,
             type: "phase_changed",
           });

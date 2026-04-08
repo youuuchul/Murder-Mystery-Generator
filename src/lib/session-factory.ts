@@ -46,6 +46,7 @@ export function buildInitialSession(
     updatedAt: now,
     sharedState: {
       phase: "lobby",
+      phaseStartedAt: now,
       currentRound: 0,
       publicClueIds: [],
       acquiredClueIds: [],

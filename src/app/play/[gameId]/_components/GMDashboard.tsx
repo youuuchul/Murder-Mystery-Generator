@@ -15,6 +15,11 @@ import {
   getAdvanceConfirmKind,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
+import {
+  formatTimerSeconds,
+  getRemainingSeconds,
+  getSessionTimerSnapshot,
+} from "@/lib/session-timer";
 import type { GamePackage, GameRules } from "@/types/game";
 import type { EndingStage, GameSession, GameSessionSummary, SharedState, CharacterSlot } from "@/types/session";
 
@@ -451,6 +456,74 @@ function advanceLabel(phase: string, maxRound: number): string {
   }
   if (phase === "vote") return "결과 공개";
   return "";
+}
+
+/**
+ * 오프닝 페이즈에서 모두가 같은 기준으로 보는 제한시간을 보여준다.
+ * 오프닝은 별도 서브페이즈가 없으므로 시작 시각만 있으면 새로고침 후에도 이어서 계산된다.
+ */
+function OpeningTimerCard({
+  sharedState,
+  rules,
+}: {
+  sharedState: SharedState;
+  rules: GameRules;
+}) {
+  const timerSnapshot = getSessionTimerSnapshot(sharedState, rules);
+  const [secondsLeft, setSecondsLeft] = useState(() => (
+    timerSnapshot
+      ? getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds)
+      : 0
+  ));
+
+  useEffect(() => {
+    if (!timerSnapshot) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
+    const intervalId = window.setInterval(() => {
+      setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [timerSnapshot?.durationSeconds, timerSnapshot?.startedAt]);
+
+  if (!timerSnapshot) {
+    return null;
+  }
+
+  const progress = timerSnapshot.durationSeconds > 0
+    ? (secondsLeft / timerSnapshot.durationSeconds) * 100
+    : 0;
+  const isExpired = secondsLeft === 0;
+
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium text-dark-300">{timerSnapshot.label}</h3>
+          <p className="mt-1 text-xs text-dark-500">오프닝 안내와 공통 화면 확인 시간을 기준으로 잡습니다.</p>
+        </div>
+        <div className="text-right">
+          <p className={`text-xl font-semibold ${isExpired ? "text-red-300" : "text-mystery-300"}`}>
+            {formatTimerSeconds(secondsLeft)}
+          </p>
+          <p className="mt-1 text-[11px] text-dark-500">
+            {isExpired ? "시간 종료" : `${Math.ceil(secondsLeft / 60)}분 이내`}
+          </p>
+        </div>
+      </div>
+
+      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
+          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function PhaseTimer({
@@ -1690,6 +1763,11 @@ export default function GMDashboard({
             </div>
 
             {/* 페이즈 타이머 */}
+            <OpeningTimerCard
+              sharedState={session.sharedState}
+              rules={game.rules}
+            />
+
             <PhaseTimer
               phase={phase}
               currentSubPhase={session.sharedState.currentSubPhase}

@@ -25,21 +25,31 @@ export function clearPhaseAdvanceRequests(sharedState: SharedState): void {
 }
 
 /**
+ * 공통 페이즈 시작 시각을 갱신한다.
+ * 오프닝 제한시간과 이후 공용 타이머 확장 시 같은 기준을 재사용한다.
+ */
+export function markPhaseStarted(sharedState: SharedState, now: string): void {
+  sharedState.phaseStartedAt = now;
+}
+
+/**
  * 현재 세션을 다음 진행 단계로 한 칸 이동시킨다.
  * 플레이어 합의 진행과 GM 수동 진행이 같은 규칙을 쓰도록 공용 로직으로 둔다.
  */
 export function applySessionAdvanceStep(session: GameSession, game: GamePackage): void {
   const { sharedState } = session;
   const maxRound = game.rules?.roundCount ?? 4;
+  const now = new Date().toISOString();
 
   clearPhaseAdvanceRequests(sharedState);
 
   if (sharedState.phase === "lobby") {
     sharedState.phase = "opening";
-    session.startedAt = new Date().toISOString();
+    session.startedAt = now;
+    markPhaseStarted(sharedState, now);
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       message: "오프닝이 시작됩니다.",
       type: "phase_changed",
     });
@@ -50,9 +60,10 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     sharedState.phase = "round-1";
     sharedState.currentRound = 1;
     sharedState.currentSubPhase = "investigation";
+    markPhaseStarted(sharedState, now);
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       message: "Round 1 조사 페이즈가 시작됩니다.",
       type: "phase_changed",
     });
@@ -66,7 +77,7 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
       sharedState.currentSubPhase = "discussion";
       sharedState.eventLog.push({
         id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         message: "토론 페이즈가 시작됩니다.",
         type: "phase_changed",
       });
@@ -76,9 +87,10 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     if (sharedState.currentRound >= maxRound) {
       sharedState.phase = "vote";
       sharedState.currentSubPhase = undefined;
+      markPhaseStarted(sharedState, now);
       sharedState.eventLog.push({
         id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         message: "투표 페이즈가 시작됩니다.",
         type: "phase_changed",
       });
@@ -88,9 +100,10 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     sharedState.phase = `round-${sharedState.currentRound + 1}`;
     sharedState.currentRound += 1;
     sharedState.currentSubPhase = "investigation";
+    markPhaseStarted(sharedState, now);
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       message: `Round ${sharedState.currentRound} 조사 페이즈가 시작됩니다.`,
       type: "phase_changed",
     });

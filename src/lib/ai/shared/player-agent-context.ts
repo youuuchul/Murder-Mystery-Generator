@@ -1,0 +1,108 @@
+import { buildGameForPlayer } from "@/lib/game-sanitizer";
+import { buildPlayerSharedBoardContent, type PlayerSharedBoardContent } from "@/lib/player-shared-board";
+import type { GamePackage, Player } from "@/types/game";
+import type { GameSession, InventoryCard, PlayerState } from "@/types/session";
+
+export interface PlayerAgentConversationTurn {
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+}
+
+export interface PlayerAgentVisibleCard {
+  cardId: string;
+  title: string;
+  description: string;
+  type: string;
+  acquiredAt: string;
+  fromPlayerId?: string;
+}
+
+export interface PlayerAgentVisibleContext {
+  session: {
+    id: string;
+    gameId: string;
+    sessionName: string;
+    sessionMode: GameSession["mode"];
+    phase: GameSession["sharedState"]["phase"];
+    currentRound: number;
+    currentSubPhase?: GameSession["sharedState"]["currentSubPhase"];
+  };
+  player: {
+    id: string;
+    name: string;
+    background: string;
+    story: string;
+    secret: string;
+    victoryCondition: Player["victoryCondition"];
+    personalGoal?: string;
+  };
+  publicState: {
+    joinedPlayers: { playerId: string; playerName: string | null }[];
+    sharedBoard: PlayerSharedBoardContent | null;
+  };
+  inventory: PlayerAgentVisibleCard[];
+  conversationHistory: PlayerAgentConversationTurn[];
+}
+
+/**
+ * AI 플레이어에게 넘길 최소 공개 컨텍스트를 만든다.
+ * 원본 게임 전체를 그대로 넘기지 않고, 현재 캐릭터가 실제로 볼 수 있는 정보만 추린다.
+ */
+export function buildPlayerAgentVisibleContext(input: {
+  game: GamePackage;
+  session: GameSession;
+  playerState: PlayerState;
+  conversationHistory?: PlayerAgentConversationTurn[];
+}): PlayerAgentVisibleContext {
+  const sanitizedGame = buildGameForPlayer(input.game, input.playerState.playerId);
+  const me = sanitizedGame.players.find((player) => player.id === input.playerState.playerId);
+
+  if (!me) {
+    throw new Error("AI 플레이어 컨텍스트를 만들 캐릭터를 찾을 수 없습니다.");
+  }
+
+  const inventory = input.playerState.inventory.map((item) => {
+    const clue = input.game.clues.find((candidate) => candidate.id === item.cardId);
+    return {
+      cardId: item.cardId,
+      title: clue?.title ?? "(제목 없음)",
+      description: clue?.description ?? "",
+      type: clue?.type ?? "physical",
+      acquiredAt: item.acquiredAt,
+      fromPlayerId: item.fromPlayerId,
+    };
+  });
+
+  return {
+    session: {
+      id: input.session.id,
+      gameId: input.session.gameId,
+      sessionName: input.session.sessionName,
+      sessionMode: input.session.mode,
+      phase: input.session.sharedState.phase,
+      currentRound: input.session.sharedState.currentRound,
+      currentSubPhase: input.session.sharedState.currentSubPhase,
+    },
+    player: {
+      id: me.id,
+      name: me.name,
+      background: me.background,
+      story: me.story,
+      secret: me.secret,
+      victoryCondition: me.victoryCondition,
+      personalGoal: me.personalGoal,
+    },
+    publicState: {
+      joinedPlayers: input.session.sharedState.characterSlots
+        .filter((slot) => slot.isLocked)
+        .map((slot) => ({
+          playerId: slot.playerId,
+          playerName: slot.playerName,
+        })),
+      sharedBoard: buildPlayerSharedBoardContent(input.game, input.session.sharedState),
+    },
+    inventory,
+    conversationHistory: input.conversationHistory ?? [],
+  };
+}

@@ -11,6 +11,7 @@ function buildDefaultRules(playerCount: number): GameRules {
   const investigationMin = playerCount >= 6 ? 20 : 15;
   return {
     roundCount: 4,
+    openingDurationMinutes: 5,
     phases: [
       { type: "investigation", label: "조사", durationMinutes: investigationMin },
       { type: "discussion", label: "토론", durationMinutes: 10 },

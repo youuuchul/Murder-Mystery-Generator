@@ -480,6 +480,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
   const fallbackPhases = defaultPhases(settings.playerCount);
   const rules: GameRules = {
     roundCount: game.rules?.roundCount ?? 4,
+    openingDurationMinutes: game.rules?.openingDurationMinutes ?? 5,
     phases: fallbackPhases.map((phase) => {
       const saved = game.rules?.phases?.find((item) => item.type === phase.type);
       return {

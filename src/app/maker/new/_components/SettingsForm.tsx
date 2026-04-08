@@ -46,6 +46,7 @@ function buildDefaultRules(playerCount: number): GameRules {
   const investigationMin = playerCount >= 6 ? 20 : 15;
   return {
     roundCount: 4,
+    openingDurationMinutes: 5,
     phases: [
       { type: "investigation", label: "조사", durationMinutes: investigationMin },
       { type: "discussion", label: "토론", durationMinutes: 10 },
@@ -175,7 +176,7 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
 
   // 라운드당 총 시간 계산
   const roundTotalMin = rules.phases.reduce((s, p) => s + p.durationMinutes, 0);
-  const totalMin = roundTotalMin * rules.roundCount;
+  const totalMin = rules.openingDurationMinutes + roundTotalMin * rules.roundCount;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">
@@ -358,14 +359,36 @@ export default function SettingsForm({ onNext }: SettingsFormProps) {
                   <span className="text-dark-300">{p.durationMinutes}분</span>
                 </div>
               ))}
+              <div className="flex justify-between">
+                <span>오프닝</span>
+                <span className="text-dark-300">{rules.openingDurationMinutes}분</span>
+              </div>
               <div className="border-t border-dark-700 pt-1 mt-1 flex justify-between font-medium text-dark-200">
                 <span>1라운드 합계</span><span>{roundTotalMin}분</span>
               </div>
               <div className="flex justify-between text-mystery-400 font-semibold">
-                <span>전체 ({rules.roundCount}라운드)</span><span>≈ {totalMin}분</span>
+                <span>전체 (오프닝 + {rules.roundCount}라운드)</span><span>≈ {totalMin}분</span>
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-xs font-medium text-dark-400 mb-3">오프닝 제한 시간</label>
+          <div className="flex items-center gap-3 bg-dark-800/50 border border-dark-700 rounded-lg px-4 py-3">
+            <span className="text-sm font-medium text-dark-200 w-20">오프닝</span>
+            <input
+              type="range"
+              min={1}
+              max={30}
+              step={1}
+              value={rules.openingDurationMinutes}
+              onChange={(e) => setRules((prev) => ({ ...prev, openingDurationMinutes: Number(e.target.value) }))}
+              className="flex-1 accent-mystery-500"
+            />
+            <span className="text-dark-300 text-sm w-12 text-right">{rules.openingDurationMinutes}분</span>
+          </div>
+          <p className="mt-2 text-xs text-dark-500">오프닝 페이즈에서 모두가 참고할 기본 제한시간입니다.</p>
         </div>
 
         {/* 페이즈별 시간 */}

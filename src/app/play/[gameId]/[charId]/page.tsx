@@ -17,6 +17,11 @@ import {
   getPlayerAdvanceRequestLabel,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
+import {
+  formatTimerSeconds,
+  getRemainingSeconds,
+  getSessionTimerSnapshot,
+} from "@/lib/session-timer";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
 import type { EndingStage, SharedState, InventoryCard, VoteReveal, SessionMode } from "@/types/session";
 
@@ -1265,6 +1270,70 @@ function SharedBoardPanel({
   );
 }
 
+/**
+ * 플레이어 화면에서 오프닝 제한시간을 보여준다.
+ * GM 없는 세션과 GM 세션 모두 같은 시각 기준을 보게 하려고 세션 상태의 시작 시각만 사용한다.
+ */
+function OpeningCountdownCard({
+  sharedState,
+  rules,
+}: {
+  sharedState: SharedState;
+  rules: GamePackage["rules"];
+}) {
+  const timerSnapshot = getSessionTimerSnapshot(sharedState, rules);
+  const [secondsLeft, setSecondsLeft] = useState(() => (
+    timerSnapshot
+      ? getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds)
+      : 0
+  ));
+
+  useEffect(() => {
+    if (!timerSnapshot) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
+    const intervalId = window.setInterval(() => {
+      setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [timerSnapshot?.durationSeconds, timerSnapshot?.startedAt]);
+
+  if (!timerSnapshot) {
+    return null;
+  }
+
+  const progress = timerSnapshot.durationSeconds > 0
+    ? (secondsLeft / timerSnapshot.durationSeconds) * 100
+    : 0;
+  const isExpired = secondsLeft === 0;
+
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-dark-500">오프닝 제한시간</p>
+          <p className="mt-1 text-sm font-medium text-dark-100">
+            {isExpired ? "오프닝 시간이 끝났습니다." : "남은 시간 안에 내용을 확인해 주세요."}
+          </p>
+        </div>
+        <p className={`text-xl font-semibold ${isExpired ? "text-red-300" : "text-mystery-300"}`}>
+          {formatTimerSeconds(secondsLeft)}
+        </p>
+      </div>
+      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
+          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function PlayerView() {
   const { gameId, charId } = useParams() as { gameId: string; charId: string };
@@ -1440,6 +1509,11 @@ export default function PlayerView() {
     if (!res.ok) {
       const err = await res.json();
       alert(err.error ?? "획득 실패");
+    } else {
+      const data = await res.json().catch(() => ({})) as { card?: InventoryCard };
+      if (data.card) {
+        setSelectedCard(data.card);
+      }
     }
     // 인벤토리 업데이트는 SSE inventory_${token} 이벤트에서만 처리
     // (로컬 update + SSE 동시 실행 시 이중 추가 버그 방지)
@@ -1657,6 +1731,7 @@ export default function PlayerView() {
               <p className="text-xs text-dark-500 mb-1">내 캐릭터</p>
               <p className="font-bold text-dark-50">{character.name}</p>
             </div>
+            <OpeningCountdownCard sharedState={sharedState} rules={game.rules} />
           </div>
         )}
 

@@ -33,7 +33,7 @@ import {
   isSessionConflictError,
 } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
-import type { EndingStage, GamePhase, GameSession } from "@/types/session";
+import type { EndingStage, GamePhase, GameSession, VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 
@@ -112,12 +112,162 @@ function canRetryActionOnLatestSession(
   );
 }
 
+function buildVoteTally(session: GameSession): VoteTally[] {
+  session.votes = session.votes ?? {};
+  const tallyMap = new Map<string, { count: number; voterNames: string[] }>();
+
+  for (const [token, targetPlayerId] of Object.entries(session.votes)) {
+    const voter = session.playerStates.find((player) => player.token === token);
+    if (!tallyMap.has(targetPlayerId)) {
+      tallyMap.set(targetPlayerId, { count: 0, voterNames: [] });
+    }
+    const entry = tallyMap.get(targetPlayerId)!;
+    entry.count += 1;
+    if (voter) {
+      entry.voterNames.push(voter.playerName);
+    }
+  }
+
+  return [...tallyMap.entries()]
+    .map(([playerId, data]) => ({
+      playerId,
+      count: data.count,
+      voterNames: data.voterNames,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function resolveEndingBranchId(
+  game: NonNullable<Awaited<ReturnType<typeof getGame>>>,
+  arrestedPlayerId: string,
+  resultType: "culprit-captured" | "wrong-arrest"
+): string | undefined {
+  if (resultType === "culprit-captured") {
+    return game.ending.branches.find((branch) => branch.triggerType === "culprit-captured")?.id;
+  }
+
+  return game.ending.branches.find((branch) => (
+    branch.triggerType === "specific-player-arrested"
+    && branch.targetPlayerId === arrestedPlayerId
+  ))?.id
+    ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
+}
+
+function pickDeterministicArrestedPlayerId(sessionId: string, candidates: string[]): string {
+  const sortedCandidates = [...candidates].sort((a, b) => a.localeCompare(b));
+  if (sortedCandidates.length <= 1) {
+    return sortedCandidates[0] ?? "";
+  }
+
+  const seed = stableHash(`${sessionId}:${sortedCandidates.join(":")}`);
+  return sortedCandidates[seed % sortedCandidates.length];
+}
+
+/**
+ * 과거 버전에서 `player-consensus` 세션이 동률 처리 대기 상태로 멈춘 경우를
+ * 조회 시점에 자동 복구해 엔딩으로 진행시킨다.
+ */
+async function recoverConsensusVoteTieIfNeeded(sessionId: string, session: GameSession): Promise<GameSession> {
+  if (
+    session.mode !== "player-consensus"
+    || session.sharedState.phase !== "vote"
+    || (session.pendingArrestOptions?.length ?? 0) === 0
+  ) {
+    return session;
+  }
+
+  const game = await getGame(session.gameId);
+  if (!game) {
+    return session;
+  }
+
+  const { session: persistedSession, result } = await mutateSessionWithRetry(
+    sessionId,
+    (latestSession) => {
+      if (
+        latestSession.mode !== "player-consensus"
+        || latestSession.sharedState.phase !== "vote"
+        || (latestSession.pendingArrestOptions?.length ?? 0) === 0
+      ) {
+        return { recovered: false };
+      }
+
+      const now = new Date().toISOString();
+      const arrestedPlayerId = pickDeterministicArrestedPlayerId(
+        latestSession.id,
+        latestSession.pendingArrestOptions ?? []
+      );
+      const tally = buildVoteTally(latestSession);
+      const culpritPlayerId = game.story.culpritPlayerId;
+      const totalVotes = Object.keys(latestSession.votes ?? {}).length;
+      const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
+      const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
+      const resultType = arrestedPlayerId === culpritPlayerId
+        ? "culprit-captured"
+        : "wrong-arrest";
+
+      const reveal: VoteReveal = {
+        tally,
+        culpritPlayerId,
+        arrestedPlayerId,
+        resultType,
+        resolvedBranchId: resolveEndingBranchId(game, arrestedPlayerId, resultType),
+        majorityCorrect,
+      };
+
+      latestSession.pendingArrestOptions = undefined;
+      latestSession.sharedState.voteReveal = reveal;
+      latestSession.sharedState.phase = "ending";
+      latestSession.sharedState.endingStage = "branch";
+      markPhaseStarted(latestSession.sharedState, now);
+
+      if (latestSession.playerAgentState) {
+        latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+          latestSession.playerAgentState,
+          latestSession.sharedState
+        );
+        latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+          latestSession.sharedState.characterSlots,
+          latestSession.playerAgentState
+        );
+      }
+
+      latestSession.sharedState.eventLog.push({
+        id: crypto.randomUUID(),
+        timestamp: now,
+        message: "동률 대기 상태를 복구해 엔딩 단계로 자동 전환했습니다.",
+        type: "system",
+      });
+
+      return { recovered: true };
+    }
+  );
+
+  if (result.recovered) {
+    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+  }
+
+  return persistedSession;
+}
+
+function stableHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
 /** GET /api/sessions/[sessionId] — 세션 상태 조회 */
 export async function GET(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const token = new URL(req.url).searchParams.get("token");
 
-  const session = await getSession(sessionId);
+  const rawSession = await getSession(sessionId);
+  const session = rawSession
+    ? await recoverConsensusVoteTieIfNeeded(sessionId, rawSession)
+    : null;
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   // 플레이어 개인 상태 — token으로 필터링

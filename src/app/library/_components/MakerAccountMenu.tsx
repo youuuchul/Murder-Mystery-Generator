@@ -42,7 +42,7 @@ export default function MakerAccountMenu({
         </svg>
       </summary>
 
-      <div className="absolute right-0 top-full z-30 mt-2 w-[26rem] max-w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-dark-700 bg-dark-900/95 shadow-2xl shadow-black/40 backdrop-blur">
+      <div className="absolute right-0 top-full z-30 mt-2 flex max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] w-[26rem] max-w-[min(26rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-dark-700 bg-dark-900/95 shadow-2xl shadow-black/40 backdrop-blur">
         <div className="border-b border-dark-800 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -59,7 +59,10 @@ export default function MakerAccountMenu({
           </div>
         </div>
 
-        <div className="max-h-[75vh] space-y-4 overflow-y-auto p-4">
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {errorMessage ? (
             <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
               {errorMessage}

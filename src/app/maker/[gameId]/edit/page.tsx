@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { resolveEditableGameForUser } from "@/lib/game-access";
-import { getGameContentSourceStatus } from "@/lib/game-content-integrity";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import MakerEditor from "./_components/MakerEditor";
@@ -41,8 +40,6 @@ export default async function EditGamePage({ params }: Props) {
     await saveGame(editableGame.game);
   }
 
-  const sourceStatus = getGameContentSourceStatus(gameId, editableGame.game);
-
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))]">
       <header className="sticky top-0 z-10 border-b border-dark-700 bg-[rgba(15,9,12,0.88)] backdrop-blur-xl">
@@ -63,26 +60,9 @@ export default async function EditGamePage({ params }: Props) {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className={`mb-6 rounded-2xl border px-5 py-4 ${
-          sourceStatus.localBackupDiffers
-            ? "border-amber-800/70 bg-amber-950/20"
-            : "border-dark-700/80 bg-dark-900/60"
-        }`}>
+        <div className="mb-6 rounded-2xl border border-dark-700/80 bg-dark-900/60 px-5 py-4">
           <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Save Status</p>
-          <p className="mt-2 text-sm text-dark-100">
-            {sourceStatus.primaryProvider === "supabase"
-              ? "지금 보고 있는 내용은 온라인에 저장된 편집본입니다."
-              : "지금 보고 있는 내용은 이 기기에 저장된 편집본입니다."}
-          </p>
-          {sourceStatus.primaryProvider === "supabase" && sourceStatus.localBackupAvailable && (
-            <p className={`mt-2 text-xs ${
-              sourceStatus.localBackupDiffers ? "text-amber-200" : "text-dark-400"
-            }`}>
-              {sourceStatus.localBackupDiffers
-                ? "이 기기에 남아 있는 백업본과 내용이 다릅니다. 예전 내용이 필요하면 저장 전에 먼저 확인하세요."
-                : "이 기기 백업과 현재 편집본이 같습니다."}
-            </p>
-          )}
+          <p className="mt-2 text-sm text-dark-100">지금 보고 있는 내용은 온라인에 저장된 편집본입니다.</p>
         </div>
         <MakerEditor initialGame={editableGame.game} />
       </main>

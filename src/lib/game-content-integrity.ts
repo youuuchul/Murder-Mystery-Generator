@@ -1,35 +1,18 @@
-import fs from "fs";
-import path from "path";
 import { getGameAssetsBucketName } from "@/lib/game-asset-storage";
 import { normalizeGame } from "@/lib/game-normalizer";
-import {
-  getPersistenceProviderConfig,
-  type PersistenceProvider,
-} from "@/lib/persistence-config";
-import { getGame as getLocalGame } from "@/lib/storage/game-storage";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
 import type { GamePackage } from "@/types/game";
 
-const LOCAL_GAME_CONTENT_BACKUP_DIR = path.join(process.cwd(), "backups", "game-content");
 const DEFAULT_SUPABASE_GAME_CONTENT_BACKUPS_BUCKET = "game-content-backups";
 const SUPABASE_GAME_CONTENT_BACKUP_FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024;
 
-export interface GameContentSourceStatus {
-  primaryProvider: PersistenceProvider;
-  localBackupAvailable: boolean;
-  localBackupDiffers: boolean;
-  localBackupUpdatedAt?: string;
-}
-
 export interface CreateGameContentBackupSnapshotOptions {
-  provider?: PersistenceProvider;
   reason?: string;
 }
 
 export interface GameContentBackupSnapshot {
-  provider: PersistenceProvider;
   location: string;
-  bucketName?: string;
+  bucketName: string;
 }
 
 let ensuredSupabaseGameContentBackupsBucketName: string | null = null;
@@ -49,41 +32,6 @@ export function getGameContentBackupsBucketName(): string {
  */
 export function areGamePackagesEquivalent(left: GamePackage, right: GamePackage): boolean {
   return JSON.stringify(normalizeGame(left)) === JSON.stringify(normalizeGame(right));
-}
-
-/**
- * 현재 편집 중인 게임이 어느 저장소를 기준으로 열렸는지와,
- * 로컬 백업본이 남아 있을 때 내용이 다른지 여부를 계산한다.
- */
-export function getGameContentSourceStatus(
-  gameId: string,
-  primaryGame: GamePackage
-): GameContentSourceStatus {
-  const primaryProvider = getPersistenceProviderConfig().provider;
-
-  if (primaryProvider !== "supabase") {
-    return {
-      primaryProvider,
-      localBackupAvailable: false,
-      localBackupDiffers: false,
-    };
-  }
-
-  const localBackup = getLocalGame(gameId);
-  if (!localBackup) {
-    return {
-      primaryProvider,
-      localBackupAvailable: false,
-      localBackupDiffers: false,
-    };
-  }
-
-  return {
-    primaryProvider,
-    localBackupAvailable: true,
-    localBackupDiffers: !areGamePackagesEquivalent(primaryGame, localBackup),
-    localBackupUpdatedAt: localBackup.updatedAt,
-  };
 }
 
 /**
@@ -114,15 +62,6 @@ function buildBackupPayload(game: GamePackage, reason: string, backedUpAt: strin
     gameUpdatedAt: game.updatedAt,
     game: normalizeGame(game),
   }, null, 2);
-}
-
-/**
- * 로컬 백업 폴더를 만든다.
- */
-function ensureLocalGameContentBackupDir(gameId: string): string {
-  const dir = path.join(LOCAL_GAME_CONTENT_BACKUP_DIR, gameId);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
 }
 
 /**
@@ -158,49 +97,36 @@ async function ensureSupabaseGameContentBackupsBucket(): Promise<string> {
 }
 
 /**
- * 게임 본문 이전 버전을 현재 저장소에 백업한다.
+ * 게임 본문 이전 버전을 Supabase Storage에 백업한다.
  * 덮어쓰기/삭제 전에 호출해 복구 지점을 남긴다.
  */
 export async function createGameContentBackupSnapshot(
   game: GamePackage,
   options: CreateGameContentBackupSnapshotOptions = {}
 ): Promise<GameContentBackupSnapshot> {
-  const provider = options.provider ?? getPersistenceProviderConfig().provider;
   const backedUpAt = new Date().toISOString();
   const reason = normalizeBackupReason(options.reason);
   const filename = `${formatBackupTimestamp(new Date(backedUpAt))}-${reason}.json`;
   const payload = buildBackupPayload(game, reason, backedUpAt);
 
-  if (provider === "supabase") {
-    const supabase = createSupabasePersistenceClient();
-    const bucketName = await ensureSupabaseGameContentBackupsBucket();
-    const objectPath = `${game.id}/${filename}`;
-    const { error } = await supabase.storage
-      .from(bucketName)
-      .upload(objectPath, Buffer.from(payload, "utf8"), {
-        contentType: "application/json",
-        cacheControl: "31536000",
-        upsert: false,
-      });
+  const supabase = createSupabasePersistenceClient();
+  const bucketName = await ensureSupabaseGameContentBackupsBucket();
+  const objectPath = `${game.id}/${filename}`;
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .upload(objectPath, Buffer.from(payload, "utf8"), {
+      contentType: "application/json",
+      cacheControl: "31536000",
+      upsert: false,
+    });
 
-    if (error) {
-      throw new Error(`Failed to backup game content to Supabase Storage: ${error.message}`);
-    }
-
-    return {
-      provider,
-      bucketName,
-      location: objectPath,
-    };
+  if (error) {
+    throw new Error(`Failed to backup game content to Supabase Storage: ${error.message}`);
   }
 
-  const dir = ensureLocalGameContentBackupDir(game.id);
-  const filePath = path.join(dir, filename);
-  fs.writeFileSync(filePath, payload, "utf8");
-
   return {
-    provider,
-    location: filePath,
+    bucketName,
+    location: objectPath,
   };
 }
 

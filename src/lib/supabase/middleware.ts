@@ -12,10 +12,6 @@ export async function updateSupabaseSession(request: NextRequest): Promise<NextR
     request,
   });
 
-  if (config.provider !== "supabase") {
-    return response;
-  }
-
   const supabase = createServerClient(config.supabaseUrl, config.supabasePublishableKey, {
     cookies: {
       getAll() {

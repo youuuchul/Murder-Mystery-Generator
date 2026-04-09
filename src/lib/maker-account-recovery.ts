@@ -1,6 +1,4 @@
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
 import { Resend } from "resend";
 import {
   isValidMakerAccountPassword,
@@ -17,11 +15,6 @@ import {
 } from "@/lib/supabase/maker-auth";
 import { DuplicateMakerRecoveryEmailError } from "@/lib/maker-auth-errors";
 
-const LOCAL_MAKER_DATA_DIR = path.join(process.cwd(), "data", "makers");
-const LOCAL_PASSWORD_RESET_TOKENS_PATH = path.join(
-  LOCAL_MAKER_DATA_DIR,
-  "password-reset-tokens.json"
-);
 const MAKER_PASSWORD_RESET_TTL_MS = 1000 * 60 * 60;
 
 interface MakerPasswordResetTokenRecord {
@@ -73,61 +66,7 @@ interface MakerRecoveryEmailConfig {
 
 const makerAuthGateway = getMakerAuthGateway();
 
-/** 복구 토큰을 저장할 로컬 디렉터리를 보장한다. */
-function ensureLocalMakerRecoveryDir(): void {
-  if (!fs.existsSync(LOCAL_MAKER_DATA_DIR)) {
-    fs.mkdirSync(LOCAL_MAKER_DATA_DIR, { recursive: true });
-  }
-}
-
-/** 로컬 JSON 저장소에 쓰는 토큰 레코드를 현재 규칙에 맞게 정리한다. */
-function normalizeLocalPasswordResetTokenRecord(
-  record: MakerPasswordResetTokenRecord
-): MakerPasswordResetTokenRecord {
-  return {
-    id: typeof record.id === "string" ? record.id.trim() : "",
-    userId: typeof record.userId === "string" ? record.userId.trim() : "",
-    tokenHash: typeof record.tokenHash === "string" ? record.tokenHash.trim() : "",
-    requestedEmail: normalizeMakerRecoveryEmail(record.requestedEmail ?? ""),
-    expiresAt: typeof record.expiresAt === "string" ? record.expiresAt : "",
-    usedAt: typeof record.usedAt === "string" && record.usedAt ? record.usedAt : null,
-    createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
-  };
-}
-
-/** 로컬 JSON 기반 재설정 토큰 목록을 읽는다. */
-function listLocalPasswordResetTokens(): MakerPasswordResetTokenRecord[] {
-  ensureLocalMakerRecoveryDir();
-  if (!fs.existsSync(LOCAL_PASSWORD_RESET_TOKENS_PATH)) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(
-      fs.readFileSync(LOCAL_PASSWORD_RESET_TOKENS_PATH, "utf8")
-    ) as MakerPasswordResetTokenRecord[];
-
-    return Array.isArray(parsed)
-      ? parsed
-        .map(normalizeLocalPasswordResetTokenRecord)
-        .filter((record) => Boolean(record.id) && Boolean(record.userId) && Boolean(record.tokenHash))
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-/** 로컬 JSON 기반 재설정 토큰 목록을 파일에 저장한다. */
-function saveLocalPasswordResetTokens(tokens: MakerPasswordResetTokenRecord[]): void {
-  ensureLocalMakerRecoveryDir();
-  fs.writeFileSync(
-    LOCAL_PASSWORD_RESET_TOKENS_PATH,
-    JSON.stringify(tokens, null, 2),
-    "utf8"
-  );
-}
-
-/** 원문 토큰을 DB/파일 비교용 해시로 바꾼다. */
+/** 원문 토큰을 DB 비교용 해시로 바꾼다. */
 function hashMakerPasswordResetToken(rawToken: string): string {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
@@ -245,37 +184,38 @@ function buildMakerPasswordResetExpiry(now: string): string {
   return new Date(Date.parse(now) + MAKER_PASSWORD_RESET_TTL_MS).toISOString();
 }
 
+/** Supabase row를 내부 레코드 타입으로 정규화한다. */
+function normalizePasswordResetTokenRecord(
+  record: MakerPasswordResetTokenRecord
+): MakerPasswordResetTokenRecord {
+  return {
+    id: typeof record.id === "string" ? record.id.trim() : "",
+    userId: typeof record.userId === "string" ? record.userId.trim() : "",
+    tokenHash: typeof record.tokenHash === "string" ? record.tokenHash.trim() : "",
+    requestedEmail: normalizeMakerRecoveryEmail(record.requestedEmail ?? ""),
+    expiresAt: typeof record.expiresAt === "string" ? record.expiresAt : "",
+    usedAt: typeof record.usedAt === "string" && record.usedAt ? record.usedAt : null,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+  };
+}
+
 /** 같은 계정의 이전 미사용 토큰을 더 이상 쓰지 못하게 정리한다. */
 async function invalidateExistingMakerPasswordResetTokens(
   userId: string,
   now: string
 ): Promise<void> {
   const config = getMakerAuthProviderConfig();
+  const adminClient = createSupabaseMakerAuthAdminClient(config);
+  const { error } = await adminClient
+    .from("maker_password_reset_tokens")
+    .update({ used_at: now })
+    .eq("user_id", userId)
+    .is("used_at", null)
+    .gt("expires_at", now);
 
-  if (config.provider === "supabase") {
-    const adminClient = createSupabaseMakerAuthAdminClient(config);
-    const { error } = await adminClient
-      .from("maker_password_reset_tokens")
-      .update({ used_at: now })
-      .eq("user_id", userId)
-      .is("used_at", null)
-      .gt("expires_at", now);
-
-    if (error) {
-      throw new Error(`Failed to invalidate existing reset tokens: ${error.message}`);
-    }
-
-    return;
+  if (error) {
+    throw new Error(`Failed to invalidate existing reset tokens: ${error.message}`);
   }
-
-  const nextTokens = listLocalPasswordResetTokens().map((record) => (
-    record.userId === userId
-      && !record.usedAt
-      && Date.parse(record.expiresAt) > Date.parse(now)
-      ? { ...record, usedAt: now }
-      : record
-  ));
-  saveLocalPasswordResetTokens(nextTokens);
 }
 
 /** 새 재설정 토큰을 저장하고 메일/내부 링크 생성에 쓸 원문 토큰을 돌려준다. */
@@ -303,29 +243,21 @@ export async function createMakerPasswordResetToken(
   await invalidateExistingMakerPasswordResetTokens(userId, now);
 
   const config = getMakerAuthProviderConfig();
-  if (config.provider === "supabase") {
-    const adminClient = createSupabaseMakerAuthAdminClient(config);
-    const { error } = await adminClient.from("maker_password_reset_tokens").insert({
-      id: record.id,
-      user_id: record.userId,
-      token_hash: record.tokenHash,
-      requested_email: record.requestedEmail,
-      expires_at: record.expiresAt,
-      used_at: record.usedAt,
-      created_at: record.createdAt,
-    });
+  const adminClient = createSupabaseMakerAuthAdminClient(config);
+  const { error } = await adminClient.from("maker_password_reset_tokens").insert({
+    id: record.id,
+    user_id: record.userId,
+    token_hash: record.tokenHash,
+    requested_email: record.requestedEmail,
+    expires_at: record.expiresAt,
+    used_at: record.usedAt,
+    created_at: record.createdAt,
+  });
 
-    if (error) {
-      throw new Error(`Failed to store password reset token: ${error.message}`);
-    }
-
-    return { rawToken, record };
+  if (error) {
+    throw new Error(`Failed to store password reset token: ${error.message}`);
   }
 
-  const nextTokens = listLocalPasswordResetTokens()
-    .concat(record)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  saveLocalPasswordResetTokens(nextTokens);
   return { rawToken, record };
 }
 
@@ -335,63 +267,46 @@ async function getMakerPasswordResetTokenRecord(
 ): Promise<MakerPasswordResetTokenRecord | null> {
   const tokenHash = hashMakerPasswordResetToken(rawToken);
   const config = getMakerAuthProviderConfig();
+  const adminClient = createSupabaseMakerAuthAdminClient(config);
+  const { data, error } = await adminClient
+    .from("maker_password_reset_tokens")
+    .select("id,user_id,token_hash,requested_email,expires_at,used_at,created_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
 
-  if (config.provider === "supabase") {
-    const adminClient = createSupabaseMakerAuthAdminClient(config);
-    const { data, error } = await adminClient
-      .from("maker_password_reset_tokens")
-      .select("id,user_id,token_hash,requested_email,expires_at,used_at,created_at")
-      .eq("token_hash", tokenHash)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Failed to load password reset token: ${error.message}`);
-    }
-
-    if (!data) {
-      return null;
-    }
-
-    return normalizeLocalPasswordResetTokenRecord({
-      id: data.id,
-      userId: data.user_id,
-      tokenHash: data.token_hash,
-      requestedEmail: data.requested_email,
-      expiresAt: data.expires_at,
-      usedAt: data.used_at,
-      createdAt: data.created_at,
-    });
+  if (error) {
+    throw new Error(`Failed to load password reset token: ${error.message}`);
   }
 
-  return listLocalPasswordResetTokens().find((record) => record.tokenHash === tokenHash) ?? null;
+  if (!data) {
+    return null;
+  }
+
+  return normalizePasswordResetTokenRecord({
+    id: data.id,
+    userId: data.user_id,
+    tokenHash: data.token_hash,
+    requestedEmail: data.requested_email,
+    expiresAt: data.expires_at,
+    usedAt: data.used_at,
+    createdAt: data.created_at,
+  });
 }
 
 /** 사용이 끝난 재설정 토큰을 재사용 불가 상태로 바꾼다. */
 async function consumeMakerPasswordResetToken(rawToken: string, usedAt: string): Promise<void> {
   const tokenHash = hashMakerPasswordResetToken(rawToken);
   const config = getMakerAuthProviderConfig();
+  const adminClient = createSupabaseMakerAuthAdminClient(config);
+  const { error } = await adminClient
+    .from("maker_password_reset_tokens")
+    .update({ used_at: usedAt })
+    .eq("token_hash", tokenHash)
+    .is("used_at", null);
 
-  if (config.provider === "supabase") {
-    const adminClient = createSupabaseMakerAuthAdminClient(config);
-    const { error } = await adminClient
-      .from("maker_password_reset_tokens")
-      .update({ used_at: usedAt })
-      .eq("token_hash", tokenHash)
-      .is("used_at", null);
-
-    if (error) {
-      throw new Error(`Failed to consume password reset token: ${error.message}`);
-    }
-
-    return;
+  if (error) {
+    throw new Error(`Failed to consume password reset token: ${error.message}`);
   }
-
-  const nextTokens = listLocalPasswordResetTokens().map((record) => (
-    record.tokenHash === tokenHash && !record.usedAt
-      ? { ...record, usedAt }
-      : record
-  ));
-  saveLocalPasswordResetTokens(nextTokens);
 }
 
 /** 재설정 토큰이 아직 유효한지 상태를 계산한다. */

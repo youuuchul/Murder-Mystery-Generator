@@ -4,17 +4,9 @@ import {
   areGamePackagesEquivalent,
   createGameContentBackupSnapshot,
 } from "@/lib/game-content-integrity";
-import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { getGamePublishReadiness } from "@/lib/game-publish";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
 import { buildMetadataFromGame, normalizeGame } from "@/lib/game-normalizer";
-import {
-  deleteGame as deleteLocalGame,
-  getGame as getLocalGame,
-  listGames as listLocalGames,
-  listPublicGames as listLocalPublicGames,
-  saveGame as saveLocalGame,
-} from "@/lib/storage/game-storage";
 
 export interface GameRepository {
   listGames(): Promise<GameMetadata[]>;
@@ -23,45 +15,6 @@ export interface GameRepository {
   saveGame(game: GamePackage): Promise<void>;
   deleteGame(gameId: string): Promise<boolean>;
 }
-
-/**
- * 로컬 JSON 기반 게임 저장소 구현.
- * 호출부는 이 경계만 의존하고, 실제 파일 I/O 구현은 storage 폴더에 남긴다.
- */
-const localGameRepository: GameRepository = {
-  async listGames() {
-    return listLocalGames();
-  },
-  async listPublicGames() {
-    return listLocalPublicGames();
-  },
-  async getGame(gameId) {
-    return getLocalGame(gameId);
-  },
-  async saveGame(game) {
-    const normalizedGame = normalizeSupabaseGameContent(game);
-    const existingGame = getLocalGame(normalizedGame.id);
-
-    if (existingGame && !areGamePackagesEquivalent(existingGame, normalizedGame)) {
-      await createGameContentBackupSnapshot(existingGame, {
-        provider: "local",
-        reason: "pre-save",
-      });
-    }
-
-    saveLocalGame(normalizedGame);
-  },
-  async deleteGame(gameId) {
-    const existingGame = getLocalGame(gameId);
-    if (existingGame) {
-      await createGameContentBackupSnapshot(existingGame, {
-        provider: "local",
-        reason: "pre-delete",
-      });
-    }
-    return deleteLocalGame(gameId);
-  },
-};
 
 interface SupabaseGameRow {
   id: string;
@@ -322,7 +275,6 @@ const supabaseGameRepository: GameRepository = {
 
     if (existingGame && !areGamePackagesEquivalent(existingGame, normalizedGame)) {
       await createGameContentBackupSnapshot(existingGame, {
-        provider: "supabase",
         reason: "pre-save",
       });
     }
@@ -368,10 +320,7 @@ const supabaseGameRepository: GameRepository = {
     if (existingContentRow) {
       await createGameContentBackupSnapshot(
         normalizeSupabaseGameContent((existingContentRow as unknown as SupabaseGameContentRow).content_json),
-        {
-          provider: "supabase",
-          reason: "pre-delete",
-        }
+        { reason: "pre-delete" }
       );
     }
 
@@ -398,29 +347,8 @@ const supabaseGameRepository: GameRepository = {
   },
 };
 
-let cachedProvider: ReturnType<typeof getPersistenceProviderConfig>["provider"] | null = null;
-let cachedRepository: GameRepository | null = null;
-
-/**
- * 현재 게임 저장소 구현을 반환한다.
- * local 과 supabase 구현 모두 이 함수 뒤로 숨겨, 호출부는 provider 차이를 몰라도 되게 유지한다.
- */
 export function getGameRepository(): GameRepository {
-  const config = getPersistenceProviderConfig();
-
-  if (cachedRepository && cachedProvider === config.provider) {
-    return cachedRepository;
-  }
-
-  cachedProvider = config.provider;
-
-  if (config.provider === "supabase") {
-    cachedRepository = supabaseGameRepository;
-    return cachedRepository;
-  }
-
-  cachedRepository = localGameRepository;
-  return cachedRepository;
+  return supabaseGameRepository;
 }
 
 export function listGames(): Promise<GameMetadata[]> {

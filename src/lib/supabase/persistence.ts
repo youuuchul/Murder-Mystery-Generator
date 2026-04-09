@@ -1,5 +1,4 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import {
   getMissingSupabasePersistenceEnv,
   getPersistenceProviderConfig,
@@ -13,20 +12,10 @@ import {
 export function createSupabasePersistenceClient(
   config: PersistenceProviderConfig = getPersistenceProviderConfig()
 ): SupabaseClient {
-  if (config.provider !== "supabase") {
-    throw new Error("Supabase persistence helpers require APP_PERSISTENCE_PROVIDER=supabase.");
-  }
-
   const missingEnv = getMissingSupabasePersistenceEnv(config);
   if (missingEnv.length > 0) {
     throw new Error(
-      `APP_PERSISTENCE_PROVIDER=supabase requires env vars: ${missingEnv.join(", ")}`
-    );
-  }
-
-  if (getMakerAuthProviderConfig().provider !== "supabase") {
-    throw new Error(
-      "Supabase game persistence currently requires MAKER_AUTH_PROVIDER=supabase."
+      `Supabase persistence requires env vars: ${missingEnv.join(", ")}`
     );
   }
 

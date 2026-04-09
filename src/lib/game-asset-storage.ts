@@ -1,7 +1,5 @@
-import fs from "fs";
 import path from "path";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
-import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 
 export const GAME_ASSET_SCOPES = [
   "covers",
@@ -24,7 +22,6 @@ export const GAME_ASSET_ALLOWED_MIME_TYPES = [
 export const GAME_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
 const DEFAULT_GAME_ASSETS_BUCKET = "game-assets";
-const LOCAL_GAMES_DIR = path.join(process.cwd(), "data", "games");
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -125,26 +122,6 @@ export function inferGameAssetContentType(filename: string): string {
 }
 
 /**
- * 업로드 시 필요한 로컬 asset 폴더를 만든다.
- */
-function ensureLocalAssetDir(gameId: string, scope: GameAssetScope): string {
-  const dir = path.join(LOCAL_GAMES_DIR, gameId, "assets", scope);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-/**
- * local provider에서 읽을 절대 파일 경로를 계산한다.
- */
-function resolveLocalAssetPath(gameId: string, assetPath: string[]): string | null {
-  const baseDir = path.resolve(LOCAL_GAMES_DIR, gameId, "assets");
-  const targetPath = path.resolve(baseDir, ...assetPath);
-  return targetPath.startsWith(baseDir) ? targetPath : null;
-}
-
-/**
  * 서버 전용 secret key client로 game-assets bucket 존재를 보장한다.
  * 업로드 전 한 번만 확인해 Vercel cold start마다 중복 생성 요청을 줄인다.
  */
@@ -180,18 +157,6 @@ async function ensureSupabaseAssetsBucket(): Promise<string> {
 }
 
 /**
- * local provider에 게임 자산을 저장한다.
- */
-async function uploadLocalGameAsset(input: UploadGameAssetInput): Promise<UploadedGameAsset> {
-  const dir = ensureLocalAssetDir(input.gameId, input.scope);
-  fs.writeFileSync(path.join(dir, input.filename), input.buffer);
-  return {
-    filename: input.filename,
-    url: buildGameAssetUrl(input.gameId, input.scope, input.filename),
-  };
-}
-
-/**
  * Supabase Storage에 게임 자산을 저장한다.
  * game JSON에는 내부 API URL만 기록해 provider 전환과 레거시 데이터 호환을 유지한다.
  */
@@ -216,24 +181,7 @@ async function uploadSupabaseGameAsset(input: UploadGameAssetInput): Promise<Upl
 }
 
 /**
- * local provider에서 자산 파일을 읽는다.
- */
-function readLocalGameAsset(gameId: string, assetPath: string[]): ReadGameAssetResult | null {
-  const absolutePath = resolveLocalAssetPath(gameId, assetPath);
-  if (!absolutePath || !fs.existsSync(absolutePath)) {
-    return null;
-  }
-
-  return {
-    buffer: fs.readFileSync(absolutePath),
-    contentType: inferGameAssetContentType(absolutePath),
-    cacheControl: GAME_ASSET_CACHE_CONTROL,
-  };
-}
-
-/**
- * Supabase Storage에서 자산 파일을 읽고, 아직 이관되지 않은 로컬 파일이 있으면 fallback 한다.
- * 이 fallback은 로컬 dev 전환기 안전장치이며, Vercel 배포 전에는 별도 asset migration을 수행해야 한다.
+ * Supabase Storage에서 자산 파일을 읽는다.
  */
 async function readSupabaseGameAsset(
   gameId: string,
@@ -249,7 +197,7 @@ async function readSupabaseGameAsset(
   const { data, error } = await supabase.storage.from(bucketName).download(objectPath);
 
   if (error || !data) {
-    return readLocalGameAsset(gameId, assetPath);
+    return null;
   }
 
   return {
@@ -345,46 +293,17 @@ async function deleteSupabaseGameAssets(gameId: string): Promise<boolean> {
   return true;
 }
 
-/**
- * provider 설정에 따라 자산 업로드 backend를 선택한다.
- */
 export async function uploadGameAsset(input: UploadGameAssetInput): Promise<UploadedGameAsset> {
-  const config = getPersistenceProviderConfig();
-  if (config.provider === "supabase") {
-    return uploadSupabaseGameAsset(input);
-  }
-  return uploadLocalGameAsset(input);
+  return uploadSupabaseGameAsset(input);
 }
 
-/**
- * provider 설정에 따라 자산 읽기 backend를 선택한다.
- */
 export async function readGameAsset(
   gameId: string,
   assetPath: string[]
 ): Promise<ReadGameAssetResult | null> {
-  const config = getPersistenceProviderConfig();
-  if (config.provider === "supabase") {
-    return readSupabaseGameAsset(gameId, assetPath);
-  }
-  return readLocalGameAsset(gameId, assetPath);
+  return readSupabaseGameAsset(gameId, assetPath);
 }
 
-/**
- * 게임 삭제 시 연결된 자산도 같은 provider에서 함께 정리한다.
- * local backup/reference 폴더는 supabase 모드에서 건드리지 않는다.
- */
 export async function deleteGameAssets(gameId: string): Promise<boolean> {
-  const config = getPersistenceProviderConfig();
-  if (config.provider === "supabase") {
-    return deleteSupabaseGameAssets(gameId);
-  }
-
-  const dir = path.join(LOCAL_GAMES_DIR, gameId.trim(), "assets");
-  if (!fs.existsSync(dir)) {
-    return false;
-  }
-
-  fs.rmSync(dir, { recursive: true, force: true });
-  return true;
+  return deleteSupabaseGameAssets(gameId);
 }

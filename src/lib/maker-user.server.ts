@@ -2,11 +2,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import type { AppUser } from "@/types/auth";
-import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import {
   buildMakerAccessPath,
-  getMakerUserFromCookieStore,
   normalizeMakerDisplayName,
 } from "@/lib/maker-user";
 import { normalizeMakerRole } from "@/lib/maker-role";
@@ -55,20 +53,12 @@ async function resolveSupabaseMakerUser(
 
 /** 현재 서버 요청에 연결된 메이커 사용자 세션을 읽는다. */
 export async function getCurrentMakerUser(): Promise<AppUser | null> {
-  if (getMakerAuthProviderConfig().provider !== "supabase") {
-    return getMakerUserFromCookieStore(cookies());
-  }
-
   const supabase = createSupabaseServerComponentClient();
   return resolveSupabaseMakerUser(() => supabase.auth.getUser());
 }
 
 /** Route Handler 요청에서 현재 작업자 세션을 검증된 사용자 기준으로 읽는다. */
 export async function getRequestMakerUser(request: NextRequest): Promise<AppUser | null> {
-  if (getMakerAuthProviderConfig().provider !== "supabase") {
-    return getMakerUserFromCookieStore(request.cookies);
-  }
-
   const supabase = createSupabaseRequestClient(request);
   return resolveSupabaseMakerUser(() => supabase.auth.getUser());
 }

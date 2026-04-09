@@ -1,19 +1,9 @@
 import type { GamePackage } from "@/types/game";
 import type { GameSession, SessionMode } from "@/types/session";
 import { normalizePlayerAgentSessionState } from "@/lib/ai/player-agent/core/player-agent-state";
-import { getPersistenceProviderConfig } from "@/lib/persistence-config";
 import { buildInitialSession } from "@/lib/session-factory";
 import { createSessionBackupSnapshot } from "@/lib/session-integrity";
 import { createSupabasePersistenceClient } from "@/lib/supabase/persistence";
-import {
-  createSession as createLocalSession,
-  deleteSession as deleteLocalSession,
-  getSession as getLocalSession,
-  getSessionByCode as getLocalSessionByCode,
-  listAllActiveSessions as listAllLocalActiveSessions,
-  listActiveSessions as listLocalActiveSessions,
-  updateSession as updateLocalSession,
-} from "@/lib/storage/session-storage";
 
 export interface CreateSessionOptions {
   hostUserId?: string;
@@ -44,66 +34,6 @@ export class SessionConflictError extends Error {
 export function isSessionConflictError(error: unknown): error is SessionConflictError {
   return error instanceof SessionConflictError;
 }
-
-/**
- * 로컬 JSON 기반 세션 저장소 구현.
- * 세션 변경이 잦아도 route/page 계층은 이 경계만 의존하게 유지한다.
- */
-const localSessionRepository: SessionRepository = {
-  async createSession(game, options = {}) {
-    const sessionName = buildAutomaticSessionName(listLocalActiveSessions(game.id));
-    return withSessionDefaults(
-      createLocalSession(game, sessionName, options.hostUserId, options.sessionMode ?? "gm"),
-      { fallbackName: sessionName }
-    );
-  },
-  async getSession(sessionId) {
-    const session = getLocalSession(sessionId);
-    return session ? withSessionDefaults(session) : null;
-  },
-  async getSessionByCode(sessionCode) {
-    const session = getLocalSessionByCode(sessionCode);
-    return session ? withSessionDefaults(session) : null;
-  },
-  async updateSession(session) {
-    const currentSession = getLocalSession(session.id);
-    if (!currentSession) {
-      throw new Error("Session not found");
-    }
-
-    const canonicalCurrentSession = withSessionDefaults(currentSession);
-    const canonicalNextSession = withSessionDefaults(session);
-
-    if (canonicalNextSession.updatedAt !== canonicalCurrentSession.updatedAt) {
-      throw new SessionConflictError();
-    }
-
-    const persistedSession = withSessionDefaults({
-      ...canonicalNextSession,
-      updatedAt: new Date().toISOString(),
-    });
-
-    updateLocalSession(persistedSession);
-    return persistedSession;
-  },
-  async deleteSession(sessionId) {
-    const currentSession = getLocalSession(sessionId);
-    if (currentSession) {
-      await createSessionBackupSnapshot(withSessionDefaults(currentSession), {
-        provider: "local",
-        reason: "pre-delete",
-      });
-    }
-
-    return deleteLocalSession(sessionId);
-  },
-  async listActiveSessions(gameId) {
-    return sortSessionsForList(listLocalActiveSessions(gameId)).map((session) => withSessionDefaults(session));
-  },
-  async listAllActiveSessions() {
-    return sortSessionsForList(listAllLocalActiveSessions()).map((session) => withSessionDefaults(session));
-  },
-};
 
 interface SupabaseSessionRow {
   id: string;
@@ -446,7 +376,6 @@ const supabaseSessionRepository: SessionRepository = {
     }
 
     await createSessionBackupSnapshot(existingSession, {
-      provider: "supabase",
       reason: "pre-delete",
     });
 
@@ -472,29 +401,8 @@ const supabaseSessionRepository: SessionRepository = {
   },
 };
 
-let cachedProvider: ReturnType<typeof getPersistenceProviderConfig>["provider"] | null = null;
-let cachedRepository: SessionRepository | null = null;
-
-/**
- * 현재 세션 저장소 구현을 반환한다.
- * local 과 supabase 구현을 모두 이 경계 뒤로 숨겨 route/page 계층은 같은 API만 사용하게 유지한다.
- */
 export function getSessionRepository(): SessionRepository {
-  const config = getPersistenceProviderConfig();
-
-  if (cachedRepository && cachedProvider === config.provider) {
-    return cachedRepository;
-  }
-
-  cachedProvider = config.provider;
-
-  if (config.provider === "supabase") {
-    cachedRepository = supabaseSessionRepository;
-    return cachedRepository;
-  }
-
-  cachedRepository = localSessionRepository;
-  return cachedRepository;
+  return supabaseSessionRepository;
 }
 
 export function createSession(

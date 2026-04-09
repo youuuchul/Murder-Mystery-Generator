@@ -13,7 +13,6 @@ import {
   getMakerUserFromCookieStore,
   normalizeMakerNextPath,
 } from "@/lib/maker-user";
-import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 
@@ -119,9 +118,7 @@ function getMakerAccessNoticeMessage(
 export default async function MakerAccessPage({ searchParams }: Props) {
   const { next, error, notice, mode: rawMode, token, recoveryEmail } = await searchParams;
   const nextPath = normalizeMakerNextPath(next, "/library/manage");
-  const authProvider = getMakerAuthProviderConfig().provider;
-  const supportsTemporaryAccess = authProvider === "local";
-  const mode = normalizeMakerAccessMode(rawMode, supportsTemporaryAccess);
+  const mode = normalizeMakerAccessMode(rawMode, false);
   const cookieStore = cookies();
   const authenticatedUser = await getCurrentMakerUser();
   const currentUser = authenticatedUser ?? getMakerUserFromCookieStore(cookieStore);
@@ -150,9 +147,6 @@ export default async function MakerAccessPage({ searchParams }: Props) {
           <h1 className="mt-3 text-2xl font-semibold">제작자 로그인</h1>
           <p className="mt-2 text-sm leading-6 text-dark-400">
             계정 로그인은 다른 브라우저와 다른 기기에서도 같은 작업자로 이어집니다.
-            {supportsTemporaryAccess
-              ? " 아직 계정이 없으면 현재 작업자 세션에 로그인 ID를 연결할 수 있습니다."
-              : " 현재 provider 는 Supabase 계정 기반으로 동작합니다."}
           </p>
         </div>
 
@@ -196,19 +190,6 @@ export default async function MakerAccessPage({ searchParams }: Props) {
               className="rounded-full border border-mystery-700 bg-mystery-950/40 px-3 py-1 text-mystery-200 transition-colors"
             >
               비밀번호 찾기
-            </a>
-          ) : null}
-          {supportsTemporaryAccess ? (
-            <a
-              href={`/maker-access?mode=temporary&next=${encodeURIComponent(nextPath)}`}
-              className={[
-                "rounded-full border px-3 py-1 transition-colors",
-                mode === "temporary"
-                  ? "border-mystery-700 bg-mystery-950/40 text-mystery-200"
-                  : "border-dark-700 bg-dark-950 text-dark-400 hover:border-dark-500 hover:text-dark-100",
-              ].join(" ")}
-            >
-              임시 작업자
             </a>
           ) : null}
         </div>
@@ -532,69 +513,6 @@ export default async function MakerAccessPage({ searchParams }: Props) {
           )
         ) : null}
 
-        {supportsTemporaryAccess && mode === "temporary" ? (
-          <form action="/api/maker-access" method="post" className="space-y-4">
-            <input type="hidden" name="intent" value="temporary_login" />
-            <input type="hidden" name="next" value={nextPath} />
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-dark-200">
-                작업자 이름
-              </span>
-              <input
-                type="text"
-                name="displayName"
-                required
-                autoFocus={!needsPassword}
-                defaultValue={currentUser?.displayName ?? ""}
-                maxLength={32}
-                autoComplete="nickname"
-                className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                placeholder="예: Alex, 스튜디오A"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-dark-200">
-                작업자 키
-                <span className="ml-2 text-xs font-normal text-dark-500">선택 입력</span>
-              </span>
-              <input
-                type="text"
-                name="recoveryKey"
-                defaultValue={currentAccount ? "" : currentUser?.id ?? ""}
-                className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 font-mono text-xs text-dark-50 outline-none transition focus:border-mystery-500"
-                placeholder="같은 작업자로 다시 들어갈 때 붙여넣는 복구 키"
-              />
-              <p className="mt-2 text-xs leading-5 text-dark-500">
-                계정을 아직 만들지 않았다면 작업자 키로 기존 ownerId 를 이어서 복구할 수 있습니다.
-              </p>
-            </label>
-
-            {needsPassword ? (
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-dark-200">
-                  메이커 공통 비밀번호
-                </span>
-                <input
-                  type="password"
-                  name="gatePassword"
-                  required
-                  autoFocus={needsPassword}
-                  autoComplete="current-password"
-                  className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                  placeholder="공유받은 제작자 비밀번호"
-                />
-              </label>
-            ) : null}
-
-            <button
-              type="submit"
-              className="w-full rounded-xl border border-dark-700 bg-dark-800 px-4 py-3 text-sm font-medium text-dark-100 transition hover:border-dark-500 hover:bg-dark-700"
-            >
-              임시 작업자로 들어가기
-            </button>
-          </form>
-        ) : null}
 
         <p className="mt-5 text-xs leading-5 text-dark-500">
           계정 로그인 이후에도 브라우저에는 작업자 세션 쿠키가 저장됩니다.

@@ -35,7 +35,6 @@ import {
   isDuplicateMakerRecoveryEmailError,
   isMakerAccountAlreadyLinkedError,
 } from "@/lib/maker-auth-errors";
-import { getMakerAuthProviderConfig } from "@/lib/maker-auth-config";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { resolveSupabaseMakerAuthEmail } from "@/lib/supabase/maker-auth";
@@ -219,16 +218,10 @@ export async function POST(request: NextRequest) {
     String(formData.get("next") ?? "/library/manage"),
     intent === "logout" ? "/maker-access" : "/library/manage"
   );
-  const authProvider = getMakerAuthProviderConfig().provider;
-
   if (intent === "logout") {
     const response = NextResponse.redirect(buildRedirectUrl(request, next), 303);
-
-    if (authProvider === "supabase") {
-      const supabase = createSupabaseRouteHandlerClient(request, response);
-      await supabase.auth.signOut();
-    }
-
+    const supabase = createSupabaseRouteHandlerClient(request, response);
+    await supabase.auth.signOut();
     response.cookies.delete(MAKER_ACCESS_COOKIE_NAME);
     response.cookies.delete(MAKER_USER_COOKIE_NAME);
     return response;
@@ -346,32 +339,19 @@ export async function POST(request: NextRequest) {
       return redirectToMakerAccess(request, next, "invalid_login_id", "login");
     }
 
-    if (authProvider === "supabase") {
-      const response = await buildLoginSuccessResponse(request, next, gatePassword);
-      const signedIn = await signInWithSupabaseSession(
-        request,
-        response,
-        loginId,
-        accountPassword
-      );
+    const response = await buildLoginSuccessResponse(request, next, gatePassword);
+    const signedIn = await signInWithSupabaseSession(
+      request,
+      response,
+      loginId,
+      accountPassword
+    );
 
-      if (!signedIn) {
-        return redirectToMakerAccess(request, next, "invalid_account_credentials", "login");
-      }
-
-      response.cookies.delete(MAKER_USER_COOKIE_NAME);
-      return response;
-    }
-
-    const account = await makerAuthGateway.authenticateAccount(loginId, accountPassword);
-    if (!account) {
+    if (!signedIn) {
       return redirectToMakerAccess(request, next, "invalid_account_credentials", "login");
     }
 
-    const user = createMakerUser(account.displayName, account.id, account.role);
-    await makerAuthGateway.upsertUser(user);
-    const response = await buildLoginSuccessResponse(request, next, gatePassword);
-    applyLocalMakerUserCookie(response, user);
+    response.cookies.delete(MAKER_USER_COOKIE_NAME);
     return response;
   }
 
@@ -447,28 +427,19 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    if (authProvider === "supabase") {
-      const response = await buildLoginSuccessResponse(request, next, gatePassword);
-      const signedIn = await signInWithSupabaseSession(
-        request,
-        response,
-        account.loginId,
-        accountPassword
-      );
+    const response = await buildLoginSuccessResponse(request, next, gatePassword);
+    const signedIn = await signInWithSupabaseSession(
+      request,
+      response,
+      account.loginId,
+      accountPassword
+    );
 
-      if (!signedIn) {
-        throw new Error("Supabase account was created but the login session could not be started.");
-      }
-
-      response.cookies.delete(MAKER_USER_COOKIE_NAME);
-      return response;
+    if (!signedIn) {
+      throw new Error("Supabase account was created but the login session could not be started.");
     }
 
-    const user = createMakerUser(account.displayName, account.id, account.role);
-    await makerAuthGateway.upsertUser(user);
-
-    const response = await buildLoginSuccessResponse(request, next, gatePassword);
-    applyLocalMakerUserCookie(response, user);
+    response.cookies.delete(MAKER_USER_COOKIE_NAME);
     return response;
   }
 
@@ -560,36 +531,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (authProvider === "supabase") {
-    return redirectToMakerAccess(request, next, "temporary_login_disabled", "login");
-  }
-
-  const displayName = String(formData.get("displayName") ?? "");
-  const recoveryKey = normalizeMakerUserId(String(formData.get("recoveryKey") ?? ""));
-
-  if (!isValidMakerDisplayName(displayName)) {
-    return redirectToMakerAccess(request, next, "invalid_display_name", "temporary");
-  }
-
-  if (recoveryKey && !isValidMakerUserId(recoveryKey)) {
-    return redirectToMakerAccess(request, next, "invalid_recovery_key", "temporary");
-  }
-
-  const gateError = await validateMakerGate(request, next, "temporary", gatePassword);
-  if (gateError) {
-    return gateError;
-  }
-
-  const matchedMaker = !currentSessionUser && !recoveryKey
-    ? await makerAuthGateway.findUserByDisplayName(displayName)
-    : null;
-  const nextUserId = recoveryKey || currentSessionUser?.id || matchedMaker?.id;
-  const user = createMakerUser(displayName, nextUserId);
-  await makerAuthGateway.upsertUser(user);
-
-  const response = await buildLoginSuccessResponse(request, next, gatePassword);
-  applyLocalMakerUserCookie(response, user);
-  return response;
+  return redirectToMakerAccess(request, next, "temporary_login_disabled", "login");
 }
 
 /**
@@ -603,11 +545,8 @@ export async function DELETE(request: NextRequest) {
   );
   const response = NextResponse.redirect(buildRedirectUrl(request, next), 303);
 
-  if (getMakerAuthProviderConfig().provider === "supabase") {
-    const supabase = createSupabaseRouteHandlerClient(request, response);
-    await supabase.auth.signOut();
-  }
-
+  const supabase = createSupabaseRouteHandlerClient(request, response);
+  await supabase.auth.signOut();
   response.cookies.delete(MAKER_ACCESS_COOKIE_NAME);
   response.cookies.delete(MAKER_USER_COOKIE_NAME);
   return response;

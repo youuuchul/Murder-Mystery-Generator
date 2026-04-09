@@ -42,7 +42,7 @@ export default function MakerAccountMenu({
         </svg>
       </summary>
 
-      <div className="absolute right-0 top-full z-30 mt-2 flex max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] w-[26rem] max-w-[min(26rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-dark-700 bg-dark-900/95 shadow-2xl shadow-black/40 backdrop-blur">
+      <div className="fixed inset-x-2 top-[calc(4rem+0.5rem)] z-30 flex max-h-[calc(100dvh-5rem)] flex-col overflow-hidden rounded-2xl border border-dark-700 bg-dark-900/95 shadow-2xl shadow-black/40 backdrop-blur sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[26rem] sm:max-w-[min(26rem,calc(100vw-1rem))] sm:max-h-[calc(100vh-5rem)]">
         <div className="border-b border-dark-800 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>

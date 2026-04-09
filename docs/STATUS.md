@@ -100,7 +100,7 @@
 - [ ] **계정별 동시 세션 수 제한** — admin 제외, 생성 API에서 검증
 - [ ] **인물 설정 관계 탭 복구** — 메이커 Step3 관계 탭 렌더링/저장 경로 점검
 - [ ] **오프닝 타임라인 입력 위치 재정리** — 배경설정 탭 → 중앙 타임라인 축으로 재배치
-- [ ] **Supabase MCP 연결** — Claude/Codex가 DB 직접 쿼리 가능하도록 선행 작업 (JSON 컬럼 개선 설계 전제) **← 진행 중**
+- [x] **Supabase MCP 연결** — Claude/Codex가 DB 직접 쿼리 가능하도록 선행 작업 (JSON 컬럼 개선 설계 전제) ✅ 완료 (2026-04-09)
 
 ### 중간
 - [ ] **게임 공개 모드 unlisted 추가** — 라이브러리 비노출 + 링크 직접 접근 가능. `visibility` 재편: `private | unlisted | public`. `draft` 제거 검토 (`lifecycle_status.draft`와 중복). 비공개 전환 시 링크 비작동 + 세션 삭제 알림. unlisted 접근 허용 RLS/토큰 정책 설계 선행 필요.

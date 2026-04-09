@@ -115,6 +115,7 @@
 - [ ] **GM 없는 세션 공통화면 범위 보강**
 
 ### 낮음/장기
+- [ ] **Git 브랜치 전략 전환** — 유저 인입 시점에 main/dev 분리 도입. 현재는 main 직접 push + Vercel 즉시 배포. 병렬 에이전트 작업 시 feature 브랜치 + worktree 활용. dev 도입 시 Vercel Preview 기반 staging 검증 추가. CLAUDE.md/AGENTS.md 지침도 함께 갱신 필요
 - [ ] AI 채팅 탭 및 대화 파이프라인 (향후 NPC 챗봇 포함 Langfuse trace 설계)
 - [ ] AI 카드 교환/전달
 - [ ] AI 시간 기반 행동 정책 (라운드 종료 직전)

@@ -18,6 +18,8 @@ export interface SessionRepository {
   deleteSession(sessionId: string): Promise<boolean>;
   listActiveSessions(gameId: string): Promise<GameSession[]>;
   listAllActiveSessions(): Promise<GameSession[]>;
+  countActiveSessionsByHost(hostUserId: string): Promise<number>;
+  listActiveSessionsByHost(hostUserId: string): Promise<GameSession[]>;
 }
 
 /**
@@ -269,6 +271,50 @@ async function loadSupabaseActiveSessions(gameId: string): Promise<GameSession[]
   );
 }
 
+async function countSupabaseActiveSessionsByHost(hostUserId: string): Promise<number> {
+  const normalizedUserId = hostUserId.trim();
+  if (!normalizedUserId) {
+    return 0;
+  }
+
+  const supabase = createSupabasePersistenceClient();
+  const { count, error } = await supabase
+    .from("sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("host_user_id", normalizedUserId)
+    .is("ended_at", null);
+
+  if (error) {
+    throw new Error(`Failed to count Supabase sessions by host: ${error.message}`);
+  }
+
+  return count ?? 0;
+}
+
+async function loadSupabaseActiveSessionsByHost(hostUserId: string): Promise<GameSession[]> {
+  const normalizedUserId = hostUserId.trim();
+  if (!normalizedUserId) {
+    return [];
+  }
+
+  const supabase = createSupabasePersistenceClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(SUPABASE_SESSION_COLUMNS)
+    .eq("host_user_id", normalizedUserId)
+    .is("ended_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list Supabase sessions by host: ${error.message}`);
+  }
+
+  return sortSessionsForList(
+    ((data ?? []) as unknown as SupabaseSessionRow[])
+      .map((row) => hydrateSupabaseSession(row))
+  );
+}
+
 async function loadSupabaseAllActiveSessions(): Promise<GameSession[]> {
   const supabase = createSupabasePersistenceClient();
   const { data, error } = await supabase
@@ -399,6 +445,12 @@ const supabaseSessionRepository: SessionRepository = {
   async listAllActiveSessions() {
     return loadSupabaseAllActiveSessions();
   },
+  async countActiveSessionsByHost(hostUserId) {
+    return countSupabaseActiveSessionsByHost(hostUserId);
+  },
+  async listActiveSessionsByHost(hostUserId) {
+    return loadSupabaseActiveSessionsByHost(hostUserId);
+  },
 };
 
 export function getSessionRepository(): SessionRepository {
@@ -434,4 +486,49 @@ export function listActiveSessions(gameId: string): Promise<GameSession[]> {
 
 export function listAllActiveSessions(): Promise<GameSession[]> {
   return getSessionRepository().listAllActiveSessions();
+}
+
+export function countActiveSessionsByHost(hostUserId: string): Promise<number> {
+  return getSessionRepository().countActiveSessionsByHost(hostUserId);
+}
+
+export function listActiveSessionsByHost(hostUserId: string): Promise<GameSession[]> {
+  return getSessionRepository().listActiveSessionsByHost(hostUserId);
+}
+
+/**
+ * 세션 ID 목록 중 아직 종료되지 않은 활성 세션만 반환한다.
+ * 비로그인 유저의 쿠키 기반 세션 추적에 사용한다.
+ */
+export async function listActiveSessionsByIds(sessionIds: string[]): Promise<GameSession[]> {
+  const normalizedIds = sessionIds.map((id) => id.trim()).filter(Boolean);
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createSupabasePersistenceClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(SUPABASE_SESSION_COLUMNS)
+    .in("id", normalizedIds)
+    .is("ended_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list Supabase sessions by IDs: ${error.message}`);
+  }
+
+  return ((data ?? []) as unknown as SupabaseSessionRow[])
+    .map((row) => hydrateSupabaseSession(row));
+}
+
+const DEFAULT_MAX_ACTIVE_SESSIONS = 3;
+
+export function getMaxActiveSessionsPerUser(): number {
+  const envValue = process.env.MAX_ACTIVE_SESSIONS_PER_USER;
+  if (envValue) {
+    const parsed = parseInt(envValue, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_ACTIVE_SESSIONS;
 }

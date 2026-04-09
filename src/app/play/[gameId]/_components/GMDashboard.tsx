@@ -1148,6 +1148,146 @@ function PhaseAdvanceConfirmModal({
   );
 }
 
+// ── 세션 한도 초과 모달 ─────────────────────────────────────────
+
+interface SessionLimitInfo {
+  id: string;
+  gameId: string;
+  gameTitle: string;
+  sessionName: string;
+  sessionCode: string;
+  phase: string;
+  currentSubPhase?: string;
+  createdAt: string;
+  lockedPlayerCount: number;
+  totalPlayerCount: number;
+}
+
+function SessionLimitModal({
+  limit,
+  sessions,
+  onClose,
+  onDeleted,
+}: {
+  limit: number;
+  sessions: SessionLimitInfo[];
+  onClose: () => void;
+  onDeleted: (sessionId: string) => void;
+}) {
+  const router = useRouter();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function getSessionPhaseLabel(phase: string, subPhase?: string): string {
+    if (phase.startsWith("round-")) {
+      const roundNumber = phase.split("-")[1];
+      const subLabel = subPhase === "discussion" ? "토론" : "조사";
+      return `Round ${roundNumber} · ${subLabel}`;
+    }
+    return PHASE_LABELS[phase] ?? phase;
+  }
+
+  function formatCreatedAt(value: string): string {
+    return new Date(value).toLocaleString("ko-KR", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  async function handleDelete(sessionId: string) {
+    setDeletingId(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      if (res.ok) {
+        onDeleted(sessionId);
+      } else {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        alert(data.error ?? "세션 삭제에 실패했습니다.");
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Session Limit</p>
+          <h2 className="text-xl font-semibold text-dark-50">세션 한도에 도달했습니다</h2>
+          <p className="text-sm leading-6 text-dark-300">
+            동시에 운영할 수 있는 세션은 최대 {limit}개입니다.
+            아래 세션을 삭제하거나 열어서 관리해주세요.
+          </p>
+        </div>
+
+        <div className="mt-5 max-h-[50vh] space-y-2 overflow-y-auto">
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              className="rounded-xl border border-dark-800 bg-dark-950/60 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-dark-50">{s.gameTitle}</p>
+                  <p className="mt-1 text-xs text-dark-400">
+                    {s.sessionName} · {formatCreatedAt(s.createdAt)}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-dark-700 px-2 py-0.5 text-[11px] text-dark-300">
+                      {getSessionPhaseLabel(s.phase, s.currentSubPhase)}
+                    </span>
+                    <span className="text-[11px] text-dark-500">
+                      {s.lockedPlayerCount} / {s.totalPlayerCount}명
+                    </span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      router.push(`/play/${s.gameId}?session=${s.id}`);
+                    }}
+                    className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                  >
+                    열기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(s.id)}
+                    disabled={deletingId === s.id}
+                    className="rounded-lg border border-red-900/60 px-3 py-2 text-xs text-red-200 transition-colors hover:bg-red-950/20 disabled:opacity-40"
+                  >
+                    {deletingId === s.id ? "삭제 중..." : "삭제"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex items-center justify-between">
+          <a
+            href="/library/manage/my-sessions"
+            className="text-xs text-mystery-400 transition-colors hover:text-mystery-300"
+          >
+            내 세션 관리 페이지로 이동
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export default function GMDashboard({
   game,
@@ -1170,6 +1310,10 @@ export default function GMDashboard({
   const [accessPromptError, setAccessPromptError] = useState<string | null>(null);
   const [verifyingSessionId, setVerifyingSessionId] = useState<string | null>(null);
   const [advanceConfirmKind, setAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
+  const [sessionLimitData, setSessionLimitData] = useState<{
+    limit: number;
+    sessions: SessionLimitInfo[];
+  } | null>(null);
   const hasAutoCreatedSessionRef = useRef(false);
   const accessPromptSession = sessionSummaries.find((item) => item.id === accessPromptSessionId) ?? null;
 
@@ -1282,8 +1426,12 @@ export default function GMDashboard({
         await refreshSessionSummaries(created.id);
         router.push(buildSessionPath(created.id));
       } else {
-        const err = await res.json();
-        alert(err.error ?? "세션 생성 실패");
+        const err = await res.json() as { error?: string; code?: string; limit?: number; sessions?: SessionLimitInfo[] };
+        if (err.code === "SESSION_LIMIT_EXCEEDED" && err.limit && err.sessions) {
+          setSessionLimitData({ limit: err.limit, sessions: err.sessions });
+        } else {
+          alert(err.error ?? "세션 생성 실패");
+        }
       }
     } finally {
       setCreating(false);
@@ -1952,6 +2100,23 @@ export default function GMDashboard({
           onCancel={() => setAdvanceConfirmKind(null)}
           onConfirm={(options) => { void confirmAdvancePhase(options); }}
           confirming={advancing}
+        />
+      ) : null}
+
+      {sessionLimitData ? (
+        <SessionLimitModal
+          limit={sessionLimitData.limit}
+          sessions={sessionLimitData.sessions}
+          onClose={() => setSessionLimitData(null)}
+          onDeleted={(deletedId) => {
+            const remaining = sessionLimitData.sessions.filter((s) => s.id !== deletedId);
+            if (remaining.length < sessionLimitData.limit) {
+              setSessionLimitData(null);
+            } else {
+              setSessionLimitData({ ...sessionLimitData, sessions: remaining });
+            }
+            void refreshSessionSummaries();
+          }}
         />
       ) : null}
     </div>

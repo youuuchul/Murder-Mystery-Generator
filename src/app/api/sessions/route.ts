@@ -4,11 +4,20 @@ import {
   applyGmSessionAccessCookie,
   canResumeGmSessionDirectly,
   GM_SESSION_ACCESS_COOKIE_NAME,
+  parseGmSessionAccessCookie,
 } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import { createSession, isGmManagedSession, listActiveSessions } from "@/lib/session-repository";
+import {
+  countActiveSessionsByHost,
+  createSession,
+  getMaxActiveSessionsPerUser,
+  isGmManagedSession,
+  listActiveSessions,
+  listActiveSessionsByHost,
+  listActiveSessionsByIds,
+} from "@/lib/session-repository";
 import type { GameSession, GameSessionSummary } from "@/types/session";
 
 /**
@@ -34,6 +43,41 @@ function toSessionSummary(
     totalPlayerCount: session.sharedState.characterSlots.length,
     canResumeDirectly: options.canResumeDirectly,
   };
+}
+
+async function buildSessionLimitResponse(
+  activeSessions: GameSession[],
+  limit: number
+): Promise<NextResponse> {
+  const gameIds = [...new Set(activeSessions.map((s) => s.gameId))];
+  const resolvedGames = await Promise.all(gameIds.map((id) => getGame(id)));
+  const gameMap = new Map(
+    resolvedGames.filter((g): g is NonNullable<typeof g> => g !== null).map((g) => [g.id, g])
+  );
+
+  return NextResponse.json(
+    {
+      error: limit === 1
+        ? "비로그인 상태에서는 동시에 1개의 세션만 열 수 있습니다. 기존 세션을 사용하거나 삭제해주세요."
+        : `활성 세션이 ${limit}개 이상이어서 새 세션을 만들 수 없습니다. 기존 세션을 삭제한 뒤 다시 시도해주세요.`,
+      code: "SESSION_LIMIT_EXCEEDED",
+      limit,
+      activeCount: activeSessions.length,
+      sessions: activeSessions.map((s) => ({
+        id: s.id,
+        gameId: s.gameId,
+        gameTitle: gameMap.get(s.gameId)?.title ?? "알 수 없는 게임",
+        sessionName: s.sessionName,
+        sessionCode: s.sessionCode,
+        phase: s.sharedState.phase,
+        currentSubPhase: s.sharedState.currentSubPhase,
+        createdAt: s.createdAt,
+        lockedPlayerCount: s.sharedState.characterSlots.filter((sl) => sl.isLocked).length,
+        totalPlayerCount: s.sharedState.characterSlots.length,
+      })),
+    },
+    { status: 429 }
+  );
 }
 
 interface CreateSessionRequestBody {
@@ -63,6 +107,28 @@ export async function POST(req: NextRequest) {
       { error: "GM 없이 직접 여는 방은 공개 게임에서만 만들 수 있습니다." },
       { status: 403 }
     );
+  }
+
+  if (sessionMode === "gm" && currentUser && !isMakerAdmin(currentUser)) {
+    const maxSessions = getMaxActiveSessionsPerUser();
+    const activeCount = await countActiveSessionsByHost(currentUser.id);
+
+    if (activeCount >= maxSessions) {
+      const activeSessions = await listActiveSessionsByHost(currentUser.id);
+      return buildSessionLimitResponse(activeSessions, maxSessions);
+    }
+  }
+
+  if (sessionMode === "gm" && !currentUser) {
+    const cookieEntries = parseGmSessionAccessCookie(
+      req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value
+    );
+    const cookieSessionIds = cookieEntries.map((e) => e.sessionId);
+    const activeCookieSessions = await listActiveSessionsByIds(cookieSessionIds);
+
+    if (activeCookieSessions.length >= 1) {
+      return buildSessionLimitResponse(activeCookieSessions, 1);
+    }
   }
 
   const sessionGame = sessionMode === "gm" && currentUser && game.access.visibility !== "public"

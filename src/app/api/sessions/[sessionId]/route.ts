@@ -287,6 +287,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       sessionMode: session.mode,
       sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
       isSessionHost: hostByUserId || hostByCookie,
+      endedAt: session.endedAt,
     });
   }
 
@@ -474,7 +475,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           sharedState.endingStage = nextStage;
           message = `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`;
         } else if (body.action === "end_session") {
-          throw new Error("세션 강제 종료는 더 이상 사용할 수 없습니다.");
+          if (sharedState.phase !== "ending") {
+            throw new Error("엔딩 페이즈에서만 게임을 종료할 수 있습니다.");
+          }
+
+          const currentStage = normalizeEndingStage(sharedState.endingStage);
+          if (currentStage !== "complete") {
+            throw new Error("모든 엔딩 단계를 공개한 뒤 종료할 수 있습니다.");
+          }
+
+          latestSession.endedAt = now;
+          message = "게임이 종료됐습니다.";
         } else if (body.action === "update_session_name") {
           const normalizedSessionName = body.sessionName?.trim();
           if (!normalizedSessionName) {
@@ -572,13 +583,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     );
 
-    broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+    broadcast(sessionId, "session_update", {
+      sharedState: persistedSession.sharedState,
+      endedAt: persistedSession.endedAt,
+    });
 
     return NextResponse.json({
       session: {
         id: persistedSession.id,
         sessionName: persistedSession.sessionName,
         sharedState: persistedSession.sharedState,
+        endedAt: persistedSession.endedAt,
       },
     });
   } catch (error) {
@@ -589,7 +604,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         || error.message === "엔딩 페이즈가 아닙니다."
         || error.message === "엔딩 결과 데이터가 없습니다."
         || error.message === "더 진행할 엔딩 단계가 없습니다."
-        || error.message === "세션 강제 종료는 더 이상 사용할 수 없습니다."
+        || error.message === "엔딩 페이즈에서만 게임을 종료할 수 있습니다."
+        || error.message === "모든 엔딩 단계를 공개한 뒤 종료할 수 있습니다."
         || error.message === "방 제목을 입력해주세요."
         || error.message === "playerId가 필요합니다."
         || error.message === "라운드 페이즈에서만 타이머를 시작할 수 있습니다."

@@ -102,10 +102,17 @@ export async function POST(req: Request, { params }: Params) {
 
             latestSession.sharedState.endingStage = nextStage;
             clearPhaseAdvanceRequests(latestSession.sharedState);
+
+            if (nextStage === "complete") {
+              latestSession.endedAt = new Date().toISOString();
+            }
+
             latestSession.sharedState.eventLog.push({
               id: crypto.randomUUID(),
               timestamp: new Date().toISOString(),
-              message: `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`,
+              message: nextStage === "complete"
+                ? "게임이 종료됐습니다."
+                : `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`,
               type: "phase_changed",
             });
           } else {

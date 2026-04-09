@@ -1,4 +1,4 @@
-export type GameVisibility = "draft" | "private" | "public";
+export type GameVisibility = "draft" | "private" | "unlisted" | "public";
 
 export interface GameAccessMeta {
   ownerId: string;

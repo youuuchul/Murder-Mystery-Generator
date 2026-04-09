@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
+import { canAccessGmPlay, isPubliclyAccessible, resolveEditableGameForUser } from "@/lib/game-access";
 import {
   applyGmSessionAccessCookie,
   canResumeGmSessionDirectly,
@@ -102,9 +102,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (sessionMode === "player-consensus" && game.access.visibility !== "public") {
+  if (sessionMode === "player-consensus" && !isPubliclyAccessible(game.access)) {
     return NextResponse.json(
-      { error: "GM 없이 직접 여는 방은 공개 게임에서만 만들 수 있습니다." },
+      { error: "GM 없이 직접 여는 방은 공개 또는 링크 전용 게임에서만 만들 수 있습니다." },
       { status: 403 }
     );
   }
@@ -131,11 +131,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const sessionGame = sessionMode === "gm" && currentUser && game.access.visibility !== "public"
+  const sessionGame = sessionMode === "gm" && currentUser && !isPubliclyAccessible(game.access)
     ? resolveEditableGameForUser(game, currentUser)?.game ?? game
     : game;
 
-  if (sessionMode === "gm" && currentUser && game.access.visibility !== "public") {
+  if (sessionMode === "gm" && currentUser && !isPubliclyAccessible(game.access)) {
     const editableGame = resolveEditableGameForUser(game, currentUser);
     if (editableGame?.claimed) {
       await saveGame(editableGame.game);

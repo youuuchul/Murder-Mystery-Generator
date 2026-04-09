@@ -121,7 +121,7 @@ export function resolveEditableGameForUser(
  * 공개 게임은 누구나 가능하고, 비공개/초안은 소유자 또는 귀속 가능한 레거시 게임만 허용한다.
  */
 export function canAccessGmPlay(game: GameWithAccess, actor?: GameActor): boolean {
-  if (normalizeGameVisibility(game.access) === "public") {
+  if (isPubliclyAccessible(game.access)) {
     return true;
   }
 
@@ -165,7 +165,14 @@ export function canDeleteGame(game: GameWithAccess, actor?: GameActor): boolean 
 function normalizeGameVisibility(access: GameAccessMeta): GameAccessMeta["visibility"] {
   return access.visibility === "draft"
     || access.visibility === "private"
+    || access.visibility === "unlisted"
     || access.visibility === "public"
     ? access.visibility
     : "private";
+}
+
+/** public 또는 unlisted — 링크로 누구나 접근 가능한 상태인지 판별한다. */
+export function isPubliclyAccessible(access: GameAccessMeta): boolean {
+  const v = normalizeGameVisibility(access);
+  return v === "public" || v === "unlisted";
 }

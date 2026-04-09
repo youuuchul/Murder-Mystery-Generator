@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { canAccessGmPlay, resolveEditableGameForUser } from "@/lib/game-access";
+import { canAccessGmPlay, isPubliclyAccessible, resolveEditableGameForUser } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
@@ -54,8 +54,8 @@ export default async function PlayPage({
           <p className="text-xs uppercase tracking-[0.24em] text-amber-300/80">GM Access</p>
           <h1 className="mt-3 text-2xl font-semibold">이 게임은 바로 플레이할 수 없습니다</h1>
           <p className="mt-3 text-sm leading-6 text-dark-400">
-            공개 게임만 누구나 GM 화면에 들어갈 수 있습니다. 비공개 또는 초안 게임은
-            소유자 작업자 세션으로만 세션을 시작할 수 있습니다.
+            공개 또는 링크 전용 게임만 누구나 GM 화면에 들어갈 수 있습니다.
+            비공개 또는 초안 게임은 소유자 작업자 세션으로만 세션을 시작할 수 있습니다.
           </p>
           <Link
             href="/library"
@@ -68,11 +68,11 @@ export default async function PlayPage({
     );
   }
 
-  const gmGame = currentUser && game.access.visibility !== "public"
+  const gmGame = currentUser && !isPubliclyAccessible(game.access)
     ? resolveEditableGameForUser(game, currentUser)?.game ?? game
     : game;
 
-  if (currentUser && game.access.visibility !== "public") {
+  if (currentUser && !isPubliclyAccessible(game.access)) {
     const editableGame = resolveEditableGameForUser(game, currentUser);
     if (editableGame?.claimed) {
       await saveGame(editableGame.game);

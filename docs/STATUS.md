@@ -103,7 +103,7 @@
 - [x] **Supabase MCP 연결** — Claude/Codex가 DB 직접 쿼리 가능하도록 선행 작업 (JSON 컬럼 개선 설계 전제) ✅ 완료 (2026-04-09)
 
 ### 중간
-- [ ] **게임 공개 모드 unlisted 추가** — 라이브러리 비노출 + 링크 직접 접근 가능. `visibility` 재편: `private | unlisted | public`. `draft` 제거 검토 (`lifecycle_status.draft`와 중복). 비공개 전환 시 링크 비작동 + 세션 삭제 알림. unlisted 접근 허용 RLS/토큰 정책 설계 선행 필요.
+- [x] **게임 공개 모드 unlisted 추가** — 라이브러리 비노출 + 링크 직접 접근 가능. `visibility` 재편: `draft | private | unlisted | public`. unlisted는 public과 동일 접근 + 라이브러리 비노출. draft 제거는 별도 검토. ✅ 완료 (2026-04-10)
 - [ ] **통 JSON DB 컬럼 개선** — `game_content.content_json` 분리로 메이커 AI 챗봇 레이턴시 개선. 선결 조건: Supabase MCP 연결 후 데이터 분포 기반 설계.
 - [ ] **메이커 AI 도우미 Langfuse 트레이싱** — `/api/maker-assistant` trace 미적용. 모드(guide/draft), step, 재시도 여부 스팬 추가. 향후 NPC 챗봇도 동일 패턴.
 - [x] **유저 정보 오버레이 모바일 스크롤 버그** — 오버레이 내부 스크롤 미작동으로 하단 로그아웃 버튼 접근 불가. iOS Safari `overflow-y: scroll` + `-webkit-overflow-scrolling: touch` 또는 body scroll lock 충돌 추정. ✅ 완료 (2026-04-09, 모바일 좌우 정렬 보정 후속 반영)

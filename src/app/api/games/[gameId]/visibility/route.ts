@@ -9,7 +9,7 @@ import type { GameVisibility } from "@/types/game";
 type Params = { params: Promise<{ gameId: string }> };
 
 const UpdateVisibilitySchema = z.object({
-  visibility: z.enum(["draft", "private", "public"]),
+  visibility: z.enum(["draft", "private", "unlisted", "public"]),
 });
 
 /** PATCH /api/games/[gameId]/visibility — 공개 상태 변경 */
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const nextVisibility = parsed.data.visibility as GameVisibility;
-  if (nextVisibility === "public") {
+  if (nextVisibility === "public" || nextVisibility === "unlisted") {
     const readiness = getGamePublishReadiness(editableGame.game);
     const issues = getGamePublishReadinessIssues(editableGame.game);
 
@@ -67,9 +67,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     access: {
       ...editableGame.game.access,
       visibility: nextVisibility,
-      publishedAt: nextVisibility === "public"
+      publishedAt: nextVisibility === "public" || nextVisibility === "unlisted"
         ? editableGame.game.access.publishedAt ?? new Date().toISOString()
-        : undefined,
+        : editableGame.game.access.publishedAt,
     },
   };
 

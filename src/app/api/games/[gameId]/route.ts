@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   canDeleteGame,
   canReadGameSource,
+  isPubliclyAccessible,
   resolveEditableGameForUser,
 } from "@/lib/game-access";
 import { deleteGame, getGame, saveGame } from "@/lib/game-repository";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ game });
   }
 
-  if (game.access.visibility !== "public") {
+  if (!isPubliclyAccessible(game.access)) {
     return NextResponse.json({ error: "이 게임을 볼 수 없습니다." }, { status: 403 });
   }
 

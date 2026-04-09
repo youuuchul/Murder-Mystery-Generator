@@ -1821,8 +1821,9 @@ export default function PlayerView() {
     : endingStage === "personal"
       ? "작가 노트 공개 요청"
       : "엔딩 종료 요청";
-  const leavePath = game.access.visibility === "public" ? `/play/${gameId}/join` : "/join";
-  const leaveLabel = game.access.visibility === "public" ? "세션 목록" : "코드 입장";
+  const isAccessible = game.access.visibility === "public" || game.access.visibility === "unlisted";
+  const leavePath = isAccessible ? `/play/${gameId}/join` : "/join";
+  const leaveLabel = isAccessible ? "세션 목록" : "코드 입장";
 
   async function handlePhaseAdvanceToggle() {
     if (!sharedState || !game) {

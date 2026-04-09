@@ -49,7 +49,7 @@ export default async function PlayJoinPage({
   params: { gameId: string };
 }) {
   const game = await getGame(params.gameId);
-  if (!game || game.access.visibility !== "public") {
+  if (!game || (game.access.visibility !== "public" && game.access.visibility !== "unlisted")) {
     notFound();
   }
 

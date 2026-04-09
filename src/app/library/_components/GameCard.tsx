@@ -32,6 +32,7 @@ interface GameCardProps {
 const VISIBILITY_LABELS: Record<GameMetadata["access"]["visibility"], string> = {
   draft: "초안",
   private: "비공개",
+  unlisted: "링크 전용",
   public: "공개",
 };
 
@@ -293,8 +294,8 @@ export default function GameCard({
                 </ul>
               ) : null}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(["draft", "private", "public"] as const).map((visibility) => (
+            <div className="grid grid-cols-4 gap-2">
+              {(["draft", "private", "unlisted", "public"] as const).map((visibility) => (
                 <button
                   key={visibility}
                   type="button"

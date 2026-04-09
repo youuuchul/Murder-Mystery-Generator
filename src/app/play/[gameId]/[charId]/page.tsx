@@ -1194,14 +1194,16 @@ function PlayerRoomRosterPanel({
 
 /**
  * 플레이어가 세션 목록으로 돌아가기 전에 한 번 더 확인하는 이탈 모달.
- * 진행 중 화면에서 실수로 빠져나가 재접속 흐름이 꼬이지 않게 막는다.
+ * unlisted 게임은 퇴장 시 세션 파괴 가능성이 있어 경고를 강화한다.
  */
 function LeaveSessionConfirmModal({
   destinationLabel,
+  isUnlisted,
   onCancel,
   onConfirm,
 }: {
   destinationLabel: string;
+  isUnlisted?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -1211,9 +1213,20 @@ function LeaveSessionConfirmModal({
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.18em] text-mystery-400/70">Leave Session</p>
           <h2 className="text-xl font-semibold text-dark-50">{destinationLabel}으로 나갈까요?</h2>
-          <p className="text-sm leading-6 text-dark-300">
-            현재 진행 화면을 나가면 다시 참가 코드를 통해 들어와야 할 수 있습니다.
-          </p>
+          {isUnlisted ? (
+            <div className="space-y-1.5">
+              <p className="text-sm leading-6 text-amber-300">
+                일부 공개 게임에서 나가면 슬롯이 해제됩니다.
+              </p>
+              <p className="text-sm leading-6 text-dark-300">
+                진행 상태가 초기화되며, 빈 슬롯에 새로 참가해야 합니다. 마지막 참여자인 경우 세션이 삭제됩니다.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm leading-6 text-dark-300">
+              현재 진행 화면을 나가면 다시 참가 코드를 통해 들어와야 할 수 있습니다.
+            </p>
+          )}
         </div>
 
         <div className="mt-5 flex gap-3">
@@ -1227,7 +1240,12 @@ function LeaveSessionConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="flex-1 rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
+            className={[
+              "flex-1 rounded-xl px-4 py-3 text-sm font-medium text-white transition-colors",
+              isUnlisted
+                ? "bg-amber-700 hover:bg-amber-600"
+                : "bg-mystery-700 hover:bg-mystery-600",
+            ].join(" ")}
           >
             {destinationLabel}으로 이동
           </button>
@@ -1915,7 +1933,7 @@ export default function PlayerView() {
               </p>
               <button
                 type="button"
-                onClick={() => router.push(leavePath)}
+                onClick={() => setShowLeaveConfirm(true)}
                 className="w-full rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
               >
                 {leaveLabel}으로 나가기
@@ -1926,9 +1944,17 @@ export default function PlayerView() {
         {showLeaveConfirm && (
           <LeaveSessionConfirmModal
             destinationLabel={leaveLabel}
+            isUnlisted={game.access.visibility === "unlisted"}
             onCancel={() => setShowLeaveConfirm(false)}
-            onConfirm={() => {
+            onConfirm={async () => {
               setShowLeaveConfirm(false);
+              if (game.access.visibility === "unlisted" && sessionId && token) {
+                await fetch(`/api/sessions/${sessionId}/leave`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ token }),
+                }).catch(() => {});
+              }
               router.push(leavePath);
             }}
           />
@@ -2516,9 +2542,17 @@ export default function PlayerView() {
       {showLeaveConfirm && (
         <LeaveSessionConfirmModal
           destinationLabel={leaveLabel}
+          isUnlisted={game.access.visibility === "unlisted"}
           onCancel={() => setShowLeaveConfirm(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setShowLeaveConfirm(false);
+            if (game.access.visibility === "unlisted" && sessionId && token) {
+              await fetch(`/api/sessions/${sessionId}/leave`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+              }).catch(() => {});
+            }
             router.push(leavePath);
           }}
         />

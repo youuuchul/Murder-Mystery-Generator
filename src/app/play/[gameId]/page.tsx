@@ -54,8 +54,8 @@ export default async function PlayPage({
           <p className="text-xs uppercase tracking-[0.24em] text-amber-300/80">GM Access</p>
           <h1 className="mt-3 text-2xl font-semibold">이 게임은 바로 플레이할 수 없습니다</h1>
           <p className="mt-3 text-sm leading-6 text-dark-400">
-            공개 또는 링크 전용 게임만 누구나 GM 화면에 들어갈 수 있습니다.
-            비공개 또는 초안 게임은 소유자 작업자 세션으로만 세션을 시작할 수 있습니다.
+            공개 또는 일부 공개 게임만 누구나 GM 화면에 들어갈 수 있습니다.
+            비공개 게임은 소유자만 세션을 시작할 수 있습니다.
           </p>
           <Link
             href="/library"
@@ -110,9 +110,15 @@ export default async function PlayPage({
     <div className="min-h-screen bg-dark-950 text-dark-100">
       <header className="border-b border-dark-800 bg-dark-950/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/library" className="text-dark-400 hover:text-dark-200 transition-colors text-sm">
-            ← 라이브러리
-          </Link>
+          {game.access.visibility === "unlisted" ? (
+            <Link href={`/game/${game.id}`} className="text-dark-400 hover:text-dark-200 transition-colors text-sm">
+              ← 게임 표지
+            </Link>
+          ) : (
+            <Link href="/library" className="text-dark-400 hover:text-dark-200 transition-colors text-sm">
+              ← 라이브러리
+            </Link>
+          )}
           <span className="text-dark-700">|</span>
           <Link
             href={`/play/${gmGame.id}`}

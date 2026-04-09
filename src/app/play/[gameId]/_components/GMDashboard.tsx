@@ -1670,16 +1670,23 @@ export default function GMDashboard({
 
   async function deleteSession() {
     if (!session) return;
-    if (!confirm("세션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+    const isUnlisted = game.access.visibility === "unlisted";
+    const message = isUnlisted
+      ? "일부 공개 게임의 세션을 삭제하시겠습니까?\nGM이 퇴장하면 세션이 즉시 파괴되며 참여자 전원이 퇴장됩니다."
+      : "세션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.";
+    if (!confirm(message)) return;
     setDeleting(true);
     try {
-      await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+      if (isUnlisted) {
+        await fetch(`/api/sessions/${session.id}/leave`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      } else {
+        await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+      }
       setSession(null);
       await refreshSessionSummaries();
     } finally {
       setDeleting(false);
     }
-    // session_deleted SSE 이벤트도 함께 전달됨
   }
 
   async function handleSessionNameChange(nextSessionName: string) {

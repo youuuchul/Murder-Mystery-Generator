@@ -484,6 +484,21 @@ export function listActiveSessions(gameId: string): Promise<GameSession[]> {
   return getSessionRepository().listActiveSessions(gameId);
 }
 
+/**
+ * 특정 게임의 활성 세션을 모두 삭제한다.
+ * 가시성 전환 등에서 잔류 세션 정리에 사용한다.
+ * broadcast는 호출 측(API 레이어)에서 처리해야 한다.
+ */
+export async function deleteActiveSessionsByGameId(gameId: string): Promise<string[]> {
+  const sessions = await listActiveSessions(gameId);
+  const deletedIds: string[] = [];
+  for (const session of sessions) {
+    const ok = await deleteSession(session.id);
+    if (ok) deletedIds.push(session.id);
+  }
+  return deletedIds;
+}
+
 export function listAllActiveSessions(): Promise<GameSession[]> {
   return getSessionRepository().listAllActiveSessions();
 }

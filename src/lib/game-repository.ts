@@ -156,11 +156,7 @@ function buildSupabaseGameRow(game: GamePackage): SupabaseGameRow {
     estimated_duration: normalizedGame.settings.estimatedDuration,
     cover_asset_id: null,
     visibility: normalizedGame.access.visibility,
-    lifecycle_status: normalizedGame.access.visibility === "draft"
-      ? "draft"
-      : publishReadiness.ready
-        ? "ready"
-        : "draft",
+    lifecycle_status: publishReadiness.ready ? "ready" : "draft",
     tags: normalizedGame.settings.tags,
     clue_count: metadata.clueCount,
     location_count: metadata.locationCount,

@@ -32,7 +32,7 @@
 - [x] 비밀번호 찾기/재설정/변경 (이메일 발송 구현 완료)
 - [x] admin role + 운영 UI (전체 게임/세션 조회·삭제·이관)
 - [x] 소유권 귀속/이관 도구 (claimable 게임 귀속, 타 계정 이관)
-- [x] 공개 상태 전환 (`draft/private/public`) + 체크리스트 검증
+- [x] 공개 상태 전환 (`private/unlisted/public`) + 체크리스트 검증
 
 ### 라이브러리/진입
 - [x] 공개 라이브러리 GM / 플레이어 CTA 분리
@@ -103,12 +103,13 @@
 - [x] **Supabase MCP 연결** — Claude/Codex가 DB 직접 쿼리 가능하도록 선행 작업 (JSON 컬럼 개선 설계 전제) ✅ 완료 (2026-04-09)
 
 ### 중간
-- [x] **게임 공개 모드 unlisted 추가** — 라이브러리 비노출 + 링크 직접 접근 가능. `visibility` 재편: `draft | private | unlisted | public`. unlisted는 public과 동일 접근 + 라이브러리 비노출. draft 제거는 별도 검토. ✅ 완료 (2026-04-10)
+- [x] **Visibility 3-mode 리팩토링** — draft 제거, `private | unlisted | public` 3-mode 체계로 전환. DB CHECK 제약조건 + RLS 정책 unlisted 포함 마이그레이션. normalizer 버그 수정. UI 워딩 YouTube 스타일(비공개/일부 공개/공개). `/game/[gameId]` 커버 페이지 신규 추가. ✅ 완료 (2026-04-10)
 - [ ] **통 JSON DB 컬럼 개선** — `game_content.content_json` 분리로 메이커 AI 챗봇 레이턴시 개선. 선결 조건: Supabase MCP 연결 후 데이터 분포 기반 설계.
 - [ ] **메이커 AI 도우미 Langfuse 트레이싱** — `/api/maker-assistant` trace 미적용. 모드(guide/draft), step, 재시도 여부 스팬 추가. 향후 NPC 챗봇도 동일 패턴.
 - [x] **유저 정보 오버레이 모바일 스크롤 버그** — 오버레이 내부 스크롤 미작동으로 하단 로그아웃 버튼 접근 불가. iOS Safari `overflow-y: scroll` + `-webkit-overflow-scrolling: touch` 또는 body scroll lock 충돌 추정. ✅ 완료 (2026-04-09, 모바일 좌우 정렬 보정 후속 반영)
 - [x] **플레이어 엔딩 이후 종료 동선** — 최종 엔딩 공개 후 게임 종료 액션 ✅ 완료 (2026-04-09)
 - [x] **장소 탐색 첫 획득 카드 상세 팝업** — 첫 획득 시 자동 팝업 오픈 ✅ 이미 구현됨 (acquireClue → setSelectedCard)
+- [x] **일부 공개(unlisted) 세션 퇴장/파괴 정책** — GM 퇴장 시 세션 즉시 파괴, 플레이어 퇴장 시 슬롯 해제(마지막이면 세션 파괴), 퇴장 경고 팝업 강화. `POST /api/sessions/[sessionId]/leave` 신규 API. 가시성 전환 시 잔류 세션 경고/일괄 삭제. unlisted join 페이지 게임표지 네비게이션. ✅ 완료 (2026-04-10)
 - [ ] **미사용 세션 자동 정리 정책** — 일정 기간(예: 24시간) 미활동 세션 자동 종료/삭제. 불특정 유저 접속 오픈 대비 세션 누적 방지. 엔딩 완료 세션 자동 정리 포함. Supabase pg_cron 또는 API 기반 정리 검토
 - [ ] **라운드 대표 이미지 업로드** — 현재 URL-only
 - [ ] **대상 작업자 찾기 UX** — 소유권 이관 시 이름/ID 검색

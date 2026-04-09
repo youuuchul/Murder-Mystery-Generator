@@ -4,12 +4,15 @@ import { resolveEditableGameForUser } from "@/lib/game-access";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { getGamePublishReadiness, getGamePublishReadinessIssues } from "@/lib/game-publish";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
+import { listActiveSessions, deleteActiveSessionsByGameId } from "@/lib/session-repository";
+import { broadcast } from "@/lib/sse/broadcaster";
 import type { GameVisibility } from "@/types/game";
 
 type Params = { params: Promise<{ gameId: string }> };
 
 const UpdateVisibilitySchema = z.object({
-  visibility: z.enum(["draft", "private", "unlisted", "public"]),
+  visibility: z.enum(["private", "unlisted", "public"]),
+  force: z.boolean().optional(),
 });
 
 /** PATCH /api/games/[gameId]/visibility — 공개 상태 변경 */
@@ -45,6 +48,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const nextVisibility = parsed.data.visibility as GameVisibility;
+  const force = parsed.data.force === true;
+
+  // unlisted 또는 private 전환 시 활성 세션 확인/정리
+  if (nextVisibility === "unlisted" || nextVisibility === "private") {
+    const activeSessions = await listActiveSessions(gameId);
+    if (activeSessions.length > 0 && !force) {
+      const targetLabel = nextVisibility === "unlisted" ? "일부 공개" : "비공개";
+      return NextResponse.json(
+        {
+          warning: true,
+          activeSessionCount: activeSessions.length,
+          error: `활성 세션 ${activeSessions.length}개가 있습니다. ${targetLabel}로 전환하면 기존 세션이 모두 삭제됩니다.`,
+        },
+        { status: 409 }
+      );
+    }
+    if (activeSessions.length > 0 && force) {
+      const deletedIds = await deleteActiveSessionsByGameId(gameId);
+      for (const sid of deletedIds) {
+        broadcast(sid, "session_deleted", {});
+      }
+    }
+  }
+
   if (nextVisibility === "public" || nextVisibility === "unlisted") {
     const readiness = getGamePublishReadiness(editableGame.game);
     const issues = getGamePublishReadinessIssues(editableGame.game);

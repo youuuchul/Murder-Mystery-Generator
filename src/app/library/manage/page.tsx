@@ -74,7 +74,6 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
   const publicCount = filteredGames.filter((item) => item.game.access.visibility === "public").length;
   const unlistedCount = filteredGames.filter((item) => item.game.access.visibility === "unlisted").length;
   const privateCount = filteredGames.filter((item) => item.game.access.visibility === "private").length;
-  const draftCount = filteredGames.filter((item) => item.game.access.visibility === "draft").length;
   const readonlyCount = managedGames.filter((item) => item.ownershipState === "readonly").length;
   const ownedCount = managedGames.filter((item) => item.ownershipState === "owned").length;
   const claimableCount = managedGames.filter((item) => item.ownershipState === "claimable").length;
@@ -211,14 +210,11 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
             </span>
             {unlistedCount > 0 && (
               <span className="rounded-full border border-sky-900 bg-sky-950/40 px-3 py-1 text-sky-300">
-                링크 전용 {unlistedCount}개
+                일부 공개 {unlistedCount}개
               </span>
             )}
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-dark-300">
               비공개 {privateCount}개
-            </span>
-            <span className="rounded-full border border-amber-900 bg-amber-950/40 px-3 py-1 text-amber-300">
-              초안 {draftCount}개
             </span>
             {includeReadonly ? (
               <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1 text-dark-400">

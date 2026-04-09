@@ -47,8 +47,8 @@ function asOptionalString(value: unknown): string | undefined {
 }
 
 function normalizeGameVisibility(value: unknown): GamePackage["access"]["visibility"] {
-  return value === "draft"
-    || value === "private"
+  return value === "private"
+    || value === "unlisted"
     || value === "public"
     ? value
     : "private";

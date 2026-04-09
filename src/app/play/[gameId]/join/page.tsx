@@ -80,12 +80,21 @@ export default async function PlayJoinPage({
     <div className="min-h-screen bg-dark-950 text-dark-100">
       <header className="sticky top-0 z-10 border-b border-dark-800 bg-dark-950/85 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Link
-            href="/library"
-            className="text-sm text-dark-400 transition-colors hover:text-dark-200"
-          >
-            ← 라이브러리
-          </Link>
+          {game.access.visibility === "unlisted" ? (
+            <Link
+              href={`/game/${game.id}`}
+              className="text-sm text-dark-400 transition-colors hover:text-dark-200"
+            >
+              ← 게임 표지
+            </Link>
+          ) : (
+            <Link
+              href="/library"
+              className="text-sm text-dark-400 transition-colors hover:text-dark-200"
+            >
+              ← 라이브러리
+            </Link>
+          )}
           <span className="text-dark-700">|</span>
           <span className="truncate text-sm font-medium text-dark-300">{game.title}</span>
         </div>

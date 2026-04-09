@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import LibraryCover from "@/app/library/_components/LibraryCover";
@@ -30,9 +30,8 @@ interface GameCardProps {
 }
 
 const VISIBILITY_LABELS: Record<GameMetadata["access"]["visibility"], string> = {
-  draft: "초안",
   private: "비공개",
-  unlisted: "링크 전용",
+  unlisted: "일부 공개",
   public: "공개",
 };
 
@@ -92,8 +91,8 @@ export default function GameCard({
     }
   }
 
-  async function handleVisibilityChange(nextVisibility: GameMetadata["access"]["visibility"]) {
-    if (!canEdit || game.access.visibility === nextVisibility) {
+  async function handleVisibilityChange(nextVisibility: GameMetadata["access"]["visibility"], force = false) {
+    if (!canEdit || (!force && game.access.visibility === nextVisibility)) {
       return;
     }
 
@@ -105,11 +104,22 @@ export default function GameCard({
       const res = await fetch(`/api/games/${game.id}/visibility`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visibility: nextVisibility }),
+        body: JSON.stringify({ visibility: nextVisibility, force }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "공개 상태 변경에 실패했습니다." }));
+
+        // 활성 세션 경고 (409) — 확인 후 force로 재시도
+        if (res.status === 409 && data.warning) {
+          const confirmed = confirm(data.error + "\n\n전환하시겠습니까?");
+          if (confirmed) {
+            setUpdatingVisibility(false);
+            return handleVisibilityChange(nextVisibility, true);
+          }
+          return;
+        }
+
         if (Array.isArray(data.checklist)) {
           setPublishChecklist(data.checklist);
         }
@@ -294,8 +304,8 @@ export default function GameCard({
                 </ul>
               ) : null}
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {(["draft", "private", "unlisted", "public"] as const).map((visibility) => (
+            <div className="grid grid-cols-3 gap-2">
+              {(["private", "unlisted", "public"] as const).map((visibility) => (
                 <button
                   key={visibility}
                   type="button"
@@ -313,6 +323,9 @@ export default function GameCard({
                 </button>
               ))}
             </div>
+            {game.access.visibility === "unlisted" && (
+              <UnlistedShareToggle gameId={game.id} />
+            )}
           </div>
         ) : null}
 
@@ -332,32 +345,12 @@ export default function GameCard({
         ) : null}
 
         {showOwnershipTransfer ? (
-          <form
+          <OwnershipTransferToggle
+            transferTarget={transferTarget}
+            setTransferTarget={setTransferTarget}
+            transferringOwnership={transferringOwnership}
             onSubmit={handleTransferOwnership}
-            className="space-y-2 rounded-lg border border-dark-800 bg-dark-950/70 px-3 py-3"
-          >
-            <p className="text-[11px] uppercase tracking-[0.18em] text-dark-500">
-              소유권 이관
-            </p>
-            <p className="text-xs leading-5 text-dark-400">
-              다른 작업자의 로그인 ID를 입력하면 이 게임 소유자를 바로 바꿉니다.
-            </p>
-            <input
-              type="text"
-              value={transferTarget}
-              onChange={(event) => setTransferTarget(event.target.value)}
-              autoComplete="off"
-              className="w-full rounded-lg border border-dark-700 bg-dark-900 px-3 py-2 font-mono text-xs text-dark-100 outline-none transition focus:border-mystery-500"
-              placeholder="예: studio-a"
-            />
-            <button
-              type="submit"
-              disabled={transferringOwnership}
-              className="inline-flex rounded-md border border-dark-700 bg-dark-900 px-3 py-2 text-xs font-medium text-dark-100 transition-colors hover:border-dark-500 hover:bg-dark-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {transferringOwnership ? "이관 중..." : "소유권 이관"}
-            </button>
-          </form>
+          />
         ) : null}
 
         {showAdminReadonlyTools ? (
@@ -435,6 +428,100 @@ export default function GameCard({
           <p className="text-xs leading-5 text-emerald-300">{actionNotice}</p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function UnlistedShareToggle({ gameId }: { gameId: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/game/${gameId}`;
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard API 미지원 시 무시 */
+    }
+  }, [shareUrl]);
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="self-start text-[11px] font-medium text-sky-400 transition-colors hover:text-sky-300"
+      >
+        {open ? "공유 링크 닫기" : "공유 링크 보기"}
+      </button>
+      {open && (
+        <div className="flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/20 px-3 py-2.5">
+          <input
+            type="text"
+            readOnly
+            value={shareUrl}
+            className="min-w-0 flex-1 rounded border border-dark-700 bg-dark-950 px-2 py-1.5 text-[11px] text-dark-200 outline-none"
+            onFocus={(e) => e.target.select()}
+          />
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="shrink-0 rounded border border-sky-800 bg-sky-900/40 px-2.5 py-1.5 text-[11px] font-medium text-sky-200 transition-colors hover:bg-sky-800/50"
+          >
+            {copied ? "복사됨" : "복사"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OwnershipTransferToggle({
+  transferTarget,
+  setTransferTarget,
+  transferringOwnership,
+  onSubmit,
+}: {
+  transferTarget: string;
+  setTransferTarget: (v: string) => void;
+  transferringOwnership: boolean;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="self-start text-[11px] font-medium text-dark-400 transition-colors hover:text-dark-200"
+      >
+        {open ? "소유권 이관 닫기" : "소유권 이관"}
+      </button>
+      {open && (
+        <form
+          onSubmit={onSubmit}
+          className="space-y-2 rounded-lg border border-dark-800 bg-dark-950/70 px-3 py-3"
+        >
+          <input
+            type="text"
+            value={transferTarget}
+            onChange={(event) => setTransferTarget(event.target.value)}
+            autoComplete="off"
+            className="w-full rounded-lg border border-dark-700 bg-dark-900 px-3 py-2 font-mono text-xs text-dark-100 outline-none transition focus:border-mystery-500"
+            placeholder="예: studio-a"
+          />
+          <button
+            type="submit"
+            disabled={transferringOwnership}
+            className="inline-flex rounded-md border border-dark-700 bg-dark-900 px-3 py-2 text-xs font-medium text-dark-100 transition-colors hover:border-dark-500 hover:bg-dark-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {transferringOwnership ? "이관 중..." : "소유권 이관"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

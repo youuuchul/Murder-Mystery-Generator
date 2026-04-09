@@ -163,8 +163,7 @@ export function canDeleteGame(game: GameWithAccess, actor?: GameActor): boolean 
 }
 
 function normalizeGameVisibility(access: GameAccessMeta): GameAccessMeta["visibility"] {
-  return access.visibility === "draft"
-    || access.visibility === "private"
+  return access.visibility === "private"
     || access.visibility === "unlisted"
     || access.visibility === "public"
     ? access.visibility

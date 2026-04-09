@@ -1,10 +1,13 @@
 import type { GameRules } from "@/types/game";
-import type { SharedState } from "@/types/session";
+import type { SharedState, TimerState } from "@/types/session";
+import type { ActiveSessionSubPhase } from "@/lib/session-phase";
 
 export interface SessionTimerSnapshot {
   label: string;
   startedAt: string;
   durationSeconds: number;
+  /** 일시정지 중이면 남은 초. undefined면 카운트다운 진행 중. */
+  pausedRemaining?: number;
 }
 
 /**
@@ -17,13 +20,34 @@ export function getOpeningDurationSeconds(rules: Pick<GameRules, "openingDuratio
 }
 
 /**
+ * 게임 규칙에서 서브페이즈 제한시간(초)을 추출한다.
+ */
+export function getSubPhaseDurationSeconds(
+  rules: Pick<GameRules, "phases"> | undefined,
+  subPhase: ActiveSessionSubPhase
+): number {
+  const cfg = rules?.phases?.find((p) => p.type === subPhase);
+  return Math.max(0, cfg?.durationMinutes ?? 10) * 60;
+}
+
+/**
  * 현재 세션 상태에서 화면에 보여줄 타이머 스냅샷을 계산한다.
- * 지금은 오프닝 제한시간만 다루고, 라운드 타이머 공용화는 이후 단계에서 확장한다.
+ * 1. `timerState`가 있으면 그것 기반 (라운드 타이머)
+ * 2. 오프닝 페이즈면 `phaseStartedAt` 기반 (기존 오프닝 자동 타이머)
  */
 export function getSessionTimerSnapshot(
-  sharedState: Pick<SharedState, "phase" | "phaseStartedAt">,
+  sharedState: Pick<SharedState, "phase" | "phaseStartedAt" | "timerState">,
   rules: Pick<GameRules, "openingDurationMinutes">
 ): SessionTimerSnapshot | null {
+  if (sharedState.timerState) {
+    return {
+      label: sharedState.timerState.label,
+      startedAt: sharedState.timerState.startedAt,
+      durationSeconds: sharedState.timerState.durationSeconds,
+      pausedRemaining: sharedState.timerState.pausedRemaining,
+    };
+  }
+
   if (sharedState.phase !== "opening" || !sharedState.phaseStartedAt) {
     return null;
   }
@@ -60,4 +84,22 @@ export function formatTimerSeconds(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+/**
+ * timerState가 만료됐는지 판정한다.
+ * 일시정지 중이면 만료가 아니다.
+ */
+export function isTimerExpired(timerState: TimerState | undefined): boolean {
+  if (!timerState) return false;
+  if (timerState.pausedRemaining !== undefined) return false;
+  return getRemainingSeconds(timerState.startedAt, timerState.durationSeconds) === 0;
+}
+
+/**
+ * timerState가 일시정지 중인지 판정한다.
+ */
+export function isTimerPaused(timerState: TimerState | undefined): boolean {
+  if (!timerState) return false;
+  return timerState.pausedRemaining !== undefined;
 }

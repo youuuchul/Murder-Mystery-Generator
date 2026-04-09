@@ -56,6 +56,8 @@ export default function PlayerSessionEntry({
   const [checking, setChecking] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [limitSessions, setLimitSessions] = useState<SessionLimitSession[] | null>(null);
+  const [limitMessage, setLimitMessage] = useState("");
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [promptSessionId, setPromptSessionId] = useState<string | null>(null);
   const [promptCode, setPromptCode] = useState("");
   const [promptError, setPromptError] = useState("");
@@ -117,6 +119,30 @@ export default function PlayerSessionEntry({
     }
   }
 
+  async function handleDeleteLimitSession(sessionId: string) {
+    const confirmed = window.confirm("이 세션을 삭제하시겠습니까? 참가 중인 플레이어가 있으면 모두 퇴장됩니다.");
+    if (!confirmed) return;
+
+    setDeletingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        setError(data.error ?? "세션을 삭제하지 못했습니다.");
+        return;
+      }
+      const remaining = (limitSessions ?? []).filter((s) => s.id !== sessionId);
+      if (remaining.length === 0) {
+        setLimitSessions(null);
+        setLimitMessage("");
+      } else {
+        setLimitSessions(remaining);
+      }
+    } finally {
+      setDeletingSessionId(null);
+    }
+  }
+
   /**
    * 플레이어 합의로 진행하는 방을 새로 만들고,
    * 만든 사람도 곧바로 플레이어 참가 퍼널로 들어가게 한다.
@@ -143,7 +169,7 @@ export default function PlayerSessionEntry({
         };
         if (data.code === "SESSION_LIMIT_EXCEEDED" && data.sessions) {
           setLimitSessions(data.sessions);
-          setError(data.error ?? "세션 한도에 도달했습니다.");
+          setLimitMessage(data.error ?? "세션 한도에 도달했습니다.");
         } else {
           setError(data.error ?? "방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
         }
@@ -213,21 +239,6 @@ export default function PlayerSessionEntry({
           {error ? (
             <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
               <p>{error}</p>
-              {limitSessions && limitSessions.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {limitSessions.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => router.push(`/join/${s.sessionCode}`)}
-                      className="flex w-full items-center justify-between rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-2 text-left transition-colors hover:border-dark-500"
-                    >
-                      <span className="text-dark-200">{s.gameTitle} — {s.sessionName}</span>
-                      <span className="shrink-0 text-xs text-mystery-400">입장 →</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>
@@ -285,6 +296,63 @@ export default function PlayerSessionEntry({
           )}
         </div>
       </section>
+
+      {/* 세션 제한 모달 */}
+      {limitSessions && limitSessions.length > 0 ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-red-400/70">Session Limit</p>
+              <h2 className="text-lg font-semibold text-dark-50">세션 한도 초과</h2>
+              <p className="text-sm leading-6 text-dark-300">{limitMessage}</p>
+            </div>
+
+            <div className="mt-5 max-h-[50vh] space-y-2 overflow-y-auto">
+              {limitSessions.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-dark-700 bg-dark-950/60 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-dark-200">{s.gameTitle}</p>
+                    <p className="mt-0.5 text-xs text-dark-500">{s.sessionName} — {s.phase}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/join/${s.sessionCode}`)}
+                      className="rounded-lg border border-dark-600 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:border-dark-400 hover:text-dark-50"
+                    >
+                      입장
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingSessionId === s.id}
+                      onClick={() => { void handleDeleteLimitSession(s.id); }}
+                      className="rounded-lg border border-red-800 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:border-red-600 hover:text-red-100 disabled:opacity-50"
+                    >
+                      {deletingSessionId === s.id ? "삭제 중…" : "삭제"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setLimitSessions(null);
+                  setLimitMessage("");
+                }}
+                className="w-full rounded-xl border border-dark-700 px-4 py-3 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {promptSession ? (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm">

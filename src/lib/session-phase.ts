@@ -122,6 +122,7 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     sharedState.phase = "opening";
     session.startedAt = now;
     markPhaseStarted(sharedState, now);
+    sharedState.timerState = undefined;
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: now,
@@ -136,6 +137,7 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     sharedState.currentRound = 1;
     sharedState.currentSubPhase = getCurrentRoundSubPhase(game.rules);
     markPhaseStarted(sharedState, now);
+    sharedState.timerState = undefined;
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: now,
@@ -150,6 +152,8 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
 
     if (nextSubPhase) {
       sharedState.currentSubPhase = nextSubPhase;
+      markPhaseStarted(sharedState, now);
+      sharedState.timerState = undefined;
       sharedState.eventLog.push({
         id: crypto.randomUUID(),
         timestamp: now,
@@ -163,6 +167,7 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
       sharedState.phase = "vote";
       sharedState.currentSubPhase = undefined;
       markPhaseStarted(sharedState, now);
+      sharedState.timerState = undefined;
       sharedState.eventLog.push({
         id: crypto.randomUUID(),
         timestamp: now,
@@ -176,6 +181,7 @@ export function applySessionAdvanceStep(session: GameSession, game: GamePackage)
     sharedState.currentRound += 1;
     sharedState.currentSubPhase = getCurrentRoundSubPhase(game.rules);
     markPhaseStarted(sharedState, now);
+    sharedState.timerState = undefined;
     sharedState.eventLog.push({
       id: crypto.randomUUID(),
       timestamp: now,

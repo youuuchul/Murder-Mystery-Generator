@@ -28,8 +28,10 @@ import {
   SessionConflictError,
   isSessionConflictError,
 } from "@/lib/session-repository";
+import { hasStoredGmSessionAccess, isSessionHost } from "@/lib/gm-session-access";
+import { getRemainingSeconds, getSubPhaseDurationSeconds } from "@/lib/session-timer";
 import { broadcast } from "@/lib/sse/broadcaster";
-import type { EndingStage, GamePhase, GameSession, VoteTally, VoteReveal } from "@/types/session";
+import type { EndingStage, GamePhase, GameSession, TimerState, VoteTally, VoteReveal } from "@/types/session";
 
 type Params = { params: { sessionId: string } };
 
@@ -272,6 +274,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!pState) return NextResponse.json({ error: "Invalid token" }, { status: 403 });
     const game = await getGame(session.gameId);
     if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    const currentUser = await getRequestMakerUser(req);
+    const hostByUserId = isSessionHost(session, currentUser?.id);
+    const hostByCookie = !hostByUserId && hasStoredGmSessionAccess(session, req.cookies);
     return NextResponse.json({
       sharedState: session.sharedState,
       playerState: pState,
@@ -281,6 +286,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       sessionName: session.sessionName,
       sessionMode: session.mode,
       sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
+      isSessionHost: hostByUserId || hostByCookie,
     });
   }
 
@@ -303,7 +309,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   });
 }
 
-/** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 */
+const TIMER_ACTIONS = new Set(["start_timer", "pause_timer", "resume_timer", "reset_timer"]);
+
+/** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 + 타이머 제어 */
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const body = await req.json().catch(() => ({})) as {
@@ -317,8 +325,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getSession(sessionId);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  if (!(await canManageSession(req, session))) {
-    return NextResponse.json({ error: "이 세션을 수정할 권한이 없습니다." }, { status: 403 });
+  const isTimerAction = TIMER_ACTIONS.has(body.action ?? "");
+  const canManage = await canManageSession(req, session);
+
+  if (!canManage) {
+    if (isTimerAction) {
+      const currentUser = await getRequestMakerUser(req);
+      const hostById = isSessionHost(session, currentUser?.id);
+      const hostByCookie = !hostById && hasStoredGmSessionAccess(session, req.cookies);
+      if (!hostById && !hostByCookie) {
+        return NextResponse.json({ error: "타이머를 조작할 권한이 없습니다." }, { status: 403 });
+      }
+    } else {
+      return NextResponse.json({ error: "이 세션을 수정할 권한이 없습니다." }, { status: 403 });
+    }
   }
 
   const game = await getGame(session.gameId);
@@ -356,30 +376,36 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             message = "오프닝이 시작됩니다.";
             latestSession.startedAt = now;
             markPhaseStarted(sharedState, now);
+            sharedState.timerState = undefined;
           } else if (sharedState.phase === "opening") {
             newPhase = "round-1";
             sharedState.currentRound = 1;
             sharedState.currentSubPhase = getCurrentRoundSubPhase(game?.rules);
             message = `Round 1 ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`;
             markPhaseStarted(sharedState, now);
+            sharedState.timerState = undefined;
           } else if (sharedState.phase.startsWith("round-")) {
             const cur = sharedState.currentRound;
             const nextSubPhase = getNextRoundSubPhase(game?.rules, sharedState.currentSubPhase);
 
             if (nextSubPhase) {
               sharedState.currentSubPhase = nextSubPhase;
+              markPhaseStarted(sharedState, now);
+              sharedState.timerState = undefined;
               message = `${getRoundSubPhaseLabel(nextSubPhase)} 페이즈가 시작됩니다.`;
             } else if (cur >= maxRound) {
               newPhase = "vote";
               sharedState.currentSubPhase = undefined;
               message = "투표 페이즈가 시작됩니다.";
               markPhaseStarted(sharedState, now);
+              sharedState.timerState = undefined;
             } else {
               newPhase = `round-${cur + 1}` as GamePhase;
               sharedState.currentRound = cur + 1;
               sharedState.currentSubPhase = getCurrentRoundSubPhase(game?.rules);
               message = `Round ${cur + 1} ${getRoundSubPhaseLabel(sharedState.currentSubPhase)} 페이즈가 시작됩니다.`;
               markPhaseStarted(sharedState, now);
+              sharedState.timerState = undefined;
             }
           } else if (sharedState.phase === "vote") {
             throw new Error("투표 결과를 먼저 공개하세요.");
@@ -391,9 +417,44 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           const enabledSubPhases = getEnabledRoundSubPhases(game?.rules);
           if (sub && enabledSubPhases.includes(sub) && sharedState.phase.startsWith("round-")) {
             sharedState.currentSubPhase = sub;
+            markPhaseStarted(sharedState, now);
+            sharedState.timerState = undefined;
             message = `${getRoundSubPhaseLabel(sub)} 페이즈가 시작됩니다.`;
             clearPhaseAdvanceRequests(sharedState);
           }
+        } else if (body.action === "start_timer") {
+          if (!sharedState.phase.startsWith("round-")) {
+            throw new Error("라운드 페이즈에서만 타이머를 시작할 수 있습니다.");
+          }
+          const subPhase = sharedState.currentSubPhase ?? "investigation";
+          const durationSeconds = getSubPhaseDurationSeconds(game?.rules, subPhase);
+          sharedState.timerState = {
+            startedAt: now,
+            durationSeconds,
+            label: getRoundSubPhaseLabel(subPhase as "investigation" | "discussion"),
+          };
+        } else if (body.action === "pause_timer") {
+          if (!sharedState.timerState || sharedState.timerState.pausedRemaining !== undefined) {
+            throw new Error("일시정지할 타이머가 없습니다.");
+          }
+          const remaining = getRemainingSeconds(sharedState.timerState.startedAt, sharedState.timerState.durationSeconds);
+          sharedState.timerState = {
+            ...sharedState.timerState,
+            pausedRemaining: remaining,
+          };
+        } else if (body.action === "resume_timer") {
+          if (!sharedState.timerState?.pausedRemaining) {
+            throw new Error("재개할 타이머가 없습니다.");
+          }
+          const remaining = sharedState.timerState.pausedRemaining;
+          const resumeStartedAt = new Date(Date.now() - (sharedState.timerState.durationSeconds - remaining) * 1000).toISOString();
+          sharedState.timerState = {
+            ...sharedState.timerState,
+            startedAt: resumeStartedAt,
+            pausedRemaining: undefined,
+          };
+        } else if (body.action === "reset_timer") {
+          sharedState.timerState = undefined;
         } else if (body.action === "advance_ending_stage") {
           if (sharedState.phase !== "ending") {
             throw new Error("엔딩 페이즈가 아닙니다.");
@@ -531,6 +592,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         || error.message === "세션 강제 종료는 더 이상 사용할 수 없습니다."
         || error.message === "방 제목을 입력해주세요."
         || error.message === "playerId가 필요합니다."
+        || error.message === "라운드 페이즈에서만 타이머를 시작할 수 있습니다."
+        || error.message === "일시정지할 타이머가 없습니다."
+        || error.message === "재개할 타이머가 없습니다."
       )
     ) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -556,8 +620,14 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  if (!(await canManageSession(req, session))) {
-    return NextResponse.json({ error: "이 세션을 삭제할 권한이 없습니다." }, { status: 403 });
+  const canManage = await canManageSession(req, session);
+  if (!canManage) {
+    const currentUser = await getRequestMakerUser(req);
+    const hostById = isSessionHost(session, currentUser?.id);
+    const hostByCookie = !hostById && hasStoredGmSessionAccess(session, req.cookies);
+    if (!hostById && !hostByCookie) {
+      return NextResponse.json({ error: "이 세션을 삭제할 권한이 없습니다." }, { status: 403 });
+    }
   }
 
   broadcast(sessionId, "session_deleted", {});

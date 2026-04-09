@@ -111,6 +111,7 @@ interface PlayerSessionStateResponse {
   sessionName?: string;
   sessionMode?: SessionMode;
   sharedBoard?: PlayerSharedBoardContent | null;
+  isSessionHost?: boolean;
 }
 
 type VideoSource =
@@ -1240,15 +1241,139 @@ function LeaveSessionConfirmModal({
 }
 
 /**
- * GM 없는 세션에서 모두가 보는 공통 화면.
+ * 공통 화면 탭에서 서버 기반 라운드 타이머를 보여준다.
+ * 합의 모드 호스트만 조작(시작/일시정지/재개) 가능. 나머지는 읽기 전용.
+ */
+function SharedBoardTimerCard({
+  timerState,
+  canControl,
+  sessionId,
+  phase,
+}: {
+  timerState?: SharedState["timerState"];
+  canControl?: boolean;
+  sessionId?: string;
+  phase?: string;
+}) {
+  const [actionPending, setActionPending] = useState(false);
+  const [, setTick] = useState(0);
+
+  const isRoundPhase = phase?.startsWith("round-") ?? false;
+  const isPaused = timerState?.pausedRemaining !== undefined;
+  const running = Boolean(timerState) && !isPaused;
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  async function sendAction(action: string) {
+    if (!sessionId) return;
+    setActionPending(true);
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  // 타이머가 아직 시작 전이고 라운드 페이즈이면 호스트에게 시작 버튼만 보여줌
+  if (!timerState) {
+    if (!canControl || !isRoundPhase) return null;
+    return (
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-dark-500">페이즈 타이머</p>
+          <p className="text-xl font-semibold font-mono tabular-nums text-dark-500">--:--</p>
+        </div>
+        <button
+          disabled={actionPending}
+          onClick={() => { void sendAction("start_timer"); }}
+          className="w-full rounded-xl border border-mystery-700 bg-mystery-900/40 px-3 py-2.5 text-sm font-medium text-mystery-200 transition-colors hover:border-mystery-500 hover:text-mystery-50 disabled:opacity-50"
+        >
+          타이머 시작
+        </button>
+      </div>
+    );
+  }
+
+  const secondsLeft = isPaused
+    ? timerState.pausedRemaining ?? 0
+    : getRemainingSeconds(timerState.startedAt, timerState.durationSeconds);
+  const progress = timerState.durationSeconds > 0
+    ? (secondsLeft / timerState.durationSeconds) * 100
+    : 0;
+  const isExpired = !isPaused && secondsLeft === 0;
+
+  return (
+    <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-dark-500">{timerState.label} 타이머</p>
+          {isExpired && (
+            <p className="mt-1 text-xs text-red-400">시간이 종료되었습니다</p>
+          )}
+        </div>
+        <p className={`text-xl font-semibold font-mono tabular-nums ${isExpired ? "text-red-300 animate-pulse" : isPaused ? "text-dark-400" : "text-mystery-300"}`}>
+          {formatTimerSeconds(secondsLeft)}
+        </p>
+      </div>
+
+      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
+          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+        />
+      </div>
+
+      {canControl && sessionId && (
+        <div className="flex gap-2">
+          <button
+            disabled={actionPending}
+            onClick={() => {
+              if (isExpired) {
+                void sendAction("start_timer");
+              } else if (isPaused) {
+                void sendAction("resume_timer");
+              } else {
+                void sendAction("pause_timer");
+              }
+            }}
+            className="flex-1 rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-2 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 disabled:opacity-50"
+          >
+            {running ? "일시정지" : isExpired ? "재시작" : "재개"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 모든 세션에서 공통 화면 탭으로 보이는 패널.
  * 현재 페이즈에 필요한 텍스트, 지도, 영상, 배경음악만 플레이어에게 노출한다.
  */
 function SharedBoardPanel({
   content,
   accessPanel,
+  timerState,
+  isHost: canControlTimer,
+  sessionId,
+  sessionMode: panelSessionMode,
+  phase,
 }: {
   content: PlayerSharedBoardContent;
   accessPanel?: ReactNode;
+  timerState?: SharedState["timerState"];
+  isHost?: boolean;
+  sessionId?: string;
+  sessionMode?: SessionMode;
+  phase?: string;
 }) {
   const videoSource = resolveVideoSource(content.videoUrl);
   const hasMedia = Boolean(content.imageUrl || videoSource || content.backgroundMusic?.trim());
@@ -1268,6 +1393,13 @@ function SharedBoardPanel({
       </div>
 
       {accessPanel}
+
+      <SharedBoardTimerCard
+        timerState={timerState}
+        canControl={canControlTimer && panelSessionMode === "player-consensus"}
+        sessionId={sessionId}
+        phase={phase}
+      />
 
       {content.narrationBlocks.map((block) => (
         <div key={block.label} className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
@@ -1417,6 +1549,7 @@ export default function PlayerView() {
   const [sessionCode, setSessionCode] = useState("");
   const [sessionName, setSessionName] = useState("");
   const [sessionMode, setSessionMode] = useState<SessionMode>("gm");
+  const [isHost, setIsHost] = useState(false);
   const [sharedBoard, setSharedBoard] = useState<PlayerSharedBoardContent | null>(null);
   const [inventory, setInventory] = useState<InventoryCard[]>([]);
   const [roundAcquired, setRoundAcquired] = useState<Record<string, number>>({});
@@ -1461,11 +1594,13 @@ export default function PlayerView() {
         sessionName: nextSessionName,
         sessionMode: nextSessionMode,
         sharedBoard: nextSharedBoard,
+        isSessionHost: nextIsHost,
       } = await sessionRes.json() as PlayerSessionStateResponse;
       setSharedState(ss);
       setSessionCode(nextSessionCode ?? "");
       setSessionName(nextSessionName ?? "현재 방");
       setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
+      setIsHost(nextIsHost ?? false);
       setSharedBoard(nextSharedBoard ?? null);
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});
@@ -1518,11 +1653,13 @@ export default function PlayerView() {
           sessionName: nextSessionName,
           sessionMode: nextSessionMode,
           sharedBoard: nextSharedBoard,
+          isSessionHost: nextIsHost,
         } = await res.json() as PlayerSessionStateResponse;
         setSharedState(ss);
         setSessionCode(nextSessionCode ?? "");
         setSessionName(nextSessionName ?? "현재 방");
         setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
+        setIsHost(nextIsHost ?? false);
         setSharedBoard(nextSharedBoard ?? null);
         setInventory(playerState.inventory ?? []);
         setRoundAcquired(playerState.roundAcquired ?? {});
@@ -1735,7 +1872,14 @@ export default function PlayerView() {
         <div className="p-4 max-w-lg mx-auto pb-8">
           {sharedBoard ? (
             <div className="mb-4">
-              <SharedBoardPanel content={sharedBoard} />
+              <SharedBoardPanel
+                content={sharedBoard}
+                timerState={sharedState.timerState}
+                isHost={isHost}
+                sessionId={sessionId}
+                sessionMode={sessionMode}
+                phase={sharedState.phase}
+              />
             </div>
           ) : null}
           <VoteResultScreen
@@ -1894,6 +2038,11 @@ export default function PlayerView() {
                   isLobby={false}
                 />
               ) : null}
+              timerState={sharedState.timerState}
+              isHost={isHost}
+              sessionId={sessionId}
+              sessionMode={sessionMode}
+              phase={sharedState.phase}
             />
             <PlayerRoomRosterPanel slots={sharedState.characterSlots} players={game.players} />
           </div>

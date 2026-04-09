@@ -538,6 +538,8 @@ function PhaseTimer({
   phase,
   currentSubPhase,
   rules,
+  timerState,
+  sessionId,
   onAdvanceRound,
   onSubPhaseChange,
   advancing,
@@ -545,6 +547,8 @@ function PhaseTimer({
   phase: string;
   currentSubPhase?: string;
   rules: GameRules;
+  timerState?: SharedState["timerState"];
+  sessionId: string;
   onAdvanceRound: () => Promise<boolean>;
   onSubPhaseChange: (sub: ActiveSubPhase) => Promise<boolean>;
   advancing: boolean;
@@ -553,18 +557,60 @@ function PhaseTimer({
   const maxRound = rules?.roundCount ?? 4;
   const isRound = roundNum > 0;
 
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [timerRunning, setTimerRunning] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
-
-  const subPhaseRef = useRef<ActiveSubPhase>(getCurrentRoundSubPhase(rules, currentSubPhase));
+  const [timerActionPending, setTimerActionPending] = useState(false);
   const autoAdvanceRef = useRef(false);
-  const resumeTimerAfterSyncRef = useRef(false);
+  const autoAdvanceFiredRef = useRef(false);
 
   const subPhaseOrder = getEnabledRoundSubPhases(rules);
   const subPhase = getCurrentRoundSubPhase(rules, currentSubPhase);
 
   useEffect(() => { autoAdvanceRef.current = autoAdvance; }, [autoAdvance]);
+
+  // 타이머가 없거나 새 서브페이즈면 자동진행 플래그 리셋
+  useEffect(() => { autoAdvanceFiredRef.current = false; }, [phase, currentSubPhase]);
+
+  const isPaused = timerState?.pausedRemaining !== undefined;
+  const timerRunning = Boolean(timerState) && !isPaused;
+
+  const secondsLeft = timerState
+    ? isPaused
+      ? timerState.pausedRemaining ?? 0
+      : getRemainingSeconds(timerState.startedAt, timerState.durationSeconds)
+    : 0;
+
+  // 1초마다 리렌더링 (카운트다운 표시)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [timerRunning]);
+
+  // 자동 넘김
+  useEffect(() => {
+    if (!timerRunning || secondsLeft > 0 || !autoAdvanceRef.current || autoAdvanceFiredRef.current) return;
+    autoAdvanceFiredRef.current = true;
+    const nextSubPhase = getNextRoundSubPhase(rules, subPhase);
+    if (nextSubPhase) {
+      void onSubPhaseChange(nextSubPhase);
+    } else {
+      void onAdvanceRound();
+    }
+  }, [secondsLeft, timerRunning, subPhase, rules, onAdvanceRound, onSubPhaseChange]);
+
+  async function sendTimerAction(action: string) {
+    setTimerActionPending(true);
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    } finally {
+      setTimerActionPending(false);
+    }
+  }
 
   function getDuration(type: ActiveSubPhase): number {
     const cfg = rules?.phases?.find((p) => p.type === type);
@@ -572,57 +618,19 @@ function PhaseTimer({
   }
 
   async function doAdvance() {
-    const nextSubPhase = getNextRoundSubPhase(rules, subPhaseRef.current);
+    const nextSubPhase = getNextRoundSubPhase(rules, subPhase);
     if (nextSubPhase) {
-      resumeTimerAfterSyncRef.current = autoAdvanceRef.current;
-      const advanced = await onSubPhaseChange(nextSubPhase);
-      if (!advanced) {
-        resumeTimerAfterSyncRef.current = false;
-      }
+      await onSubPhaseChange(nextSubPhase);
     } else {
-      resumeTimerAfterSyncRef.current = false;
       await onAdvanceRound();
     }
   }
 
-  useEffect(() => {
-    if (!isRound) {
-      setSecondsLeft(0);
-      setTimerRunning(false);
-      return;
-    }
-
-    const nextSubPhase = getCurrentRoundSubPhase(rules, currentSubPhase);
-    subPhaseRef.current = nextSubPhase;
-    setSecondsLeft(getDuration(nextSubPhase));
-    setTimerRunning(resumeTimerAfterSyncRef.current);
-    resumeTimerAfterSyncRef.current = false;
-  }, [currentSubPhase, isRound, phase, rules]);
-
-  // 카운트다운
-  useEffect(() => {
-    if (!timerRunning) return;
-    const id = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(id);
-          setTimerRunning(false);
-          if (autoAdvanceRef.current) setTimeout(() => { void doAdvance(); }, 500);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [timerRunning, subPhase]);
-
   if (!isRound) return null;
 
-  const totalSeconds = getDuration(subPhase);
+  const totalSeconds = timerState?.durationSeconds ?? getDuration(subPhase);
   const progress = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
-  const minutes = Math.floor(secondsLeft / 60);
-  const seconds = secondsLeft % 60;
-  const isExpired = secondsLeft === 0;
+  const isExpired = Boolean(timerState) && !isPaused && secondsLeft === 0;
   const isLastSubPhase = getNextRoundSubPhase(rules, subPhase) === null;
 
   return (
@@ -672,7 +680,7 @@ function PhaseTimer({
             isExpired ? "text-red-400 animate-pulse" : timerRunning ? "text-dark-50" : "text-dark-400"
           }`}
         >
-          {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+          {formatTimerSeconds(secondsLeft)}
         </div>
         <p className="text-xs text-dark-600 mt-1">
           {getRoundSubPhaseLabel(subPhase)} — {Math.round(getDuration(subPhase) / 60)}분 배정
@@ -683,28 +691,30 @@ function PhaseTimer({
       <div className="h-1 bg-dark-800 rounded-full overflow-hidden">
         <div
           className="h-full bg-mystery-600 rounded-full transition-all duration-1000"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
         />
       </div>
 
       {/* 컨트롤 */}
       <div className="flex gap-2">
         <button
+          disabled={timerActionPending}
           onClick={() => {
-            if (secondsLeft === 0) {
-              setSecondsLeft(getDuration(subPhase));
-              setTimerRunning(true);
+            if (!timerState || isExpired) {
+              void sendTimerAction("start_timer");
+            } else if (isPaused) {
+              void sendTimerAction("resume_timer");
             } else {
-              setTimerRunning((r) => !r);
+              void sendTimerAction("pause_timer");
             }
           }}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
             timerRunning
               ? "bg-dark-700 hover:bg-dark-600 text-dark-200"
               : "bg-mystery-800 hover:bg-mystery-700 text-mystery-100 border border-mystery-700"
           }`}
         >
-          {timerRunning ? "⏸ 일시정지" : isExpired ? "↺ 재시작" : "▶ 시작"}
+          {timerRunning ? "일시정지" : isExpired ? "재시작" : isPaused ? "재개" : "시작"}
         </button>
         <button
             onClick={() => { void doAdvance(); }}
@@ -721,7 +731,7 @@ function PhaseTimer({
 
       {isExpired && (
         <p className="text-xs text-red-400 text-center">
-          ⏰ {getRoundSubPhaseLabel(subPhase)} 시간 종료
+          {getRoundSubPhaseLabel(subPhase)} 시간 종료
           {!autoAdvance && " — 다음 페이즈로 이동하세요"}
         </p>
       )}
@@ -1955,6 +1965,8 @@ export default function GMDashboard({
               phase={phase}
               currentSubPhase={session.sharedState.currentSubPhase}
               rules={game.rules}
+              timerState={session.sharedState.timerState}
+              sessionId={session.id}
               onAdvanceRound={advancePhase}
               onSubPhaseChange={advanceSubPhase}
               advancing={advancing}

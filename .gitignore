@@ -3,7 +3,6 @@
 
 # Local agent/tooling state
 .claude/
-.mcp.json
 
 # Dependencies
 node_modules/

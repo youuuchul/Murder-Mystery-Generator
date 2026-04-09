@@ -1733,7 +1733,7 @@ export default function PlayerView() {
           </span>
         </div>
         <div className="p-4 max-w-lg mx-auto pb-8">
-          {sessionMode === "player-consensus" && sharedBoard ? (
+          {sharedBoard ? (
             <div className="mb-4">
               <SharedBoardPanel content={sharedBoard} />
             </div>
@@ -1771,7 +1771,7 @@ export default function PlayerView() {
   }
 
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
-    { id: "shared", label: "공통화면", hidden: sessionMode !== "player-consensus" },
+    { id: "shared", label: "공통화면" },
     { id: "character", label: "캐릭터 카드" },
     { id: "inventory", label: `인벤토리 (${inventory.length})` },
     { id: "locations", label: "장소 탐색" },
@@ -1883,7 +1883,7 @@ export default function PlayerView() {
             ))}
         </div>
 
-        {tab === "shared" && sessionMode === "player-consensus" && sharedBoard && (
+        {tab === "shared" && sharedBoard && (
           <div className="space-y-4">
             <SharedBoardPanel
               content={sharedBoard}
@@ -1899,7 +1899,7 @@ export default function PlayerView() {
           </div>
         )}
 
-        {tab === "shared" && sessionMode === "player-consensus" && !sharedBoard && (
+        {tab === "shared" && !sharedBoard && (
           <div className="space-y-4">
             {sessionCode ? (
               <PlayerJoinAccessPanel

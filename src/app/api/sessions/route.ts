@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (sessionMode === "gm" && currentUser && !isMakerAdmin(currentUser)) {
+  if (currentUser && !isMakerAdmin(currentUser)) {
     const maxSessions = getMaxActiveSessionsPerUser();
     const activeCount = await countActiveSessionsByHost(currentUser.id);
 
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (sessionMode === "gm" && !currentUser) {
+  if (!currentUser) {
     const cookieEntries = parseGmSessionAccessCookie(
       req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value
     );
@@ -147,13 +147,11 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await createSession(sessionGame, {
-    hostUserId: sessionMode === "gm" ? currentUser?.id : undefined,
+    hostUserId: currentUser?.id,
     sessionMode,
   });
   const response = NextResponse.json({ session }, { status: 201 });
-  if (sessionMode === "gm") {
-    applyGmSessionAccessCookie(response, req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value, session);
-  }
+  applyGmSessionAccessCookie(response, req.cookies.get(GM_SESSION_ACCESS_COOKIE_NAME)?.value, session);
   return response;
 }
 

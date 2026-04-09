@@ -26,6 +26,15 @@ interface CreateSessionResponse {
   };
 }
 
+interface SessionLimitSession {
+  id: string;
+  gameId: string;
+  gameTitle: string;
+  sessionName: string;
+  sessionCode: string;
+  phase: string;
+}
+
 type PlayerSessionEntryProps = {
   gameId: string;
   gameTitle: string;
@@ -46,6 +55,7 @@ export default function PlayerSessionEntry({
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [limitSessions, setLimitSessions] = useState<SessionLimitSession[] | null>(null);
   const [promptSessionId, setPromptSessionId] = useState<string | null>(null);
   const [promptCode, setPromptCode] = useState("");
   const [promptError, setPromptError] = useState("");
@@ -126,8 +136,17 @@ export default function PlayerSessionEntry({
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({})) as { error?: string };
-        setError(data.error ?? "방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
+        const data = await response.json().catch(() => ({})) as {
+          error?: string;
+          code?: string;
+          sessions?: SessionLimitSession[];
+        };
+        if (data.code === "SESSION_LIMIT_EXCEEDED" && data.sessions) {
+          setLimitSessions(data.sessions);
+          setError(data.error ?? "세션 한도에 도달했습니다.");
+        } else {
+          setError(data.error ?? "방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
+        }
         return;
       }
 
@@ -192,9 +211,24 @@ export default function PlayerSessionEntry({
           </div>
 
           {error ? (
-            <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-              {error}
-            </p>
+            <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              <p>{error}</p>
+              {limitSessions && limitSessions.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {limitSessions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => router.push(`/join/${s.sessionCode}`)}
+                      className="flex w-full items-center justify-between rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-2 text-left transition-colors hover:border-dark-500"
+                    >
+                      <span className="text-dark-200">{s.gameTitle} — {s.sessionName}</span>
+                      <span className="shrink-0 text-xs text-mystery-400">입장 →</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
 

@@ -18,13 +18,13 @@ interface CookieStoreWithGetAll {
 
 /**
  * SSR 클라이언트 생성에 필요한 Supabase 설정을 읽는다.
- * 메이커 인증 provider 가 `supabase` 가 아닐 때 호출되면 즉시 실패시켜 잘못된 사용을 드러낸다.
+ * 메이커 인증은 Supabase 단일 구현이므로 필수 환경변수 유효성만 확인한다.
  */
 function getSupabaseSsrConfig() {
   const config = getMakerAuthProviderConfig();
 
-  if (config.provider !== "supabase") {
-    throw new Error("Supabase SSR helpers require MAKER_AUTH_PROVIDER=supabase.");
+  if (!config.supabaseUrl || !config.supabasePublishableKey) {
+    throw new Error("Supabase SSR helpers require NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
   }
 
   return config;

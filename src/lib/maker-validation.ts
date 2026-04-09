@@ -40,12 +40,12 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
   }
 
   if (game.story.timeline.enabled && game.story.timeline.slots.length === 0) {
-    addIssue(issues, 2, "error", "타임라인을 사용하려면 시간대 슬롯을 1개 이상 추가하세요.");
+    addIssue(issues, 3, "error", "타임라인을 사용하려면 시간대 슬롯을 1개 이상 추가하세요.");
   }
 
   const blankTimelineSlots = game.story.timeline.slots.filter((slot) => isBlank(slot.label)).length;
   if (blankTimelineSlots > 0) {
-    addIssue(issues, 2, "warning", `이름이 비어 있는 타임라인 슬롯이 ${blankTimelineSlots}개 있습니다.`);
+    addIssue(issues, 3, "warning", `이름이 비어 있는 타임라인 슬롯이 ${blankTimelineSlots}개 있습니다.`);
   }
 
   const namelessNpcs = game.story.npcs.filter((npc) => isBlank(npc.name)).length;

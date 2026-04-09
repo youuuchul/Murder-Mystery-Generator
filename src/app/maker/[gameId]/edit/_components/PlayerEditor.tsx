@@ -44,6 +44,7 @@ const VICTORY_OPTIONS: { value: VictoryCondition; label: string; desc: string; c
 
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 const ta = inp + " resize-none";
+const DEFAULT_TIMELINE_SLOT_LABELS = ["19:00", "19:30", "20:00", "20:30"];
 
 /** 메이커 편집기에서 새 캐릭터를 추가할 때 사용하는 기본 템플릿이다. */
 function createPlayer(): Player {
@@ -68,6 +69,11 @@ function createTimelineSlot(label = ""): TimelineSlot {
     id: crypto.randomUUID(),
     label,
   };
+}
+
+/** 타임라인을 처음 켤 때 바로 입력 가능한 기본 시간대 슬롯 세트를 만든다. */
+function createDefaultTimelineSlots(): TimelineSlot[] {
+  return DEFAULT_TIMELINE_SLOT_LABELS.map((label) => createTimelineSlot(label));
 }
 
 /**
@@ -113,6 +119,72 @@ function alignTimelineEntries(player: Player, timeline: StoryTimeline): Player {
 }
 
 /**
+ * 중앙 타임라인 탭에서 사용 여부를 전환한다.
+ * 처음 켤 때 슬롯이 비어 있으면 기본 시간대를 자동으로 생성해 바로 입력을 시작할 수 있게 한다.
+ */
+function TimelineUsageToggle({
+  timeline,
+  onChange,
+}: {
+  timeline: StoryTimeline;
+  onChange: (timeline: StoryTimeline) => void;
+}) {
+  function toggleTimeline(enabled: boolean) {
+    onChange({
+      ...timeline,
+      enabled,
+      slots: enabled && timeline.slots.length === 0
+        ? createDefaultTimelineSlots()
+        : timeline.slots,
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-dark-700 bg-dark-900/50 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-dark-100">행동 타임라인 사용</p>
+          <p className="mt-1 text-xs text-dark-500">
+            시간대 슬롯 관리와 캐릭터별 행동 입력은 이 중앙 타임라인 탭에서 함께 진행합니다.
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => toggleTimeline(false)}
+            className={[
+              "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+              !timeline.enabled
+                ? "border-dark-500 bg-dark-800 text-dark-100"
+                : "border-dark-700 text-dark-500 hover:text-dark-300",
+            ].join(" ")}
+          >
+            사용 안 함
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleTimeline(true)}
+            className={[
+              "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+              timeline.enabled
+                ? "border-mystery-600 bg-mystery-900/30 text-mystery-200"
+                : "border-dark-700 text-dark-500 hover:text-dark-300",
+            ].join(" ")}
+          >
+            사용
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-dark-600">
+        {timeline.enabled
+          ? `현재 사용 중 · 시간대 슬롯 ${timeline.slots.length}개`
+          : "현재 사용하지 않습니다. 켜면 기본 시간대 슬롯을 만들고 캐릭터별 행동 입력을 활성화합니다."}
+      </p>
+    </div>
+  );
+}
+
+/**
  * 제작자가 시간대별로 모든 캐릭터 행동을 한 곳에서 입력하도록 돕는 중앙 타임라인 편집기다.
  * 슬롯마다 플레이어 전체를 나열해 알리바이 충돌을 한눈에 비교할 수 있게 한다.
  */
@@ -144,7 +216,7 @@ function TimelineMatrixEditor({
     return (
       <div className="text-center py-10 border border-dashed border-dark-700 rounded-xl">
         <p className="text-dark-500 text-sm">타임라인 사용이 꺼져 있습니다.</p>
-        <p className="text-xs text-dark-600 mt-1">Step 2에서 시간대 슬롯을 먼저 켜고 정의하세요.</p>
+        <p className="text-xs text-dark-600 mt-1">상단에서 타임라인 사용을 켜면 시간대별 행동을 입력할 수 있습니다.</p>
       </div>
     );
   }
@@ -153,7 +225,7 @@ function TimelineMatrixEditor({
     return (
       <div className="text-center py-10 border border-dashed border-dark-700 rounded-xl">
         <p className="text-dark-500 text-sm">아직 정의된 시간대 슬롯이 없습니다.</p>
-        <p className="text-xs text-dark-600 mt-1">Step 2에서 슬롯을 추가하면 여기서 캐릭터별 행동을 한 번에 입력할 수 있습니다.</p>
+        <p className="text-xs text-dark-600 mt-1">위 슬롯 관리에서 시간대를 추가하면 캐릭터별 행동 입력을 진행할 수 있습니다.</p>
       </div>
     );
   }
@@ -759,7 +831,7 @@ export default function PlayerEditor({
       return;
     }
 
-    if (focusTarget === "step-3-timeline" && timeline.enabled) {
+    if (focusTarget === "step-3-timeline") {
       setView("timeline");
       return;
     }
@@ -777,11 +849,11 @@ export default function PlayerEditor({
           <p className="text-sm text-dark-500 mt-1">
             {players.length}명 등록 · 피해자는 사건 개요 탭에서 작성합니다.
           </p>
-          {timeline.enabled && (
-            <p className="text-xs text-dark-600 mt-1">
-              행동 타임라인 사용 중 · 시간대 슬롯 {timeline.slots.length}개
-            </p>
-          )}
+          <p className="text-xs text-dark-600 mt-1">
+            {timeline.enabled
+              ? `행동 타임라인 사용 중 · 시간대 슬롯 ${timeline.slots.length}개`
+              : "행동 타임라인 사용 안 함 · 중앙 타임라인 탭에서 설정할 수 있습니다."}
+          </p>
         </div>
         <Button size="sm" onClick={() => onChange([...players, createPlayer()])}>+ 플레이어 추가</Button>
       </div>
@@ -830,31 +902,37 @@ export default function PlayerEditor({
         >
           캐릭터 정보
         </button>
-        {timeline.enabled && (
-          <button
-            type="button"
-            onClick={() => setView("timeline")}
-            className={[
-              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
-              view === "timeline" ? "bg-dark-700 text-dark-50" : "text-dark-500 hover:text-dark-300",
-            ].join(" ")}
-          >
-            중앙 타임라인
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setView("timeline")}
+          className={[
+            "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
+            view === "timeline" ? "bg-dark-700 text-dark-50" : "text-dark-500 hover:text-dark-300",
+          ].join(" ")}
+        >
+          중앙 타임라인
+        </button>
       </div>
 
-      {view === "timeline" && timeline.enabled ? (
+      {view === "timeline" ? (
         <div data-maker-anchor="step-3-timeline" className="space-y-4">
-          <TimelineSlotManager
+          <TimelineUsageToggle
             timeline={timeline}
             onChange={onChangeTimeline}
           />
-          <TimelineMatrixEditor
-            players={syncedPlayers}
-            timeline={timeline}
-            onChange={onChange}
-          />
+          {timeline.enabled && (
+            <>
+              <TimelineSlotManager
+                timeline={timeline}
+                onChange={onChangeTimeline}
+              />
+              <TimelineMatrixEditor
+                players={syncedPlayers}
+                timeline={timeline}
+                onChange={onChange}
+              />
+            </>
+          )}
         </div>
       ) : players.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-dark-700 rounded-xl">

@@ -161,13 +161,12 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
       if (message.includes("오프닝 스토리")) return "step-2-opening";
       if (message.includes("피해자")) return "step-2-victim";
       if (message.includes("NPC")) return "step-2-npcs";
-      if (message.includes("타임라인") || message.includes("시간대 슬롯")) return "step-2-timeline";
       return "step-2-opening";
     }
 
     if (step === 3) {
       if (message.includes("범인")) return "step-3-culprit";
-      if (message.includes("행동 타임라인")) return "step-3-timeline";
+      if (message.includes("타임라인") || message.includes("시간대 슬롯")) return "step-3-timeline";
       return "step-3-players";
     }
 

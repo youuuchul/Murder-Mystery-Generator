@@ -1311,6 +1311,7 @@ export default function GMDashboard({
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [advancingEndingStage, setAdvancingEndingStage] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
   const [revealingVote, setRevealingVote] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [unlockingPlayerId, setUnlockingPlayerId] = useState<string | null>(null);
@@ -1638,6 +1639,35 @@ export default function GMDashboard({
     }
   }
 
+  async function endSession() {
+    if (!session) return;
+    setEndingSession(true);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "end_session" }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "게임 종료 실패");
+        return;
+      }
+
+      const data = await res.json();
+      setSession((prev) =>
+        prev
+          ? { ...prev, sharedState: data.session.sharedState, endedAt: data.session.endedAt }
+          : prev
+      );
+    } catch {
+      alert("게임 종료 중 오류가 발생했습니다.");
+    } finally {
+      setEndingSession(false);
+    }
+  }
+
   async function deleteSession() {
     if (!session) return;
     if (!confirm("세션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
@@ -1948,8 +1978,18 @@ export default function GMDashboard({
                     >
                       {advancingEndingStage ? "처리 중…" : endingAdvanceLabel(nextEndingStage)}
                     </button>
+                  ) : session.endedAt ? (
+                    <div className="rounded-xl border border-emerald-800 bg-emerald-950/30 px-3 py-3 text-center text-sm font-medium text-emerald-300">
+                      게임 종료됨
+                    </div>
                   ) : (
-                    <div className="text-center py-2 text-sm text-dark-500">모든 엔딩 단계 공개 완료</div>
+                    <button
+                      onClick={endSession}
+                      disabled={endingSession}
+                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {endingSession ? "처리 중…" : "게임 종료"}
+                    </button>
                   )}
                 </div>
               )}

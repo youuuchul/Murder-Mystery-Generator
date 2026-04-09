@@ -112,6 +112,7 @@ interface PlayerSessionStateResponse {
   sessionMode?: SessionMode;
   sharedBoard?: PlayerSharedBoardContent | null;
   isSessionHost?: boolean;
+  endedAt?: string;
 }
 
 type VideoSource =
@@ -1547,6 +1548,7 @@ export default function PlayerView() {
   const [sessionMode, setSessionMode] = useState<SessionMode>("gm");
   const [isHost, setIsHost] = useState(false);
   const [sharedBoard, setSharedBoard] = useState<PlayerSharedBoardContent | null>(null);
+  const [endedAt, setEndedAt] = useState<string | undefined>();
   const [inventory, setInventory] = useState<InventoryCard[]>([]);
   const [roundAcquired, setRoundAcquired] = useState<Record<string, number>>({});
   const [roundVisited, setRoundVisited] = useState<Record<string, string[]>>({});
@@ -1591,6 +1593,7 @@ export default function PlayerView() {
         sessionMode: nextSessionMode,
         sharedBoard: nextSharedBoard,
         isSessionHost: nextIsHost,
+        endedAt: nextEndedAt,
       } = await sessionRes.json() as PlayerSessionStateResponse;
       setSharedState(ss);
       setSessionCode(nextSessionCode ?? "");
@@ -1598,6 +1601,7 @@ export default function PlayerView() {
       setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
       setIsHost(nextIsHost ?? false);
       setSharedBoard(nextSharedBoard ?? null);
+      setEndedAt(nextEndedAt);
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});
       setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -1650,6 +1654,7 @@ export default function PlayerView() {
           sessionMode: nextSessionMode,
           sharedBoard: nextSharedBoard,
           isSessionHost: nextIsHost,
+          endedAt: nextEndedAt,
         } = await res.json() as PlayerSessionStateResponse;
         setSharedState(ss);
         setSessionCode(nextSessionCode ?? "");
@@ -1657,6 +1662,7 @@ export default function PlayerView() {
         setSessionMode(nextSessionMode === "player-consensus" ? "player-consensus" : "gm");
         setIsHost(nextIsHost ?? false);
         setSharedBoard(nextSharedBoard ?? null);
+        setEndedAt(nextEndedAt);
         setInventory(playerState.inventory ?? []);
         setRoundAcquired(playerState.roundAcquired ?? {});
         setRoundVisited(playerState.roundVisitedLocations ?? {});
@@ -1669,8 +1675,9 @@ export default function PlayerView() {
     sessionId && token ? `/api/sessions/${sessionId}/events?token=${encodeURIComponent(token)}` : null,
     {
       session_update: (data: unknown) => {
-        const d = data as { sharedState: SharedState };
+        const d = data as { sharedState: SharedState; endedAt?: string };
         setSharedState(d.sharedState);
+        if (d.endedAt) setEndedAt(d.endedAt);
       },
       [`inventory_${token}`]: (data: unknown) => {
         const d = data as { inventory: InventoryCard[]; roundAcquired?: Record<string, number>; roundVisitedLocations?: Record<string, string[]> };
@@ -1894,6 +1901,25 @@ export default function PlayerView() {
               submitting={phaseRequestSubmitting}
               onToggle={handlePhaseAdvanceToggle}
             />
+          )}
+          {endingStage === "complete" && (
+            <div className="mt-6 rounded-2xl border border-mystery-800 bg-dark-900 p-5 text-center space-y-4">
+              <p className="text-sm font-semibold text-mystery-300">
+                {endedAt ? "게임이 종료됐습니다" : "모든 엔딩이 공개됐습니다"}
+              </p>
+              <p className="text-xs text-dark-400">
+                {endedAt
+                  ? "수고하셨습니다. 아래 버튼을 눌러 나갈 수 있습니다."
+                  : "GM이 게임을 종료하면 세션이 마감됩니다."}
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(leavePath)}
+                className="w-full rounded-xl bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
+              >
+                {leaveLabel}으로 나가기
+              </button>
+            </div>
           )}
         </div>
         {showLeaveConfirm && (

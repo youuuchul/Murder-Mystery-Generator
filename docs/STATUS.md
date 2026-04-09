@@ -107,7 +107,7 @@
 - [ ] **통 JSON DB 컬럼 개선** — `game_content.content_json` 분리로 메이커 AI 챗봇 레이턴시 개선. 선결 조건: Supabase MCP 연결 후 데이터 분포 기반 설계.
 - [ ] **메이커 AI 도우미 Langfuse 트레이싱** — `/api/maker-assistant` trace 미적용. 모드(guide/draft), step, 재시도 여부 스팬 추가. 향후 NPC 챗봇도 동일 패턴.
 - [ ] **유저 정보 오버레이 모바일 스크롤 버그** — 오버레이 내부 스크롤 미작동으로 하단 로그아웃 버튼 접근 불가. iOS Safari `overflow-y: scroll` + `-webkit-overflow-scrolling: touch` 또는 body scroll lock 충돌 추정.
-- [ ] **플레이어 엔딩 이후 종료 동선** — 최종 엔딩 공개 후 게임 종료 액션
+- [x] **플레이어 엔딩 이후 종료 동선** — 최종 엔딩 공개 후 게임 종료 액션 ✅ 완료 (2026-04-09)
 - [ ] **장소 탐색 첫 획득 카드 상세 팝업** — 첫 획득 시 자동 팝업 오픈
 - [ ] **미사용 세션 자동 정리 정책** — 일정 기간(예: 24시간) 미활동 세션 자동 종료/삭제. 불특정 유저 접속 오픈 대비 세션 누적 방지. 엔딩 완료 세션 자동 정리 포함. Supabase pg_cron 또는 API 기반 정리 검토
 - [ ] **라운드 대표 이미지 업로드** — 현재 URL-only

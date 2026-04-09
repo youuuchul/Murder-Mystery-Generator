@@ -1909,7 +1909,7 @@ export default function PlayerView() {
               </p>
               <p className="text-xs text-dark-400">
                 {endedAt
-                  ? "수고하셨습니다. 아래 버튼을 눌러 나갈 수 있습니다."
+                  ? "아래 버튼을 눌러 나갈 수 있습니다."
                   : "GM이 게임을 종료하면 세션이 마감됩니다."}
               </p>
               <button

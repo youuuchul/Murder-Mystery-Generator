@@ -326,24 +326,20 @@ function PersonInfoPanel({
               <p className="font-semibold text-dark-100 mt-1">{person.name || "(이름 없음)"}</p>
               {person.background ? (
                 <p className="text-sm text-dark-300 leading-relaxed mt-2">{person.background}</p>
-              ) : (
-                <p className="text-sm text-dark-600 mt-2">입력된 배경이 없습니다.</p>
-              )}
+              ) : null}
             </div>
           </div>
 
-          <div className="border-t border-dark-800 pt-3 space-y-2">
-            <p className="text-xs text-dark-500">내가 보는 인상</p>
-            {person.impressions.length === 0 ? (
-              <p className="text-sm text-dark-600">입력된 관계 / 인상이 없습니다.</p>
-            ) : (
-              person.impressions.map((impression, index) => (
+          {person.impressions.length > 0 && (
+            <div className="border-t border-dark-800 pt-3 space-y-2">
+              <p className="text-xs text-dark-500">내가 보는 인상</p>
+              {person.impressions.map((impression, index) => (
                 <p key={`${person.type}:${person.id}:${index}`} className="text-sm text-dark-300 leading-relaxed">
                   {impression}
                 </p>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

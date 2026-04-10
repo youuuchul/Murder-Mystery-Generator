@@ -7,6 +7,8 @@ type MobileNavMenuProps = {
   displayName: string;
   isAdmin?: boolean;
   logoutNextPath?: string;
+  /** 계정 정보 패널 열기 지원 여부 (MakerAccountMenu가 DOM에 있을 때) */
+  showAccountLink?: boolean;
   /** 페이지별 추가 링크 (e.g. 세션 관리, 제작 보호 ON 등) */
   extraItems?: Array<{ label: string; href: string; variant?: "default" | "badge" }>;
 };
@@ -19,6 +21,7 @@ export default function MobileNavMenu({
   displayName,
   isAdmin,
   logoutNextPath = "/maker-access",
+  showAccountLink,
   extraItems,
 }: MobileNavMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,6 +72,20 @@ export default function MobileNavMenu({
 
           {/* 메뉴 항목 */}
           <div className="p-2">
+            {showAccountLink && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  const details = document.querySelector<HTMLDetailsElement>("details[data-account-menu]");
+                  if (details) details.open = true;
+                }}
+                className="w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-dark-50 transition-colors hover:bg-dark-800"
+              >
+                계정 정보
+              </button>
+            )}
+
             <Link
               href="/guide/create"
               onClick={() => setIsOpen(false)}

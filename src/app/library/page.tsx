@@ -53,16 +53,9 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <nav className="flex items-center gap-2">
             {currentUser ? (
               <>
-                {/* 데스크톱: 가이드·계정·ADMIN 인라인 */}
+                {/* 데스크톱: 가이드·ADMIN 인라인 */}
                 <div className="hidden items-center gap-2 sm:flex">
                   <GuideMenu />
-                  <MakerAccountMenu
-                    currentUser={currentUser}
-                    currentAccount={currentAccount}
-                    nextPath="/library"
-                    errorMessage={accountErrorMessage}
-                    noticeMessage={accountNoticeMessage}
-                  />
                   {isMakerAdmin(currentUser) ? (
                     <Link
                       href="/library/manage/sessions"
@@ -73,10 +66,22 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                   ) : null}
                 </div>
 
+                {/* 계정 메뉴: 데스크톱에서 summary 보임, 모바일에서는 햄버거 "계정 정보"로 접근 */}
+                <div className="[&>details>summary]:hidden [&>details>summary]:sm:flex">
+                  <MakerAccountMenu
+                    currentUser={currentUser}
+                    currentAccount={currentAccount}
+                    nextPath="/library"
+                    errorMessage={accountErrorMessage}
+                    noticeMessage={accountNoticeMessage}
+                  />
+                </div>
+
                 {/* 모바일: ⋮ 메뉴 */}
                 <MobileNavMenu
                   displayName={currentUser.displayName}
                   isAdmin={isMakerAdmin(currentUser)}
+                  showAccountLink
                 />
 
                 <Link

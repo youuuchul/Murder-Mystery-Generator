@@ -103,15 +103,8 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
           </div>
 
           <nav className="flex items-center gap-2">
-            {/* 데스크톱: 계정·ADMIN·보호·가이드 인라인 */}
+            {/* 데스크톱: ADMIN·보호·가이드 인라인 */}
             <div className="hidden items-center gap-2 sm:flex">
-              <MakerAccountMenu
-                currentUser={currentUser}
-                currentAccount={currentAccount}
-                nextPath={managePagePath}
-                errorMessage={accountErrorMessage}
-                noticeMessage={accountNoticeMessage}
-              />
               {isMakerAdmin(currentUser) ? (
                 <Link
                   href="/library/manage/sessions"
@@ -128,11 +121,23 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
               <GuideMenu />
             </div>
 
+            {/* 계정 메뉴 */}
+            <div className="[&>details>summary]:hidden [&>details>summary]:sm:flex">
+              <MakerAccountMenu
+                currentUser={currentUser}
+                currentAccount={currentAccount}
+                nextPath={managePagePath}
+                errorMessage={accountErrorMessage}
+                noticeMessage={accountNoticeMessage}
+              />
+            </div>
+
             {/* 모바일: ⋮ 메뉴 */}
             <MobileNavMenu
               displayName={currentUser.displayName}
               isAdmin={isMakerAdmin(currentUser)}
               logoutNextPath="/maker-access"
+              showAccountLink
               extraItems={
                 makerAccessEnabled
                   ? [{ label: "제작 보호 ON", href: "#", variant: "badge" as const }]

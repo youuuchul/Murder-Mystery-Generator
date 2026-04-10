@@ -89,8 +89,13 @@ export default async function MySessionsPage({ searchParams }: MySessionsPagePro
           </div>
 
           <nav className="flex items-center gap-2">
-            {/* 데스크톱 */}
+            {/* 데스크톱: 가이드 */}
             <div className="hidden items-center gap-2 sm:flex">
+              <GuideMenu />
+            </div>
+
+            {/* 계정 메뉴 */}
+            <div className="[&>details>summary]:hidden [&>details>summary]:sm:flex">
               <MakerAccountMenu
                 currentUser={currentUser}
                 currentAccount={currentAccount}
@@ -98,13 +103,13 @@ export default async function MySessionsPage({ searchParams }: MySessionsPagePro
                 errorMessage={accountErrorMessage}
                 noticeMessage={accountNoticeMessage}
               />
-              <GuideMenu />
             </div>
 
             {/* 모바일 */}
             <MobileNavMenu
               displayName={currentUser.displayName}
               logoutNextPath="/maker-access"
+              showAccountLink
             />
           </nav>
         </div>

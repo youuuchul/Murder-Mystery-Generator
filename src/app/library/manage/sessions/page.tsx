@@ -100,13 +100,6 @@ export default async function ManageSessionsPage({ searchParams }: ManageSession
           <nav className="flex items-center gap-2">
             {/* 데스크톱 */}
             <div className="hidden items-center gap-2 sm:flex">
-              <MakerAccountMenu
-                currentUser={currentUser}
-                currentAccount={currentAccount}
-                nextPath="/library/manage/sessions"
-                errorMessage={accountErrorMessage}
-                noticeMessage={accountNoticeMessage}
-              />
               <span className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300">
                 ADMIN
               </span>
@@ -118,11 +111,23 @@ export default async function ManageSessionsPage({ searchParams }: ManageSession
               <GuideMenu />
             </div>
 
+            {/* 계정 메뉴 */}
+            <div className="[&>details>summary]:hidden [&>details>summary]:sm:flex">
+              <MakerAccountMenu
+                currentUser={currentUser}
+                currentAccount={currentAccount}
+                nextPath="/library/manage/sessions"
+                errorMessage={accountErrorMessage}
+                noticeMessage={accountNoticeMessage}
+              />
+            </div>
+
             {/* 모바일 */}
             <MobileNavMenu
               displayName={currentUser.displayName}
               isAdmin
               logoutNextPath="/maker-access"
+              showAccountLink
               extraItems={
                 isMakerAccessEnabled()
                   ? [{ label: "제작 보호 ON", href: "#", variant: "badge" as const }]

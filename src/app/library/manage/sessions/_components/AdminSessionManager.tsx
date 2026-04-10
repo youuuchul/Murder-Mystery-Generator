@@ -176,7 +176,8 @@ export default function AdminSessionManager({ sessions }: AdminSessionManagerPro
         </p>
       ) : null}
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-dark-800">
+      {/* 데스크톱: 테이블 */}
+      <div className="mt-6 hidden overflow-hidden rounded-2xl border border-dark-800 md:block">
         <div className="grid grid-cols-[auto_1.2fr_1.2fr_0.7fr_0.8fr_0.9fr_0.9fr] gap-3 border-b border-dark-800 bg-dark-950/80 px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-dark-500">
           <label className="flex items-center">
             <input
@@ -254,6 +255,87 @@ export default function AdminSessionManager({ sessions }: AdminSessionManagerPro
           </div>
         ) : (
           <div className="px-4 py-16 text-center text-sm text-dark-500">
+            조건에 맞는 세션이 없습니다.
+          </div>
+        )}
+      </div>
+
+      {/* 모바일: 카드 리스트 */}
+      <div className="mt-6 md:hidden">
+        <div className="mb-3 flex items-center gap-3 px-1">
+          <label className="flex items-center gap-2 text-xs text-dark-400">
+            <input
+              type="checkbox"
+              checked={filteredSessions.length > 0 && selectedVisibleCount === filteredSessions.length}
+              onChange={toggleAllVisible}
+              className="h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500"
+            />
+            전체 선택
+          </label>
+        </div>
+
+        {filteredSessions.length > 0 ? (
+          <div className="space-y-3">
+            {filteredSessions.map((session) => {
+              const isRowDeleting = deletingIds.includes(session.id);
+
+              return (
+                <div
+                  key={session.id}
+                  className="rounded-2xl border border-dark-800 bg-dark-950/60 p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <label className="flex items-center pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(session.id)}
+                        onChange={() => toggleSession(session.id)}
+                        className="h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500"
+                      />
+                    </label>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-dark-50">{session.gameTitle}</p>
+                      <p className="mt-1 text-sm text-dark-200">
+                        {session.sessionName}
+                        <span className="ml-2 font-mono text-xs text-dark-500">{session.sessionCode}</span>
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-dark-400">
+                        <span className="rounded-full border border-dark-700 px-2 py-0.5">{modeLabel(session.mode)}</span>
+                        <span>{session.phaseLabel}</span>
+                        <span>{session.lockedPlayerCount}/{session.totalPlayerCount}명</span>
+                      </div>
+
+                      {session.hostDisplayName ? (
+                        <p className="mt-1 text-xs text-dark-500">GM {session.hostDisplayName}</p>
+                      ) : null}
+                      <p className="mt-1 text-xs text-dark-500">{session.createdAtLabel}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 pl-7">
+                    <Link
+                      href={sessionEntryHref(session)}
+                      className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                    >
+                      열기
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void deleteSingleSession(session.id, session.sessionName)}
+                      disabled={isRowDeleting}
+                      className="rounded-lg border border-red-900/60 px-3 py-2 text-xs text-red-200 transition-colors hover:bg-red-950/20 disabled:opacity-40"
+                    >
+                      {isRowDeleting ? "삭제 중…" : "삭제"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dark-800 px-4 py-16 text-center text-sm text-dark-500">
             조건에 맞는 세션이 없습니다.
           </div>
         )}

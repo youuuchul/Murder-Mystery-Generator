@@ -2,6 +2,7 @@ import Link from "next/link";
 import { describeMakerRecoveryEmail } from "@/lib/maker-account-recovery";
 import { isMakerAdmin } from "@/lib/maker-role";
 import type { AppUser, MakerAccountIdentity } from "@/types/auth";
+import DetailsCloseButton from "./DetailsCloseButton";
 
 type MakerAccountMenuProps = {
   currentUser: AppUser;
@@ -25,7 +26,7 @@ export default function MakerAccountMenu({
   const shouldStartOpen = Boolean(errorMessage || noticeMessage);
 
   return (
-    <details className="group relative" open={shouldStartOpen}>
+    <details className="group relative" open={shouldStartOpen} data-account-menu>
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1.5 text-sm text-dark-100 transition-colors hover:border-dark-500 hover:text-white [&::-webkit-details-marker]:hidden">
         <span>작업자 {currentUser.displayName}</span>
         <svg
@@ -49,11 +50,14 @@ export default function MakerAccountMenu({
               <p className="text-sm font-semibold text-dark-50">계정 정보</p>
               <p className="mt-1 font-mono text-[11px] text-dark-500">{currentUser.id}</p>
             </div>
-            {isMakerAdmin(currentUser) ? (
-              <span className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-[11px] font-medium text-amber-300">
-                ADMIN
-              </span>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {isMakerAdmin(currentUser) ? (
+                <span className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-[11px] font-medium text-amber-300">
+                  ADMIN
+                </span>
+              ) : null}
+              <DetailsCloseButton className="rounded-lg p-1 text-dark-400 transition-colors hover:bg-dark-800 hover:text-dark-100 sm:hidden" />
+            </div>
           </div>
         </div>
 

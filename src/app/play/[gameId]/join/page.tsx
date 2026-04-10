@@ -6,6 +6,8 @@ import type { GameSessionSummary } from "@/types/session";
 import PlayerSessionEntry from "./_components/PlayerSessionEntry";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 const PHASE_LABELS: Record<string, string> = {
   lobby: "대기실",

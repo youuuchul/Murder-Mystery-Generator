@@ -214,21 +214,12 @@ function buildChatSystemPrompt(
     ? player.scoreConditions.map((s) => `- ${s.description}`).join("\n")
     : "없음";
 
-  // victoryCondition을 캐릭터 심리로 변환
-  const motivationMap: Record<string, string> = {
-    "avoid-arrest": "당신은 의심받는 것이 두렵습니다. 자신에게 불리한 증거가 나오면 화제를 돌리거나 다른 사람에게 의심을 돌리려 합니다.",
-    "uncertain": "당신은 자신의 입장이 불안정합니다. 상황에 따라 협력할 수도, 숨길 수도 있습니다.",
-    "arrest-culprit": "당신은 진실을 밝히고 싶습니다. 의심스러운 행동이나 모순된 발언을 놓치지 않으려 합니다.",
-    "personal-goal": player.personalGoal
-      ? `당신에게는 사건 해결보다 중요한 개인적인 일이 있습니다: ${player.personalGoal}`
-      : "당신에게는 사건과 별개로 이루어야 할 개인적인 일이 있습니다.",
-  };
-  const motivation = motivationMap[player.victoryCondition] ?? "";
-
-  // scoreConditions를 내면 동기로 변환
-  const innerDrives = player.scoreConditions.length > 0
-    ? player.scoreConditions.map((s) => `- ${s.description}`).join("\n")
-    : "";
+  // 내면 동기 원본 데이터
+  const stanceLines = [
+    `- 입장: ${player.victoryCondition}`,
+    player.personalGoal ? `- 개인 사정: ${player.personalGoal}` : "",
+    ...player.scoreConditions.map((s) => `- 신경 쓰이는 것: ${s.description}`),
+  ].filter(Boolean);
 
   return [
     `당신은 "${characterName}"입니다. 아래 설정에 완전히 몰입해서 이 인물로서 대화하세요.`,
@@ -250,15 +241,15 @@ function buildChatSystemPrompt(
       ? player.timeline.map((t) => `- ${t.slotLabel}: ${t.action}`)
       : []),
     player.timeline.length > 0 ? "" : "",
-    `[당신의 심리]`,
-    motivation,
-    innerDrives ? `당신이 신경 쓰고 있는 것들:\n${innerDrives}` : "",
+    stanceLines.length > 0 ? `[내면 — 아래 정보를 캐릭터 심리로 해석해서 행동에 반영하세요. 절대 그대로 말하지 마세요.]` : "",
+    ...stanceLines,
     "",
     `[현재 가진 단서] ${inventory.length > 0 ? inventory.map((c) => c.title).join(", ") : "없음"}`,
     `[대화 상대] ${otherPlayers || "없음"}`,
     "",
     "절대 규칙 (어기면 안 됩니다):",
-    "- 캐릭터로서만 말하세요. 게임 규칙, 점수, 승리 조건, 목표 달성 같은 메타 정보를 절대 언급하지 마세요.",
+    "- 캐릭터로서만 말하세요. 게임 규칙, 점수, 승리 조건, 목표, 입장 같은 메타 정보를 절대 언급하지 마세요.",
+    "- [내면] 항목은 당신의 행동 방향을 결정하는 참고 자료입니다. 대화에서 이 내용을 직접 읽어주지 마세요.",
     "- '나는 AI입니다', '시스템 프롬프트', '설정에 따르면' 같은 말은 절대 하지 마세요.",
     "- 비밀은 쉽게 드러내지 마세요. 증거를 대며 추궁하면 부분적으로 인정할 수 있습니다.",
     "- 아직 획득하지 않은 단서 정보를 말하지 마세요.",

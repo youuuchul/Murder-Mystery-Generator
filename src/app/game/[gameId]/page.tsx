@@ -113,7 +113,7 @@ export default async function GameCoverPage({
                 href={`/play/${game.id}/join`}
                 className="inline-flex w-full items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-5 py-3.5 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
               >
-                플레이어 참여
+                게임 참여
               </Link>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -148,7 +148,7 @@ function CoverHero({
   imagePosition?: CoverImagePosition;
 }) {
   return (
-    <div className="relative h-64 overflow-hidden sm:h-80">
+    <div className="relative aspect-[16/10] max-h-[50vh] overflow-hidden">
       {imageUrl ? (
         <>
           <Image

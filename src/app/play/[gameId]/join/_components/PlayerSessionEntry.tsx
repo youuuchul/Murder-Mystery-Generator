@@ -194,14 +194,13 @@ export default function PlayerSessionEntry({
           </div>
 
           <div className="rounded-2xl border border-dark-800 bg-dark-950/60 p-4 lg:max-w-sm">
-            <p className="text-xs uppercase tracking-[0.22em] text-dark-500">No GM</p>
             <button
               type="button"
               onClick={handleCreatePlayerSession}
               disabled={creatingSession}
-              className="mt-4 w-full rounded-xl border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-500 hover:text-emerald-50 disabled:opacity-50"
+              className="w-full rounded-xl border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-500 hover:text-emerald-50 disabled:opacity-50"
             >
-              {creatingSession ? "방 만드는 중…" : "GM 없이 직접 세션 생성"}
+              {creatingSession ? "방 만드는 중…" : "방 만들기"}
             </button>
           </div>
         </div>

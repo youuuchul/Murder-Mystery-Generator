@@ -82,6 +82,35 @@ export async function POST(request: NextRequest) {
       message: payload.message,
       requestedMode: payload.responseMode,
     });
+
+    const systemPrompt = buildMakerAssistantSystemPrompt(payload.task, responseMode);
+    const userPrompt = buildMakerAssistantUserPrompt({
+      task: payload.task,
+      responseMode,
+      context,
+      message: payload.message,
+      conversationHistory: payload.conversationHistory,
+      clueSuggestionContext: payload.clueSuggestionContext,
+    });
+
+    // 스트리밍 모드
+    if (payload.stream) {
+      const readableStream = new ReadableStream({
+        start(controller) {
+          void streamResponse(systemPrompt, userPrompt, payload.task, responseMode, controller);
+        },
+      });
+
+      return new Response(readableStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-store",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
+    // 기존 non-streaming 모드
     const traceName = getMakerAssistantTraceName(payload.task, responseMode);
     const sessionId = getMakerAssistantTraceSessionId(currentUser.id, payload.game.id);
     const tags = getMakerAssistantTraceTags(payload.task, responseMode, payload.currentStep);
@@ -227,6 +256,57 @@ async function invokeWithTokenRetry(
   }
 
   return retryText;
+}
+
+/**
+ * LangChain stream으로 텍스트를 청크 단위로 전송한다.
+ * 스트리밍 완료 후 파싱을 시도하고, 성공하면 결과 JSON을, 실패하면 에러를 전송한다.
+ */
+async function streamResponse(
+  systemPrompt: string,
+  userPrompt: string,
+  task: MakerAssistantResponse["task"],
+  responseMode: "guide" | "draft",
+  controller: ReadableStreamDefaultController<Uint8Array>
+): Promise<void> {
+  const encoder = new TextEncoder();
+  const send = (event: string, data: unknown) => {
+    controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+  };
+
+  try {
+    const chat = getMakerAssistantChat(PRIMARY_MAX_COMPLETION_TOKENS);
+    const messages = [new SystemMessage(systemPrompt), new HumanMessage(userPrompt)];
+    const stream = await chat.stream(messages);
+
+    let fullText = "";
+    for await (const chunk of stream) {
+      const text = typeof chunk.content === "string" ? chunk.content : "";
+      if (text) {
+        fullText += text;
+        send("chunk", { text });
+      }
+    }
+
+    // 파싱 시도
+    try {
+      const result = parseMakerAssistantResult(fullText.trim(), responseMode);
+      send("done", { task, previousResponseId: null, result, repairAttempts: 0 });
+    } catch {
+      // 파싱 실패 → repair (non-streaming)
+      const resolved = await resolveMakerAssistantResult(fullText.trim(), responseMode, task);
+      send("done", { task, previousResponseId: null, result: resolved.result, repairAttempts: resolved.repairAttempts });
+    }
+  } catch (error) {
+    if (isOpenAIApiError(error)) {
+      const classified = classifyOpenAIError(error);
+      send("error", { error: classified.message, isApiIssue: classified.isApiIssue });
+    } else {
+      send("error", { error: error instanceof Error ? error.message : "스트리밍 실패" });
+    }
+  } finally {
+    controller.close();
+  }
 }
 
 /** AIMessage.content에서 텍스트를 추출한다. */

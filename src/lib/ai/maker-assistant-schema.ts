@@ -38,6 +38,7 @@ export const makerAssistantRequestSchema = z.object({
     content: z.string().trim().min(1).max(4000),
     responseMode: z.enum(["guide", "draft"]).optional(),
   })).max(8).optional(),
+  stream: z.boolean().optional(),
 });
 
 const makerAssistantFindingSchema = z.object({

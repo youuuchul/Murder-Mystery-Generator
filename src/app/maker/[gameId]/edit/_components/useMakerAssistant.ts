@@ -10,6 +10,7 @@ import {
   type MakerAssistantConversationTurn,
   type MakerAssistantResponseModePreference,
   type MakerAssistantResponse,
+  type MakerAssistantResult,
   type MakerAssistantTask,
 } from "@/types/assistant";
 
@@ -123,9 +124,7 @@ export default function useMakerAssistant({
     try {
       const response = await fetch("/api/maker-assistant", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           task,
           game,
@@ -134,33 +133,102 @@ export default function useMakerAssistant({
           responseMode: requestedMode,
           conversationHistory,
           clueSuggestionContext,
+          stream: true,
         }),
       });
 
-      const data = await response.json() as MakerAssistantResponse | { error?: string; isApiIssue?: boolean };
-
       if (!response.ok) {
-        const errorData = data as { error?: string; isApiIssue?: boolean };
-        if (errorData.isApiIssue) {
-          setIsApiIssue(true);
-        }
-        throw new Error(errorData.error || "제작 도우미 호출 실패");
+        const data = await response.json().catch(() => ({})) as { error?: string; isApiIssue?: boolean };
+        if (data.isApiIssue) setIsApiIssue(true);
+        throw new Error(data.error || "제작 도우미 호출 실패");
       }
 
-      const payload = data as MakerAssistantResponse;
+      // SSE 스트리밍 처리
+      const streamingMsgId = crypto.randomUUID();
+      let streamedText = "";
 
+      // 스트리밍 중 메시지 추가 (실시간 텍스트 표시)
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: streamingMsgId,
           role: "assistant",
           task,
           label: MAKER_ASSISTANT_TASK_LABELS[task],
-          content: payload.result.mode === "draft" ? payload.result.body : payload.result.summary,
+          content: "",
           createdAt: new Date().toISOString(),
-          result: payload.result,
+          result: undefined,
+          streaming: true,
         },
       ]);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error("응답 스트림을 열 수 없습니다.");
+
+      let buffer = "";
+      let finalResult: MakerAssistantResult | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            const eventType = line.slice(7).trim();
+            const nextLine = lines[lines.indexOf(line) + 1];
+            if (!nextLine?.startsWith("data: ")) continue;
+
+            const data = JSON.parse(nextLine.slice(6)) as
+              | { text: string }
+              | { task: string; result: MakerAssistantResult; repairAttempts: number }
+              | { error: string; isApiIssue?: boolean };
+
+            if (eventType === "chunk" && "text" in data) {
+              streamedText += data.text;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingMsgId ? { ...m, content: streamedText } : m
+                )
+              );
+            } else if (eventType === "done" && "result" in data) {
+              finalResult = data.result;
+            } else if (eventType === "error" && "error" in data) {
+              if ("isApiIssue" in data && data.isApiIssue) setIsApiIssue(true);
+              throw new Error(data.error);
+            }
+          }
+        }
+      }
+
+      // 스트리밍 완료 → 파싱된 결과로 교체
+      if (finalResult) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === streamingMsgId
+              ? {
+                  ...m,
+                  content: finalResult!.mode === "draft" ? finalResult!.body : finalResult!.summary,
+                  result: finalResult!,
+                  streaming: false,
+                }
+              : m
+          )
+        );
+      } else {
+        // done 이벤트 없이 스트림 종료 → raw 텍스트 유지
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === streamingMsgId ? { ...m, streaming: false } : m
+          )
+        );
+      }
+
       return true;
     } catch (requestError) {
       setMessages((prev) => prev.filter((item) => item.id !== userMessage.id));

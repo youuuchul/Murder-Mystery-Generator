@@ -121,4 +121,5 @@ export interface MakerAssistantChatMessage {
   content: string;
   createdAt: string;
   result?: MakerAssistantResult;
+  streaming?: boolean;
 }

@@ -86,17 +86,11 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="rounded-[28px] border border-dark-800 bg-[radial-gradient(circle_at_top_left,rgba(140,88,77,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(76,35,52,0.22),transparent_28%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(11,11,14,0.98))] p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Public Library</p>
-          <h2 className="mt-4 text-3xl font-semibold text-dark-50">바로 시작할 수 있는 시나리오</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-dark-300">
-            오늘 진행할 시나리오를 고르거나, 이미 받은 참가 코드로 바로 들어오세요.
-          </p>
+          <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Murder Mystery</p>
+          <h2 className="mt-4 text-3xl font-semibold text-dark-50">시나리오를 고르고 바로 플레이</h2>
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-dark-300">
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
-              지금 고를 수 있는 작품 {publicGameItems.length}개
-            </span>
-            <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
-              GM은 방을 열고, 플레이어는 코드로 참여
+              공개 시나리오 {publicGameItems.length}개
             </span>
           </div>
           <LibraryQuickJoin />

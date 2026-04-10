@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
+import AiChatPanel from "./_components/AiChatPanel";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import {
   ENDING_STAGE_LABELS,
@@ -2290,26 +2291,17 @@ export default function PlayerView() {
 
             {/* 밀담 탭 */}
             {hasAiPlayers && locationSubTab === "chat" && (
-              <div className="space-y-3">
-                <div className="text-center py-12 border-2 border-dashed border-dark-800 rounded-xl">
-                  <p className="text-dark-400 text-sm font-medium">AI 캐릭터와 밀담</p>
-                  <p className="text-dark-600 text-xs mt-2">대화할 캐릭터를 선택하세요</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {sharedState?.characterSlots
-                      ?.filter((slot) => slot.isAiControlled && slot.isLocked)
-                      .map((slot) => (
-                        <button
-                          key={slot.playerId}
-                          type="button"
-                          className="rounded-xl border border-dark-700 bg-dark-900 px-4 py-2.5 text-sm text-dark-200 transition-colors hover:border-mystery-600 hover:text-dark-100"
-                        >
-                          {slot.playerName ?? "AI"}
-                        </button>
-                      )) ?? null}
-                  </div>
-                  <p className="mt-4 text-dark-700 text-[11px]">채팅 기능 준비 중</p>
-                </div>
-              </div>
+              <AiChatPanel
+                sessionId={sessionId}
+                token={token}
+                callerName={game.players.find((p) => p.id === charId)?.name ?? "플레이어"}
+                aiSlots={
+                  sharedState?.characterSlots
+                    ?.filter((slot) => slot.isAiControlled && slot.isLocked)
+                    .map((slot) => ({ playerId: slot.playerId, playerName: slot.playerName ?? null }))
+                  ?? []
+                }
+              />
             )}
 
             {/* 단서 획득 (기존 장소 탐색) */}

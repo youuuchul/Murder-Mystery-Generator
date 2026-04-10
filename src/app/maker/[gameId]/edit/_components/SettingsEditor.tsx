@@ -10,17 +10,19 @@ interface SettingsEditorProps {
   onChange: (partial: Partial<GamePackage>) => void;
 }
 
-const TAG_SUGGESTIONS = [
-  "고딕 저택",
-  "도시 누아르",
-  "폐쇄형",
-  "심리전",
-  "가문 비밀",
-  "파티",
-  "호러",
-  "코믹",
-  "역사",
-  "SF",
+const TAG_SUGGESTION_GROUPS: { label: string; tags: string[] }[] = [
+  {
+    label: "유통",
+    tags: ["독점 제공", "오리지널", "IP 기반", "펀딩 예정", "펀딩 중"],
+  },
+  {
+    label: "장르",
+    tags: ["고딕 저택", "도시 누아르", "폐쇄형", "심리전", "가문 비밀", "파티", "호러", "코믹", "역사", "SF", "판타지", "로맨스"],
+  },
+  {
+    label: "기능/제작",
+    tags: ["AI 일러스트", "수작업 일러스트", "혼합 일러스트", "BGM 포함", "동영상 포함", "텍스트 중시", "추리 중시"],
+  },
 ];
 
 const DIFFICULTIES = [
@@ -274,7 +276,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                 onClick={() => removeTag(tag)}
                 className="rounded-full border border-mystery-700 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-200 hover:bg-mystery-950/50 transition-colors"
               >
-                #{tag} ×
+                # {tag} ×
               </button>
             ))}
           </div>
@@ -302,16 +304,22 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {TAG_SUGGESTIONS.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => addTag(tag)}
-                className="rounded-full border border-dark-700 bg-dark-800/60 px-3 py-1 text-xs text-dark-300 hover:border-dark-500 hover:text-dark-100 transition-colors"
-              >
-                + #{tag}
-              </button>
+          <div className="space-y-2">
+            {TAG_SUGGESTION_GROUPS.map((group) => (
+              <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[11px] text-dark-600">{group.label}</span>
+                {group.tags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => addTag(tag)}
+                    disabled={settings.tags.includes(tag)}
+                    className="rounded-full border border-dark-700 bg-dark-800/60 px-3 py-1 text-xs text-dark-300 hover:border-dark-500 hover:text-dark-100 transition-colors disabled:opacity-30 disabled:cursor-default"
+                  >
+                    # {tag}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>

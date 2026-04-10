@@ -332,7 +332,7 @@ export default async function MakerAccessPage({ searchParams }: Props) {
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-dark-200">
                 복구 이메일
-                <span className="ml-2 text-xs font-normal text-emerald-300">선택 입력</span>
+                <span className="ml-2 text-xs font-normal text-dark-500">선택 입력</span>
               </span>
               <input
                 type="email"
@@ -499,17 +499,23 @@ export default async function MakerAccessPage({ searchParams }: Props) {
         ) : null}
 
 
-        <div className="mt-5 space-y-2 text-xs leading-5 text-dark-500">
-          <p>
-            회원가입 시 아이디, 비밀번호, 작업자 이름을 수집하며, 복구 이메일은 선택 항목입니다.
-            가입을 완료하면 위 항목의 수집 및 이용에 동의한 것으로 간주됩니다.
-          </p>
-          <p>
-            저작권, 데이터 관리 등 서비스 이용 정책은{" "}
-            <a href="/guide" className="text-dark-400 underline underline-offset-2 hover:text-dark-200">사용 가이드</a>
-            에서 확인하세요.
-          </p>
-        </div>
+        {mode === "signup" && (
+          <div className="mt-5 space-y-3 text-xs leading-5 text-dark-500">
+            <div>
+              <p>회원 가입 과정에서 개인정보 보호법 제15조제1항제4호(계약 체결/이행)에 따라, 다음과 같은 개인정보를 수집·이용합니다.</p>
+              <p className="mt-2">수집하는 개인정보 항목 :</p>
+              <p>[필수] 아이디, 비밀번호, 작업자 이름</p>
+              <p>[선택] 복구 이메일</p>
+              <p className="mt-1">※ 선택 항목은 입력하지 않아도 회원 가입이 가능하며 회원 가입 이후 자유롭게 등록 가능합니다.</p>
+              <p className="mt-1">가입을 완료하면 위 항목의 수집 및 이용에 동의한 것으로 간주됩니다.</p>
+            </div>
+            <p>
+              저작권, 데이터 관리 등 서비스 이용 정책은{" "}
+              <a href="/guide" className="text-dark-400 underline underline-offset-2 hover:text-dark-200">사용 가이드</a>
+              에서 확인하세요.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

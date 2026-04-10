@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   propagateAttributes,
   startActiveObservation,
-  updateActiveObservation,
 } from "@langfuse/tracing";
+import { trace } from "@opentelemetry/api";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { getMakerAssistantChat } from "@/lib/ai/langchain-openai";
 import { classifyOpenAIError, isOpenAIApiError } from "@/lib/ai/openai-error";
@@ -120,9 +120,12 @@ export async function POST(request: NextRequest, { params }: Params) {
           sessionId,
           callerPlayerId: callerState.playerId,
           targetPlayerId: body.targetPlayerId,
-          traceInput: JSON.stringify(traceInput),
         },
       }, async () => {
+        // async await 전에 span 참조 캡처 (컨텍스트 유실 방지)
+        const currentSpan = trace.getActiveSpan();
+        currentSpan?.setAttribute("langfuse.observation.input", JSON.stringify(traceInput));
+
         const systemPrompt = buildChatSystemPrompt(aiContext, aiPlayer.name);
         const messages = [
           new SystemMessage(systemPrompt),
@@ -145,15 +148,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         }
 
         const traceOutput = { reply: content.slice(0, 200), tokens: response.response_metadata?.tokenUsage };
-
-        // input/output을 한 번에 설정 (async 컨텍스트 유실 방지)
-        updateActiveObservation({
-          input: traceInput,
-          output: traceOutput,
-          metadata: {
-            traceOutput: JSON.stringify(traceOutput),
-          },
-        });
+        // span 참조를 직접 사용 (async 후에도 안전)
+        currentSpan?.setAttribute("langfuse.observation.output", JSON.stringify(traceOutput));
 
         return content;
       });

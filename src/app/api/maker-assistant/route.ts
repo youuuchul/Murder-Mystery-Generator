@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   propagateAttributes,
   startActiveObservation,
-  updateActiveObservation,
 } from "@langfuse/tracing";
+import { trace } from "@opentelemetry/api";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ZodError } from "zod";
 import {
@@ -106,9 +106,12 @@ export async function POST(request: NextRequest) {
           task: payload.task,
           route: "/api/maker-assistant",
           gameTitle: payload.game.title.slice(0, 200),
-          traceInput: JSON.stringify(traceInput),
         },
       }, async () => {
+        // async await 전에 span 참조 캡처 (컨텍스트 유실 방지)
+        const currentSpan = trace.getActiveSpan();
+        currentSpan?.setAttribute("langfuse.observation.input", JSON.stringify(traceInput));
+
         try {
           const systemPrompt = buildMakerAssistantSystemPrompt(payload.task, responseMode);
           const userPrompt = buildMakerAssistantUserPrompt({
@@ -136,15 +139,8 @@ export async function POST(request: NextRequest) {
             repairAttempts: resolved.repairAttempts,
           });
 
-          // input/output을 한 번에 설정 (async 컨텍스트 유실 최소화)
-          updateActiveObservation({
-            input: traceInput,
-            output: traceOutput,
-            metadata: {
-              repairAttempts: String(resolved.repairAttempts),
-              traceOutput: JSON.stringify(traceOutput),
-            },
-          });
+          // span 참조를 직접 사용 (async 후에도 안전)
+          currentSpan?.setAttribute("langfuse.observation.output", JSON.stringify(traceOutput));
 
           return {
             task: payload.task,
@@ -152,15 +148,9 @@ export async function POST(request: NextRequest) {
             result: resolved.result,
           } satisfies MakerAssistantResponse;
         } catch (error) {
-          updateActiveObservation({
-            level: "ERROR",
-            statusMessage:
-              error instanceof Error ? error.message : "maker assistant request failed",
-            metadata: {
-              task: payload.task,
-              route: "/api/maker-assistant",
-            },
-          });
+          currentSpan?.setAttribute("langfuse.observation.level", "ERROR");
+          currentSpan?.setAttribute("langfuse.observation.status_message",
+            error instanceof Error ? error.message : "maker assistant request failed");
           throw error;
         }
       });

@@ -13,6 +13,7 @@ import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "../_components/GuideMenu";
 import GameGrid from "../_components/GameGrid";
 import MakerAccountMenu from "../_components/MakerAccountMenu";
+import MobileNavMenu from "../_components/MobileNavMenu";
 import {
   getMakerAccountErrorMessage,
   getMakerAccountNoticeMessage,
@@ -102,27 +103,43 @@ export default async function ManageLibraryPage({ searchParams }: ManageLibraryP
           </div>
 
           <nav className="flex items-center gap-2">
-            <MakerAccountMenu
-              currentUser={currentUser}
-              currentAccount={currentAccount}
-              nextPath={managePagePath}
-              errorMessage={accountErrorMessage}
-              noticeMessage={accountNoticeMessage}
+            {/* 데스크톱: 계정·ADMIN·보호·가이드 인라인 */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <MakerAccountMenu
+                currentUser={currentUser}
+                currentAccount={currentAccount}
+                nextPath={managePagePath}
+                errorMessage={accountErrorMessage}
+                noticeMessage={accountNoticeMessage}
+              />
+              {isMakerAdmin(currentUser) ? (
+                <Link
+                  href="/library/manage/sessions"
+                  className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-950/70"
+                >
+                  ADMIN
+                </Link>
+              ) : null}
+              {makerAccessEnabled ? (
+                <span className="rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300">
+                  제작 보호 ON
+                </span>
+              ) : null}
+              <GuideMenu />
+            </div>
+
+            {/* 모바일: ⋮ 메뉴 */}
+            <MobileNavMenu
+              displayName={currentUser.displayName}
+              isAdmin={isMakerAdmin(currentUser)}
+              logoutNextPath="/maker-access"
+              extraItems={
+                makerAccessEnabled
+                  ? [{ label: "제작 보호 ON", href: "#", variant: "badge" as const }]
+                  : undefined
+              }
             />
-            {isMakerAdmin(currentUser) ? (
-              <Link
-                href="/library/manage/sessions"
-                className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-950/70 sm:inline-flex"
-              >
-                ADMIN
-              </Link>
-            ) : null}
-            {makerAccessEnabled ? (
-              <span className="hidden rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300 sm:inline-flex">
-                제작 보호 ON
-              </span>
-            ) : null}
-            <GuideMenu />
+
             <Link
               href="/maker/new"
               className="rounded-md border border-mystery-600 bg-mystery-700 px-4 py-1.5 text-sm text-white transition-colors hover:bg-mystery-600"

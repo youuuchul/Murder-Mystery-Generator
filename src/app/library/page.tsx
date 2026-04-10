@@ -7,6 +7,7 @@ import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import GuideMenu from "./_components/GuideMenu";
 import LibraryQuickJoin from "./_components/LibraryQuickJoin";
 import MakerAccountMenu from "./_components/MakerAccountMenu";
+import MobileNavMenu from "./_components/MobileNavMenu";
 import PublicGameGrid from "./_components/PublicGameGrid";
 import {
   getMakerAccountErrorMessage,
@@ -50,24 +51,34 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <h1 className="text-lg font-semibold text-dark-50">Murder Mystery</h1>
 
           <nav className="flex items-center gap-2">
-            <GuideMenu />
             {currentUser ? (
               <>
-                <MakerAccountMenu
-                  currentUser={currentUser}
-                  currentAccount={currentAccount}
-                  nextPath="/library"
-                  errorMessage={accountErrorMessage}
-                  noticeMessage={accountNoticeMessage}
+                {/* 데스크톱: 가이드·계정·ADMIN 인라인 */}
+                <div className="hidden items-center gap-2 sm:flex">
+                  <GuideMenu />
+                  <MakerAccountMenu
+                    currentUser={currentUser}
+                    currentAccount={currentAccount}
+                    nextPath="/library"
+                    errorMessage={accountErrorMessage}
+                    noticeMessage={accountNoticeMessage}
+                  />
+                  {isMakerAdmin(currentUser) ? (
+                    <Link
+                      href="/library/manage/sessions"
+                      className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-950/70"
+                    >
+                      ADMIN
+                    </Link>
+                  ) : null}
+                </div>
+
+                {/* 모바일: ⋮ 메뉴 */}
+                <MobileNavMenu
+                  displayName={currentUser.displayName}
+                  isAdmin={isMakerAdmin(currentUser)}
                 />
-                {isMakerAdmin(currentUser) ? (
-                  <Link
-                    href="/library/manage/sessions"
-                    className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-950/70 sm:inline-flex"
-                  >
-                    ADMIN
-                  </Link>
-                ) : null}
+
                 <Link
                   href="/library/manage"
                   className="rounded-md border border-mystery-800/60 bg-mystery-950/30 px-3 py-1.5 text-sm text-mystery-200 transition-colors hover:border-mystery-600 hover:text-mystery-50"

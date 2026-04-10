@@ -8,6 +8,7 @@ import {
 } from "@/lib/session-repository";
 import GuideMenu from "../../_components/GuideMenu";
 import MakerAccountMenu from "../../_components/MakerAccountMenu";
+import MobileNavMenu from "../../_components/MobileNavMenu";
 import {
   getMakerAccountErrorMessage,
   getMakerAccountNoticeMessage,
@@ -88,14 +89,23 @@ export default async function MySessionsPage({ searchParams }: MySessionsPagePro
           </div>
 
           <nav className="flex items-center gap-2">
-            <MakerAccountMenu
-              currentUser={currentUser}
-              currentAccount={currentAccount}
-              nextPath="/library/manage/my-sessions"
-              errorMessage={accountErrorMessage}
-              noticeMessage={accountNoticeMessage}
+            {/* 데스크톱 */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <MakerAccountMenu
+                currentUser={currentUser}
+                currentAccount={currentAccount}
+                nextPath="/library/manage/my-sessions"
+                errorMessage={accountErrorMessage}
+                noticeMessage={accountNoticeMessage}
+              />
+              <GuideMenu />
+            </div>
+
+            {/* 모바일 */}
+            <MobileNavMenu
+              displayName={currentUser.displayName}
+              logoutNextPath="/maker-access"
             />
-            <GuideMenu />
           </nav>
         </div>
       </header>

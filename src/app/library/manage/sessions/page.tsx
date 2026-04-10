@@ -8,6 +8,7 @@ import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import { listAllActiveSessions } from "@/lib/session-repository";
 import GuideMenu from "../../_components/GuideMenu";
 import MakerAccountMenu from "../../_components/MakerAccountMenu";
+import MobileNavMenu from "../../_components/MobileNavMenu";
 import {
   getMakerAccountErrorMessage,
   getMakerAccountNoticeMessage,
@@ -97,22 +98,37 @@ export default async function ManageSessionsPage({ searchParams }: ManageSession
           </div>
 
           <nav className="flex items-center gap-2">
-            <MakerAccountMenu
-              currentUser={currentUser}
-              currentAccount={currentAccount}
-              nextPath="/library/manage/sessions"
-              errorMessage={accountErrorMessage}
-              noticeMessage={accountNoticeMessage}
-            />
-            <span className="hidden rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300 sm:inline-flex">
-              ADMIN
-            </span>
-            {isMakerAccessEnabled() ? (
-              <span className="hidden rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300 sm:inline-flex">
-                제작 보호 ON
+            {/* 데스크톱 */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <MakerAccountMenu
+                currentUser={currentUser}
+                currentAccount={currentAccount}
+                nextPath="/library/manage/sessions"
+                errorMessage={accountErrorMessage}
+                noticeMessage={accountNoticeMessage}
+              />
+              <span className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-xs font-medium text-amber-300">
+                ADMIN
               </span>
-            ) : null}
-            <GuideMenu />
+              {isMakerAccessEnabled() ? (
+                <span className="rounded-full border border-emerald-900 bg-emerald-950/70 px-3 py-1 text-xs font-medium text-emerald-300">
+                  제작 보호 ON
+                </span>
+              ) : null}
+              <GuideMenu />
+            </div>
+
+            {/* 모바일 */}
+            <MobileNavMenu
+              displayName={currentUser.displayName}
+              isAdmin
+              logoutNextPath="/maker-access"
+              extraItems={
+                isMakerAccessEnabled()
+                  ? [{ label: "제작 보호 ON", href: "#", variant: "badge" as const }]
+                  : undefined
+              }
+            />
           </nav>
         </div>
       </header>

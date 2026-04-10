@@ -1,35 +1,59 @@
 # Player Agent Layer
 
-`player-agent` 는 GM 없는 세션, 1인 플레이, 테스트 플레이를 위한
-AI 플레이어 전용 계층이다.
+AI 플레이어 전용 계층. GM 없는 세션, 인원 부족 시 AI 자동 채우기, 밀담 채팅에 사용된다.
 
-현재는 폴더 골격만 준비된 상태다.
+## 현재 구현 상태
 
-## 역할
+| 기능 | 상태 | 위치 |
+|------|------|------|
+| AI 슬롯 상태 관리 | 구현 완료 | `core/player-agent-state.ts` |
+| 자동 단서 획득 | 구현 완료 | `actions/auto-actions.ts` |
+| 자동 투표 | 로직 구현, 호출 미연결 | `actions/auto-actions.ts` |
+| 밀담 채팅 | 구현 완료 | `../../app/api/sessions/[sessionId]/chat/route.ts` |
+| 가시 컨텍스트 | 구현 완료 | `../shared/player-agent-context.ts` |
 
-- 플레이어 슬롯을 채우는 AI 캐릭터 관리
-- 채팅 응답
-- 카드 습득 / 투표 / 아이템 교환 같은 행동 결정
-- 시나리오별 예외 규칙 분리
-- 공통 정규화 컨텍스트 위에서 빠른 플레이어 응답 제공
+## 폴더 구조
 
-## 폴더 기준
+```
+player-agent/
+├── core/
+│   └── player-agent-state.ts   # AI 슬롯 초기화, 상태 동기화, 런타임 상태
+├── actions/
+│   └── auto-actions.ts         # 규칙 기반 단서 획득 + 투표 (LLM 미사용)
+└── README.md
+```
 
-- `core`
-  - 세션 상태 해석, 캐릭터 컨텍스트, 단계별 입력 정리
-- `chat`
-  - 대화 응답 조립, 응답 포맷, 누수 방지 필터
-- `actions`
-  - 카드 습득, 투표, 교환, 반응 행동
-- `prompts`
-  - 공통 프롬프트, 정책 문구, 출력 포맷
-- `scenario-overrides`
-  - 특정 시나리오 전용 예외 규칙
+### 채팅이 이 폴더에 없는 이유
+
+밀담 채팅은 Next.js API route에서 직접 구현했다.
+
+- API route: `src/app/api/sessions/[sessionId]/chat/route.ts`
+- UI: `src/app/play/[gameId]/[charId]/_components/AiChatPanel.tsx`
+- 공유 컨텍스트: `src/lib/ai/shared/player-agent-context.ts`
+
+LangChain ChatOpenAI 호출, 프롬프트 조립, 이력 저장이 모두 route 안에 있다.
+향후 프롬프트가 복잡해지면 이 폴더로 분리할 수 있다.
+
+## 동작 원리
+
+### 자동 단서 획득 (`auto-actions.ts`)
+
+- 트리거: 인간 플레이어가 단서 획득 시
+- 모든 AI 플레이어가 각각 1개씩 단서 획득 (루프)
+- 규칙 기반: 씬 단서 제외, 중복 제외, 라운드 잠금, 조건식 평가
+- 결정론적 선택: `sessionId:playerId:roundKey` 해시
+
+### 밀담 채팅
+
+- LangChain ChatOpenAI (gpt-5-mini)
+- 캐릭터 프롬프트: 배경, 스토리, 비밀, 관계, 타임라인, 내면 동기
+- 데이터 격리: `buildPlayerAgentVisibleContext` → 해당 캐릭터 공개 정보만
+- 다자 밀담: `turnContext`로 이전 AI 응답 누적 전달
+- 메타 노출 방지: 점수/승리조건/목표 → LLM이 캐릭터 심리로 해석
 
 ## 원칙
 
-- AI 플레이어는 자기에게 공개된 정보만 사용한다.
-- 다음 단계 데이터나 비공개 정보를 먼저 말하면 안 된다.
-- 공통 프롬프트를 기본으로 하고, 시나리오별 override 는 최소화한다.
-- 메이커 도우미와 원본 데이터는 공유하되, 플레이어 응답은 더 짧고 빨라야 한다.
-- 긴 응답이 필요하거나 불리한 질문이면 회피 응답도 정상 정책으로 허용한다.
+- AI 플레이어는 자기에게 공개된 정보만 사용한다
+- 획득 전 단서, 다른 캐릭터 비밀은 절대 포함 안 됨
+- 게임 메타 용어(점수, 승리 조건, 목표)를 대화에서 언급하지 않는다
+- 메이커 도우미와 원본 데이터는 공유하되, 응답 파이프라인은 분리

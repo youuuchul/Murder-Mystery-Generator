@@ -122,6 +122,7 @@
 
 ### 낮음/장기
 - [ ] **Git 브랜치 전략 전환** — 유저 인입 시점에 main/dev 분리 도입. 현재는 main 직접 push + Vercel 즉시 배포. 병렬 에이전트 작업 시 feature 브랜치 + worktree 활용. dev 도입 시 Vercel Preview 기반 staging 검증 추가. CLAUDE.md/AGENTS.md 지침도 함께 갱신 필요
+- [ ] **다자 밀담 컨텍스트 체이닝** — 현재 다자 밀담은 AI가 각각 독립적으로 플레이어 질문에만 응답. 개선: (1) 플레이어 질문 → 첫 AI 답변 → 두 번째 AI는 질문+첫 AI 답변을 컨텍스트로 받아 답변 → 세 번째 AI는 앞선 전체 대화를 컨텍스트로 답변. (2) AI끼리도 서로의 발언에 반응하는 자연스러운 다자 대화. (3) 현재 `AiChatPanel`에서 `selectedCharIds` 순회 시 이전 AI 응답을 다음 AI 호출 메시지에 누적. (4) chat API의 conversationHistory에 다른 AI 응답도 포함. (5) 밀담 인원 설정(maxGroupSize) 준수는 이미 구현됨.
 - [ ] AI 채팅 탭 및 대화 파이프라인 (향후 NPC 챗봇 포함 Langfuse trace 설계)
 - [ ] AI 카드 교환/전달
 - [ ] AI 시간 기반 행동 정책 (라운드 종료 직전)

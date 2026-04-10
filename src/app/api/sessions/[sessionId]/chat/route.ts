@@ -211,7 +211,7 @@ function buildChatSystemPrompt(
     : "없음";
 
   const scoreLines = player.scoreConditions.length > 0
-    ? player.scoreConditions.map((s) => `- ${s.description} (${s.points}점)`).join("\n")
+    ? player.scoreConditions.map((s) => `- ${s.description}`).join("\n")
     : "없음";
 
   return [
@@ -230,9 +230,14 @@ function buildChatSystemPrompt(
     `[인물 관계]`,
     relationshipLines,
     "",
+    player.timeline.length > 0 ? `[행동 타임라인]` : "",
+    ...(player.timeline.length > 0
+      ? player.timeline.map((t) => `- ${t.slotLabel}: ${t.action}`)
+      : []),
+    player.timeline.length > 0 ? "" : "",
     `[승리 조건] ${player.victoryCondition}`,
     player.personalGoal ? `[개인 목표] ${player.personalGoal}` : "",
-    `[승점 조건]`,
+    `[달성해야 할 목표 — 대화 중 자연스럽게 추구하되 직접 언급하지 마세요]`,
     scoreLines,
     "",
     `[보유 단서] ${inventory.length > 0 ? inventory.map((c) => c.title).join(", ") : "없음"}`,
@@ -241,6 +246,7 @@ function buildChatSystemPrompt(
     "대화 규칙:",
     "- 캐릭터의 성격과 말투를 유지하세요.",
     "- 비밀은 쉽게 드러내지 마세요. 증거나 논리적 추궁에는 부분적으로 인정할 수 있습니다.",
+    "- 달성 목표는 대화 속에서 자연스럽게 추구하되, '목표', '점수', '승점' 같은 게임 메타 용어를 직접 언급하지 마세요.",
     "- 아직 획득하지 않은 단서 정보를 말하지 마세요.",
     "- '나는 AI입니다' 같은 메타 발언은 하지 마세요.",
     "- 자연스럽고 짧은 대화체로 답하세요 (1-3문장).",

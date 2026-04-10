@@ -32,6 +32,7 @@ export interface PlayerAgentVisibleContext {
     personalGoal?: string;
     relationships: Array<{ targetName: string; description: string }>;
     scoreConditions: Array<{ description: string; points: number }>;
+    timeline: Array<{ slotLabel: string; action: string }>;
   };
   publicState: {
     joinedPlayers: { playerId: string; playerName: string | null }[];
@@ -103,6 +104,12 @@ export function buildPlayerAgentVisibleContext(input: {
         return { targetName, description: rel.description };
       }),
       scoreConditions: me.scoreConditions ?? [],
+      timeline: (me.timelineEntries ?? [])
+        .filter((te) => te.action?.trim())
+        .map((te) => {
+          const slot = input.game.story?.timeline?.slots?.find((s) => s.id === te.slotId);
+          return { slotLabel: slot?.label ?? te.slotId, action: te.action };
+        }),
     },
     publicState: {
       joinedPlayers: input.session.sharedState.characterSlots

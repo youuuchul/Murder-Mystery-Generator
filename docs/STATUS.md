@@ -91,6 +91,7 @@
 | 이미지 서버 파생본 | 썸네일 전략 검토 |
 | 비밀번호 찾기 | 운영 도메인 기준 메일 발송 최종 검증 |
 | admin 운영 UI | 미세조정 가능 |
+| Langfuse Vercel 환경변수 | Vercel에 설정된 LANGFUSE_PUBLIC_KEY/SECRET_KEY가 MurdermysteryGenerator 프로젝트 키와 일치하는지 검증. 현재 my-first-test-org로 trace가 간 적 있음. 로컬 .env 키는 정상 확인됨 |
 
 ---
 

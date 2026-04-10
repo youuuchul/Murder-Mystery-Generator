@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
 import SettingsEditor from "./SettingsEditor";
 import StoryEditor from "./StoryEditor";
@@ -59,7 +60,9 @@ function pruneDanglingRelationships(players: Player[], story: Story): Player[] {
 }
 
 export default function MakerEditor({ initialGame }: MakerEditorProps) {
+  const router = useRouter();
   const editVersionRef = useRef(0);
+  const hasUnsavedRef = useRef(false);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const validationPanelRef = useRef<HTMLDivElement | null>(null);
   const [game, setGame] = useState<GamePackage>(initialGame);
@@ -93,6 +96,12 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     setSaveError(null);
   }, []);
 
+  // ref를 state와 동기화 (이벤트 핸들러에서 최신 값 참조용)
+  useEffect(() => {
+    hasUnsavedRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
+
+  // 브라우저 닫기/새로고침 시 경고
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       if (!hasUnsavedChanges) {
@@ -106,6 +115,31 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // 클라이언트 네비게이션 (Link 클릭) 가드 — 미저장 변경 시 confirm 경고
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (!hasUnsavedRef.current) return;
+
+      const anchor = (event.target as HTMLElement).closest("a[href]");
+      if (!anchor) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("javascript")) return;
+
+      // 현재 편집 페이지 내부 앵커는 무시
+      if (href.includes(`/maker/${initialGame.id}/edit`)) return;
+
+      // eslint-disable-next-line no-restricted-globals
+      if (!confirm("저장하지 않은 변경사항이 있습니다. 페이지를 떠나시겠습니까?")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [initialGame.id]);
 
   useEffect(() => {
     const actionBar = actionBarRef.current;
@@ -237,7 +271,14 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         return false;
       }
 
-      const { game: saved } = await res.json();
+      const responseData = await res.json();
+      const saved = responseData?.game;
+
+      if (!saved || !saved.id) {
+        setSaveError("저장은 완료됐으나 서버 응답이 비어 있습니다. 페이지를 새로고침해 주세요.");
+        return false;
+      }
+
       if (editVersionRef.current === requestedEditVersion) {
         setGame(saved);
         setHasUnsavedChanges(false);

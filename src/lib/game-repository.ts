@@ -355,6 +355,16 @@ export function listPublicGames(): Promise<GameMetadata[]> {
   return getGameRepository().listPublicGames();
 }
 
+export async function countNonPublicGames(): Promise<number> {
+  const supabase = createSupabasePersistenceClient();
+  const { count, error } = await supabase
+    .from("games")
+    .select("id", { count: "exact", head: true })
+    .neq("visibility", "public");
+  if (error) throw new Error(`Failed to count games: ${error.message}`);
+  return count ?? 0;
+}
+
 export function getGame(gameId: string): Promise<GamePackage | null> {
   return getGameRepository().getGame(gameId);
 }

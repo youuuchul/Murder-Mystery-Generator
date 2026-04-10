@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listPublicGames } from "@/lib/game-repository";
+import { listPublicGames, countNonPublicGames } from "@/lib/game-repository";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { buildMakerAccessPath } from "@/lib/maker-user";
@@ -30,7 +30,10 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const currentAccount = currentUser
     ? await makerAuthGateway.getAccountById(currentUser.id)
     : null;
-  const games = await listPublicGames();
+  const [games, nonPublicCount] = await Promise.all([
+    listPublicGames(),
+    countNonPublicGames(),
+  ]);
   const makerUsers = await makerAuthGateway.listUsers();
   const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
   const publicGameItems = games.map((game) => ({
@@ -86,11 +89,19 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="rounded-[28px] border border-dark-800 bg-[radial-gradient(circle_at_top_left,rgba(140,88,77,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(76,35,52,0.22),transparent_28%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(11,11,14,0.98))] p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Murder Mystery</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-mystery-300/70">Public Library</p>
           <h2 className="mt-4 text-3xl font-semibold text-dark-50">시나리오를 고르고 바로 플레이</h2>
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-dark-300">
             <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
               공개 시나리오 {publicGameItems.length}개
+            </span>
+            {nonPublicCount > 0 && (
+              <span className="rounded-full border border-dark-700 bg-dark-900/80 px-3 py-1">
+                제작중 {nonPublicCount}개
+              </span>
+            )}
+            <span className="rounded-full border border-mystery-800/60 bg-mystery-950/30 px-3 py-1 text-mystery-300/80">
+              누구나 직접 제작 가능
             </span>
           </div>
           <LibraryQuickJoin />

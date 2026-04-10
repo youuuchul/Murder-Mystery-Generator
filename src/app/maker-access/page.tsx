@@ -269,32 +269,35 @@ export default async function MakerAccessPage({ searchParams }: Props) {
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-dark-200">
+                로그인 ID
+                <span className="ml-2 text-xs font-normal text-dark-500">영소문자/숫자, 3~32자</span>
+              </span>
+              <input
+                type="text"
+                name="loginId"
+                required
+                autoFocus={!needsPassword}
+                maxLength={32}
+                pattern="[a-z0-9][a-z0-9._\-]{2,31}"
+                autoComplete="username"
+                className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
+                placeholder="로그인에 사용할 ID"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-dark-200">
                 작업자 이름
               </span>
               <input
                 type="text"
                 name="displayName"
                 required
-                autoFocus={!needsPassword}
                 defaultValue={currentUser?.displayName ?? ""}
                 maxLength={32}
                 autoComplete="nickname"
                 className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                placeholder="예: Alex, 스튜디오A"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-dark-200">
-                로그인 ID
-              </span>
-              <input
-                type="text"
-                name="loginId"
-                required
-                autoComplete="username"
-                className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-mystery-500"
-                placeholder="다른 기기에서도 계속 쓸 고정 ID"
+                placeholder="제작자로 노출되는 이름"
               />
             </label>
 
@@ -334,16 +337,11 @@ export default async function MakerAccessPage({ searchParams }: Props) {
               <input
                 type="email"
                 name="recoveryEmail"
+                pattern="[^@\s]+@[^@\s]+\.[^@\s]{2,}"
                 autoComplete="email"
-                className="w-full rounded-xl border border-emerald-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-emerald-500"
+                className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-red-500 valid:border-emerald-900 valid:focus:border-emerald-500"
                 placeholder="name@example.com"
               />
-              <div className="mt-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                비워두면 비밀번호를 찾을 수 없습니다.
-                <div className="mt-1 text-xs text-amber-200/80">
-                  나중에 내 게임 관리에서 추가할 수 있습니다.
-                </div>
-              </div>
             </label>
 
             {currentUser ? (

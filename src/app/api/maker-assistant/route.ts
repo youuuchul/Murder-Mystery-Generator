@@ -87,6 +87,12 @@ export async function POST(request: NextRequest) {
     const tags = getMakerAssistantTraceTags(payload.task, responseMode, payload.currentStep);
 
     const body = await startActiveObservation(traceName, async () => {
+      const traceInput = buildMakerAssistantTraceInput({
+        currentUser,
+        payload,
+        responseMode,
+      });
+
       return propagateAttributes({
         userId: currentUser.id,
         sessionId,
@@ -97,21 +103,12 @@ export async function POST(request: NextRequest) {
           gameId: payload.game.id,
           currentStep: String(payload.currentStep),
           responseMode,
+          task: payload.task,
+          route: "/api/maker-assistant",
+          gameTitle: payload.game.title.slice(0, 200),
+          traceInput: JSON.stringify(traceInput),
         },
       }, async () => {
-        updateActiveObservation({
-          input: buildMakerAssistantTraceInput({
-            currentUser,
-            payload,
-            responseMode,
-          }),
-          metadata: {
-            task: payload.task,
-            route: "/api/maker-assistant",
-            gameTitle: payload.game.title.slice(0, 200),
-          },
-        });
-
         try {
           const systemPrompt = buildMakerAssistantSystemPrompt(payload.task, responseMode);
           const userPrompt = buildMakerAssistantUserPrompt({
@@ -134,15 +131,18 @@ export async function POST(request: NextRequest) {
 
           const resolved = await resolveMakerAssistantResult(rawText, responseMode, payload.task);
 
+          const traceOutput = buildMakerAssistantTraceOutput({
+            result: resolved.result,
+            repairAttempts: resolved.repairAttempts,
+          });
+
+          // input/output을 한 번에 설정 (async 컨텍스트 유실 최소화)
           updateActiveObservation({
-            output: buildMakerAssistantTraceOutput({
-              result: resolved.result,
-              repairAttempts: resolved.repairAttempts,
-            }),
+            input: traceInput,
+            output: traceOutput,
             metadata: {
-              task: payload.task,
-              responseMode,
               repairAttempts: String(resolved.repairAttempts),
+              traceOutput: JSON.stringify(traceOutput),
             },
           });
 

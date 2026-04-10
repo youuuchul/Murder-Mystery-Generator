@@ -7,7 +7,7 @@ import {
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { getMakerAssistantChat } from "@/lib/ai/langchain-openai";
 import { classifyOpenAIError, isOpenAIApiError } from "@/lib/ai/openai-error";
-import { startLangfuseTracing } from "@/lib/ai/langfuse";
+import { startLangfuseTracing, forceFlushLangfuseTracing } from "@/lib/ai/langfuse";
 import { buildPlayerAgentVisibleContext } from "@/lib/ai/shared/player-agent-context";
 import { getGame } from "@/lib/game-repository";
 import { getSession, updateSession } from "@/lib/session-repository";
@@ -102,6 +102,13 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const traceName = `player-agent.chat.${aiPlayer.name}`;
     const reply = await startActiveObservation(traceName, async () => {
+      const traceInput = {
+        callerName,
+        targetName: aiPlayer.name,
+        message: body.message.slice(0, 200),
+        historyLength: conversationHistory.length,
+      };
+
       return propagateAttributes({
         userId: `player:${callerState.playerId}`,
         sessionId: `player-chat:${sessionId}`,
@@ -113,17 +120,9 @@ export async function POST(request: NextRequest, { params }: Params) {
           sessionId,
           callerPlayerId: callerState.playerId,
           targetPlayerId: body.targetPlayerId,
+          traceInput: JSON.stringify(traceInput),
         },
       }, async () => {
-        updateActiveObservation({
-          input: {
-            callerName,
-            targetName: aiPlayer.name,
-            message: body.message.slice(0, 200),
-            historyLength: conversationHistory.length,
-          },
-        });
-
         const systemPrompt = buildChatSystemPrompt(aiContext, aiPlayer.name);
         const messages = [
           new SystemMessage(systemPrompt),
@@ -145,8 +144,15 @@ export async function POST(request: NextRequest, { params }: Params) {
           throw new Error("AI 응답이 비어 있습니다.");
         }
 
+        const traceOutput = { reply: content.slice(0, 200), tokens: response.response_metadata?.tokenUsage };
+
+        // input/output을 한 번에 설정 (async 컨텍스트 유실 방지)
         updateActiveObservation({
-          output: { reply: content.slice(0, 200), tokens: response.response_metadata?.tokenUsage },
+          input: traceInput,
+          output: traceOutput,
+          metadata: {
+            traceOutput: JSON.stringify(traceOutput),
+          },
         });
 
         return content;
@@ -159,6 +165,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       { role: "user" as const, content: `[${callerName}]: ${body.message.trim()}`, createdAt: new Date().toISOString() },
       { role: "assistant" as const, content: reply, createdAt: new Date().toISOString() },
     ].slice(-MAX_CONVERSATION_HISTORY * 2);
+
+    await forceFlushLangfuseTracing().catch(() => {});
 
     // 세션에 대화 이력 저장
     await saveConversationHistory(session, body.targetPlayerId, newHistory);

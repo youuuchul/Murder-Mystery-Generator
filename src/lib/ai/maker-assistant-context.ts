@@ -120,36 +120,54 @@ export function buildMakerAssistantContext(
     return context;
   }
 
-  context.players = normalizedGame.players.map((player) => ({
-    id: player.id,
-    name: player.name,
-    background: player.background,
-    story: player.story,
-    secret: player.secret,
-    victoryCondition: player.victoryCondition,
-    personalGoal: player.personalGoal ?? "",
-    timeline: mapTimelineEntries(player.timelineEntries, slotMap),
-    relatedClues: player.relatedClues,
-  }));
+  // Step별 컨텍스트 최적화: 불필요한 데이터를 줄여 토큰 사용을 절감한다.
+  const needsFullPlayers = currentStep === 3 || task === "validate_consistency" || task === "suggest_clues";
+  const needsLocations = currentStep === 4 || task === "validate_consistency" || task === "suggest_clues";
+  const needsClues = currentStep === 4 || task === "validate_consistency" || task === "suggest_clues";
 
-  context.locations = normalizedGame.locations.map((location) => ({
-    id: location.id,
-    name: location.name,
-    description: location.description,
-    ownerPlayerId: location.ownerPlayerId ?? "",
-    unlocksAtRound: location.unlocksAtRound,
-    clueIds: location.clueIds,
-  }));
+  if (needsFullPlayers) {
+    context.players = normalizedGame.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      background: player.background,
+      story: player.story,
+      secret: player.secret,
+      victoryCondition: player.victoryCondition,
+      personalGoal: player.personalGoal ?? "",
+      timeline: mapTimelineEntries(player.timelineEntries, slotMap),
+      relatedClues: player.relatedClues,
+    }));
+  } else if (currentStep !== 1) {
+    // Step 1은 players 불필요. 나머지는 이름+ID만 제공 (참조용).
+    context.players = normalizedGame.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      victoryCondition: player.victoryCondition,
+    }));
+  }
 
-  context.clues = normalizedGame.clues.map((clue) => ({
-    id: clue.id,
-    title: clue.title,
-    description: clue.description,
-    type: clue.type,
-    locationId: clue.locationId,
-    locationName:
-      normalizedGame.locations.find((location) => location.id === clue.locationId)?.name ?? "",
-  }));
+  if (needsLocations) {
+    context.locations = normalizedGame.locations.map((location) => ({
+      id: location.id,
+      name: location.name,
+      description: location.description,
+      ownerPlayerId: location.ownerPlayerId ?? "",
+      unlocksAtRound: location.unlocksAtRound,
+      clueIds: location.clueIds,
+    }));
+  }
+
+  if (needsClues) {
+    context.clues = normalizedGame.clues.map((clue) => ({
+      id: clue.id,
+      title: clue.title,
+      description: clue.description,
+      type: clue.type,
+      locationId: clue.locationId,
+      locationName:
+        normalizedGame.locations.find((location) => location.id === clue.locationId)?.name ?? "",
+    }));
+  }
 
   return context;
 }

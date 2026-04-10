@@ -70,7 +70,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                 ) : null}
                 <Link
                   href="/library/manage"
-                  className="rounded-md border border-dark-700 px-3 py-1.5 text-sm text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                  className="rounded-md border border-mystery-800/60 bg-mystery-950/30 px-3 py-1.5 text-sm text-mystery-200 transition-colors hover:border-mystery-600 hover:text-mystery-50"
                 >
                   내 게임 관리
                 </Link>
@@ -78,7 +78,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             ) : (
               <Link
                 href={buildMakerAccessPath("/library/manage")}
-                className="rounded-md border border-dark-700 px-3 py-1.5 text-sm text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
+                className="rounded-md border border-mystery-800/60 bg-mystery-950/30 px-3 py-1.5 text-sm text-mystery-200 transition-colors hover:border-mystery-600 hover:text-mystery-50"
               >
                 제작자 로그인
               </Link>
@@ -101,7 +101,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
               </span>
             )}
             <span className="rounded-full border border-mystery-800/60 bg-mystery-950/30 px-3 py-1 text-mystery-300/80">
-              누구나 직접 제작 가능
+              회원가입 후 직접 제작
             </span>
           </div>
           <LibraryQuickJoin />

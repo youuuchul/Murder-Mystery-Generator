@@ -47,9 +47,7 @@ export default function MakerAccountMenu({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-dark-50">계정 정보</p>
-              <p className="mt-1 text-xs leading-5 text-dark-400">
-                다른 기기에서는 로그인 ID와 계정 비밀번호로 같은 작업 환경에 다시 들어올 수 있습니다.
-              </p>
+              <p className="mt-1 font-mono text-[11px] text-dark-500">{currentUser.id}</p>
             </div>
             {isMakerAdmin(currentUser) ? (
               <span className="rounded-full border border-amber-800 bg-amber-950/50 px-3 py-1 text-[11px] font-medium text-amber-300">
@@ -123,16 +121,12 @@ export default function MakerAccountMenu({
                       name="recoveryEmail"
                       defaultValue={currentAccount.recoveryEmail ?? ""}
                       autoComplete="email"
-                      className="w-full rounded-xl border border-emerald-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-emerald-500"
+                      className="w-full rounded-xl border border-red-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-red-500 valid:border-emerald-900 valid:focus:border-emerald-500"
                       placeholder="name@example.com"
                     />
                   </label>
 
-                  {currentAccount.recoveryEmail ? (
-                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
-                      로그인 화면에서 메일로 재설정 링크를 받을 수 있습니다.
-                    </div>
-                  ) : (
+                  {!currentAccount.recoveryEmail && (
                     <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                       비워두면 비밀번호를 찾을 수 없습니다.
                     </div>
@@ -149,9 +143,6 @@ export default function MakerAccountMenu({
 
               <div className="rounded-2xl border border-dark-800 bg-dark-950/70 p-4">
                 <p className="text-sm font-medium text-dark-100">비밀번호 변경</p>
-                <p className="mt-1 text-xs text-dark-400">
-                  현재 비밀번호를 확인한 뒤 새 비밀번호로 바꿉니다.
-                </p>
                 <form action="/api/maker-access" method="post" className="mt-4 space-y-3">
                   <input type="hidden" name="intent" value="change_password" />
                   <input type="hidden" name="next" value={nextPath} />
@@ -198,7 +189,7 @@ export default function MakerAccountMenu({
                     type="submit"
                     className="w-full rounded-xl border border-dark-700 bg-dark-800 px-4 py-3 text-sm font-medium text-dark-100 transition hover:border-dark-500 hover:bg-dark-700"
                   >
-                    새 비밀번호 저장
+                    비밀번호 변경
                   </button>
                 </form>
               </div>

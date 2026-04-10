@@ -346,25 +346,12 @@ export default async function MakerAccessPage({ searchParams }: Props) {
               </div>
             </label>
 
-            {!currentUser ? (
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-dark-200">
-                  기존 작업자 키
-                  <span className="ml-2 text-xs font-normal text-dark-500">선택 입력</span>
-                </span>
-                <input
-                  type="text"
-                  name="recoveryKey"
-                  className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 font-mono text-xs text-dark-50 outline-none transition focus:border-mystery-500"
-                  placeholder="기존 ownerId 를 새 계정으로 옮길 때만 입력"
-                />
-              </label>
-            ) : (
+            {currentUser ? (
               <div className="rounded-2xl border border-dark-800 bg-dark-950/80 px-4 py-3 text-xs leading-5 text-dark-400">
                 현재 작업자 세션에 계정을 연결합니다.
                 <div className="mt-2 font-mono text-dark-200">{currentUser.id}</div>
               </div>
-            )}
+            ) : null}
 
             {needsPassword ? (
               <label className="block">

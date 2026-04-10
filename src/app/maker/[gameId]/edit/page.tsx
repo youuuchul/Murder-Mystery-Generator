@@ -5,6 +5,8 @@ import { getGame, saveGame } from "@/lib/game-repository";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import MakerEditor from "./_components/MakerEditor";
 
+export const dynamic = "force-dynamic";
+
 type Props = { params: Promise<{ gameId: string }> };
 
 export default async function EditGamePage({ params }: Props) {

@@ -60,10 +60,6 @@ export default async function EditGamePage({ params }: Props) {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-6 rounded-2xl border border-dark-700/80 bg-dark-900/60 px-5 py-4">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-dark-500">Save Status</p>
-          <p className="mt-2 text-sm text-dark-100">지금 보고 있는 내용은 온라인에 저장된 편집본입니다.</p>
-        </div>
         <MakerEditor initialGame={editableGame.game} />
       </main>
     </div>

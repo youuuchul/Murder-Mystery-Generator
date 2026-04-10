@@ -459,23 +459,20 @@ function CardDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="bg-dark-900 border-t border-dark-700 rounded-t-3xl p-6 space-y-5 max-h-[80vh] overflow-y-auto"
+        className="bg-dark-900 border border-dark-700 rounded-2xl p-5 sm:p-6 space-y-4 w-full max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 카드 헤더 */}
-        <div className="flex items-start gap-4">
-          <div className="flex-1">
-            <p className="font-bold text-dark-50 text-lg leading-tight">{clue?.title ?? "(제목 없음)"}</p>
-            <p className="text-xs text-dark-500 mt-0.5">
-              {typeLabel[clue?.type ?? ""] ?? clue?.type}
-              {item.fromPlayerId && " · 이전받음"}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-dark-500 hover:text-dark-300 text-sm leading-none">닫기</button>
+        <div>
+          <p className="font-bold text-dark-50 text-lg leading-tight">{clue?.title ?? "(제목 없음)"}</p>
+          <p className="text-xs text-dark-500 mt-1">
+            {typeLabel[clue?.type ?? ""] ?? clue?.type}
+            {item.fromPlayerId && " · 이전받음"}
+          </p>
         </div>
 
         {/* 카드 내용 */}
@@ -547,19 +544,16 @@ function SceneClueModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="bg-dark-900 border-t border-dark-700 rounded-t-3xl p-6 space-y-5 max-h-[80vh] overflow-y-auto"
+        className="bg-dark-900 border border-dark-700 rounded-2xl p-5 sm:p-6 space-y-4 w-full max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-4">
-          <div className="flex-1">
-            <p className="font-bold text-dark-50 text-lg leading-tight">{clue.title || "(제목 없음)"}</p>
-            <p className="text-xs text-dark-500 mt-0.5">현장 단서</p>
-          </div>
-          <button onClick={onClose} className="text-dark-500 hover:text-dark-300 text-sm leading-none">닫기</button>
+        <div>
+          <p className="font-bold text-dark-50 text-lg leading-tight">{clue.title || "(제목 없음)"}</p>
+          <p className="text-xs text-dark-500 mt-1">현장 단서</p>
         </div>
 
         <div className="bg-dark-800 rounded-xl p-4 space-y-4">

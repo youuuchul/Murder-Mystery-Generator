@@ -122,7 +122,7 @@ export default function MakerAccountMenu({
                       pattern="[^@\s]+@[^@\s]+\.[^@\s]{2,}"
                       defaultValue={currentAccount.recoveryEmail ?? ""}
                       autoComplete="email"
-                      className="w-full rounded-xl border border-red-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-red-500 valid:border-emerald-900 valid:focus:border-emerald-500"
+                      className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-dark-500 [&:not(:placeholder-shown):invalid]:border-red-900 [&:not(:placeholder-shown):invalid]:focus:border-red-500 [&:not(:placeholder-shown):valid]:border-emerald-900 [&:not(:placeholder-shown):valid]:focus:border-emerald-500"
                       placeholder="name@example.com"
                     />
                   </label>

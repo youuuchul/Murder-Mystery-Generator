@@ -54,12 +54,11 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
           <span>인원 {game.settings.playerCount}인</span>
           <span>시간 {game.settings.estimatedDuration}분</span>
           {ownerDisplayName ? <span>제작자 : {ownerDisplayName}</span> : null}
-          {tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-dark-300">
-              #{tag}
-            </span>
-          ))}
         </div>
+
+        {tags.length > 0 && (
+          <TagBadges tags={tags} max={10} visibleMax={5} />
+        )}
 
         <div className="grid gap-2 sm:grid-cols-2">
           <Link
@@ -76,6 +75,36 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
           </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TagBadges({ tags, max, visibleMax }: { tags: string[]; max: number; visibleMax: number }) {
+  const capped = tags.slice(0, max);
+  const visible = capped.slice(0, visibleMax);
+  const hiddenCount = capped.length - visible.length;
+
+  return (
+    <div className="group/tags relative flex flex-wrap gap-1.5 text-xs">
+      {visible.map((tag) => (
+        <span key={tag} className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-dark-300">
+          #{tag}
+        </span>
+      ))}
+      {hiddenCount > 0 && (
+        <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-dark-500 cursor-default">
+          +{hiddenCount}
+        </span>
+      )}
+      {hiddenCount > 0 && (
+        <div className="pointer-events-none absolute left-0 top-full z-10 mt-1 hidden flex-wrap gap-1.5 rounded-xl border border-dark-700 bg-dark-900 p-2 shadow-lg group-hover/tags:flex">
+          {capped.slice(visibleMax).map((tag) => (
+            <span key={tag} className="rounded-full border border-dark-700 bg-dark-800 px-2 py-0.5 text-dark-300">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

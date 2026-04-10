@@ -87,7 +87,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
   function addTag(raw: string) {
     const tag = raw.trim();
-    if (!tag || settings.tags.includes(tag)) return;
+    if (!tag || settings.tags.includes(tag) || settings.tags.length >= 10) return;
     updateSettings("tags", [...settings.tags, tag]);
     setTagInput("");
   }
@@ -258,7 +258,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       </div>
 
       <div data-maker-anchor="step-1-tags">
-        <label className="block text-sm font-medium text-dark-200 mb-3">태그</label>
+        <label className="block text-sm font-medium text-dark-200 mb-3">
+          태그
+          <span className="ml-2 text-xs font-normal text-dark-500">{settings.tags.length}/10</span>
+        </label>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {settings.tags.length === 0 && (

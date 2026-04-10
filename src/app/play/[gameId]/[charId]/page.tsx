@@ -2298,9 +2298,16 @@ export default function PlayerView() {
                 aiSlots={
                   sharedState?.characterSlots
                     ?.filter((slot) => slot.isAiControlled && slot.isLocked)
-                    .map((slot) => ({ playerId: slot.playerId, playerName: slot.playerName ?? null }))
+                    .map((slot) => {
+                      const character = game.players.find((p) => p.id === slot.playerId);
+                      return {
+                        playerId: slot.playerId,
+                        playerName: character?.name ?? slot.playerName ?? "AI",
+                      };
+                    })
                   ?? []
                 }
+                maxGroupSize={game.rules?.privateChat?.maxGroupSize ?? 2}
               />
             )}
 

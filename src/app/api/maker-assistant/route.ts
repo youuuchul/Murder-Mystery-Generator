@@ -11,7 +11,7 @@ import {
   isMakerAssistantEnabled,
 } from "@/lib/ai/langchain-openai";
 import { classifyOpenAIError, isOpenAIApiError } from "@/lib/ai/openai-error";
-import { startLangfuseTracing } from "@/lib/ai/langfuse";
+import { startLangfuseTracing, forceFlushLangfuseTracing } from "@/lib/ai/langfuse";
 import { buildMakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import { resolveMakerAssistantResponseMode } from "@/lib/ai/maker-assistant-response-mode";
 import {
@@ -165,6 +165,9 @@ export async function POST(request: NextRequest) {
         }
       });
     });
+
+    // Vercel 서버리스에서 응답 전에 trace가 flush되도록 보장
+    await forceFlushLangfuseTracing().catch(() => {});
 
     return NextResponse.json(body);
   } catch (error) {

@@ -60,10 +60,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "대상 AI 캐릭터를 찾을 수 없습니다." }, { status: 400 });
     }
 
-    // AI 캐릭터의 PlayerState 찾기
-    const aiPlayerState = session.playerStates?.find((ps) => ps.playerId === body.targetPlayerId);
+    // AI 캐릭터의 PlayerState 찾기 (없으면 빈 상태로 생성)
+    let aiPlayerState = session.playerStates?.find((ps) => ps.playerId === body.targetPlayerId);
     if (!aiPlayerState) {
-      return NextResponse.json({ error: "AI 캐릭터 상태를 찾을 수 없습니다." }, { status: 400 });
+      aiPlayerState = {
+        token: `ai-${body.targetPlayerId}-chat`,
+        playerId: body.targetPlayerId,
+        playerName: targetSlot.playerName ?? "AI",
+        inventory: [],
+        transferLog: [],
+        roundAcquired: {},
+        roundVisitedLocations: {},
+      };
     }
 
     // AI 캐릭터 정보 로드
@@ -220,23 +228,43 @@ async function saveConversationHistory(
   targetPlayerId: string,
   history: PlayerAgentConversationTurn[]
 ): Promise<void> {
+  // playerAgentState가 없으면 대화 이력만 로컬에서 관리 (세션 업데이트 생략)
   if (!session.playerAgentState) return;
 
-  const updatedSlots = session.playerAgentState.slots.map((slot) => {
-    if (slot.playerId === targetPlayerId) {
-      return { ...slot, conversationHistory: history };
-    }
-    return slot;
-  });
+  const slotExists = session.playerAgentState.slots.some((slot) => slot.playerId === targetPlayerId);
 
-  const updatedSession: GameSession = {
-    ...session,
-    playerAgentState: {
-      ...session.playerAgentState,
-      slots: updatedSlots,
-    },
-    updatedAt: new Date().toISOString(),
-  };
+  const updatedSlots = slotExists
+    ? session.playerAgentState.slots.map((slot) => {
+        if (slot.playerId === targetPlayerId) {
+          return { ...slot, conversationHistory: history };
+        }
+        return slot;
+      })
+    : [
+        ...session.playerAgentState.slots,
+        {
+          playerId: targetPlayerId,
+          enabled: true,
+          runtimeStatus: "idle" as const,
+          conversationHistory: history,
+          knownCardIds: [],
+          actionState: {},
+        },
+      ];
 
-  await updateSession(updatedSession);
+  try {
+    const updatedSession: GameSession = {
+      ...session,
+      playerAgentState: {
+        ...session.playerAgentState,
+        slots: updatedSlots,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateSession(updatedSession);
+  } catch (error) {
+    // 세션 업데이트 실패해도 채팅 응답은 정상 반환 (대화 이력은 다음에 다시 시도)
+    console.error("[chat] Failed to save conversation history:", error);
+  }
 }

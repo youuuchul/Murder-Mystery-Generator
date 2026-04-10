@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   applyPlayerAgentAutoAcquireReaction,
   tracePlayerAgentAutoAcquireOutcome,
+  type PlayerAgentAutoAcquireOutcome,
 } from "@/lib/ai/player-agent/actions/auto-actions";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
@@ -306,16 +307,26 @@ export async function POST(req: NextRequest, { params }: Params) {
             type: "card_received",
           });
 
-          const autoAcquireOutcome = applyPlayerAgentAutoAcquireReaction(
-            latestSession,
-            game,
-            {
-              triggerPlayerId: latestPlayerState.playerId,
-              trigger: "human_clue_acquired",
-            }
-          );
+          // 모든 AI 플레이어가 각각 1개씩 단서를 획득하도록 반복 호출
+          const autoAcquireOutcomes: PlayerAgentAutoAcquireOutcome[] = [];
+          const aiSlotCount = latestSession.sharedState.characterSlots.filter(
+            (slot) => slot.isAiControlled && slot.isLocked
+          ).length;
 
-          return { autoAcquireOutcome };
+          for (let i = 0; i < aiSlotCount; i++) {
+            const outcome = applyPlayerAgentAutoAcquireReaction(
+              latestSession,
+              game,
+              {
+                triggerPlayerId: latestPlayerState.playerId,
+                trigger: "human_clue_acquired",
+              }
+            );
+            autoAcquireOutcomes.push(outcome);
+            if (!outcome.acted) break; // 더 이상 가능한 AI가 없으면 중단
+          }
+
+          return { autoAcquireOutcome: autoAcquireOutcomes[0] ?? { acted: false, trigger: "human_clue_acquired" }, autoAcquireOutcomes };
         }
       );
 
@@ -332,15 +343,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         roundVisitedLocations: persistedPlayerState.roundVisitedLocations,
       });
 
-      await tracePlayerAgentAutoAcquireOutcome({
-        session: {
-          id: persistedSession.id,
-          gameId: persistedSession.gameId,
-          mode: persistedSession.mode,
-          sharedState: persistedSession.sharedState,
-        },
-        outcome: result.autoAcquireOutcome,
-      });
+      for (const outcome of result.autoAcquireOutcomes ?? [result.autoAcquireOutcome]) {
+        await tracePlayerAgentAutoAcquireOutcome({
+          session: {
+            id: persistedSession.id,
+            gameId: persistedSession.gameId,
+            mode: persistedSession.mode,
+            sharedState: persistedSession.sharedState,
+          },
+          outcome,
+        });
+      }
 
       return NextResponse.json({ card: persistedCard });
     } catch (error) {

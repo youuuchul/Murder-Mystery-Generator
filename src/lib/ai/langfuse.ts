@@ -106,6 +106,16 @@ export async function flushLangfuseTracing(): Promise<void> {
   await globalThis.__murderMysteryLangfuseSdk?.shutdown();
 }
 
+/** SDK를 종료하지 않고 현재 대기 중인 span만 강제 전송한다. 서버리스 응답 직전에 사용. */
+export async function forceFlushLangfuseTracing(): Promise<void> {
+  await globalThis.__murderMysteryLangfuseStartPromise;
+  // NodeSDK의 내부 span processor에 flush 요청
+  const sdk = globalThis.__murderMysteryLangfuseSdk;
+  if (sdk && typeof (sdk as unknown as { _tracerProvider?: { forceFlush?: () => Promise<void> } })._tracerProvider?.forceFlush === "function") {
+    await (sdk as unknown as { _tracerProvider: { forceFlush: () => Promise<void> } })._tracerProvider.forceFlush();
+  }
+}
+
 /**
  * trace 에 남길 문자열에서 이메일과 주요 API 키 패턴을 가린다.
  * 메이커 도우미 프롬프트 디버깅 가치는 유지하면서 계정 정보 누출만 줄인다.

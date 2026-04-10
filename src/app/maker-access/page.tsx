@@ -499,10 +499,17 @@ export default async function MakerAccessPage({ searchParams }: Props) {
         ) : null}
 
 
-        <p className="mt-5 text-xs leading-5 text-dark-500">
-          계정 로그인 이후에도 브라우저에는 작업자 세션 쿠키가 저장됩니다.
-          메이커 공통 비밀번호 게이트가 켜져 있으면 접근 쿠키도 함께 저장됩니다.
-        </p>
+        <div className="mt-5 space-y-2 text-xs leading-5 text-dark-500">
+          <p>
+            회원가입 시 아이디, 비밀번호, 작업자 이름을 수집하며, 복구 이메일은 선택 항목입니다.
+            가입을 완료하면 위 항목의 수집 및 이용에 동의한 것으로 간주됩니다.
+          </p>
+          <p>
+            저작권, 데이터 관리 등 서비스 이용 정책은{" "}
+            <a href="/guide" className="text-dark-400 underline underline-offset-2 hover:text-dark-200">사용 가이드</a>
+            에서 확인하세요.
+          </p>
+        </div>
       </div>
     </div>
   );

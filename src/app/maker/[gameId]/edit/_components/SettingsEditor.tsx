@@ -567,21 +567,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-dark-400">밀담 가능 시간</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={1}
-                      max={15}
-                      step={1}
-                      value={privateChat.durationMinutes}
-                      onChange={(e) => updatePrivateChat({ durationMinutes: Number(e.target.value) })}
-                      className="w-24 accent-mystery-500"
-                    />
-                    <span className="text-dark-300 text-xs w-8 text-right">{privateChat.durationMinutes}분</span>
-                  </div>
-                </div>
               </div>
             )}
           </div>

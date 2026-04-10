@@ -206,6 +206,14 @@ function buildChatSystemPrompt(
     .map((p) => p.playerName ?? "알 수 없음")
     .join(", ");
 
+  const relationshipLines = player.relationships.length > 0
+    ? player.relationships.map((r) => `- ${r.targetName}: ${r.description}`).join("\n")
+    : "없음";
+
+  const scoreLines = player.scoreConditions.length > 0
+    ? player.scoreConditions.map((s) => `- ${s.description} (${s.points}점)`).join("\n")
+    : "없음";
+
   return [
     `당신은 머더미스터리 게임의 캐릭터 "${characterName}"입니다.`,
     `아래 설정에 맞는 말투와 성격으로 대화하세요.`,
@@ -219,8 +227,13 @@ function buildChatSystemPrompt(
     `[비밀]`,
     player.secret,
     "",
+    `[인물 관계]`,
+    relationshipLines,
+    "",
     `[승리 조건] ${player.victoryCondition}`,
     player.personalGoal ? `[개인 목표] ${player.personalGoal}` : "",
+    `[승점 조건]`,
+    scoreLines,
     "",
     `[보유 단서] ${inventory.length > 0 ? inventory.map((c) => c.title).join(", ") : "없음"}`,
     `[다른 참가자] ${otherPlayers || "없음"}`,

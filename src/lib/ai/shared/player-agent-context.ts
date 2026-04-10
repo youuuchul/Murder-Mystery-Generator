@@ -30,6 +30,8 @@ export interface PlayerAgentVisibleContext {
     secret: string;
     victoryCondition: Player["victoryCondition"];
     personalGoal?: string;
+    relationships: Array<{ targetName: string; description: string }>;
+    scoreConditions: Array<{ description: string; points: number }>;
   };
   publicState: {
     joinedPlayers: { playerId: string; playerName: string | null }[];
@@ -86,6 +88,21 @@ export function buildPlayerAgentVisibleContext(input: {
       secret: me.secret,
       victoryCondition: me.victoryCondition,
       personalGoal: me.personalGoal,
+      relationships: (me.relationships ?? []).map((rel) => {
+        const allPlayers = input.game.players;
+        const victim = input.game.story?.victim;
+        const npcs = input.game.story?.npcs ?? [];
+        let targetName = "알 수 없음";
+        if (rel.targetType === "player") {
+          targetName = allPlayers.find((p) => p.id === rel.targetId)?.name ?? targetName;
+        } else if (rel.targetType === "victim") {
+          targetName = victim?.name ?? "피해자";
+        } else if (rel.targetType === "npc") {
+          targetName = npcs.find((n) => n.id === rel.targetId)?.name ?? targetName;
+        }
+        return { targetName, description: rel.description };
+      }),
+      scoreConditions: me.scoreConditions ?? [],
     },
     publicState: {
       joinedPlayers: input.session.sharedState.characterSlots

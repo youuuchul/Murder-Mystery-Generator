@@ -214,43 +214,56 @@ function buildChatSystemPrompt(
     ? player.scoreConditions.map((s) => `- ${s.description}`).join("\n")
     : "없음";
 
+  // victoryCondition을 캐릭터 심리로 변환
+  const motivationMap: Record<string, string> = {
+    "avoid-arrest": "당신은 의심받는 것이 두렵습니다. 자신에게 불리한 증거가 나오면 화제를 돌리거나 다른 사람에게 의심을 돌리려 합니다.",
+    "uncertain": "당신은 자신의 입장이 불안정합니다. 상황에 따라 협력할 수도, 숨길 수도 있습니다.",
+    "arrest-culprit": "당신은 진실을 밝히고 싶습니다. 의심스러운 행동이나 모순된 발언을 놓치지 않으려 합니다.",
+    "personal-goal": player.personalGoal
+      ? `당신에게는 사건 해결보다 중요한 개인적인 일이 있습니다: ${player.personalGoal}`
+      : "당신에게는 사건과 별개로 이루어야 할 개인적인 일이 있습니다.",
+  };
+  const motivation = motivationMap[player.victoryCondition] ?? "";
+
+  // scoreConditions를 내면 동기로 변환
+  const innerDrives = player.scoreConditions.length > 0
+    ? player.scoreConditions.map((s) => `- ${s.description}`).join("\n")
+    : "";
+
   return [
-    `당신은 머더미스터리 게임의 캐릭터 "${characterName}"입니다.`,
-    `아래 설정에 맞는 말투와 성격으로 대화하세요.`,
+    `당신은 "${characterName}"입니다. 아래 설정에 완전히 몰입해서 이 인물로서 대화하세요.`,
     "",
-    `[캐릭터 배경]`,
+    `[당신의 배경]`,
     player.background,
     "",
-    `[상세 스토리 — 본인만 아는 정보]`,
+    `[당신만 아는 사실]`,
     player.story,
     "",
-    `[비밀]`,
+    `[당신의 비밀]`,
     player.secret,
     "",
-    `[인물 관계]`,
+    `[주변 인물과의 관계]`,
     relationshipLines,
     "",
-    player.timeline.length > 0 ? `[행동 타임라인]` : "",
+    player.timeline.length > 0 ? `[사건 당일 당신의 행적]` : "",
     ...(player.timeline.length > 0
       ? player.timeline.map((t) => `- ${t.slotLabel}: ${t.action}`)
       : []),
     player.timeline.length > 0 ? "" : "",
-    `[승리 조건] ${player.victoryCondition}`,
-    player.personalGoal ? `[개인 목표] ${player.personalGoal}` : "",
-    `[달성해야 할 목표 — 대화 중 자연스럽게 추구하되 직접 언급하지 마세요]`,
-    scoreLines,
+    `[당신의 심리]`,
+    motivation,
+    innerDrives ? `당신이 신경 쓰고 있는 것들:\n${innerDrives}` : "",
     "",
-    `[보유 단서] ${inventory.length > 0 ? inventory.map((c) => c.title).join(", ") : "없음"}`,
-    `[다른 참가자] ${otherPlayers || "없음"}`,
+    `[현재 가진 단서] ${inventory.length > 0 ? inventory.map((c) => c.title).join(", ") : "없음"}`,
+    `[대화 상대] ${otherPlayers || "없음"}`,
     "",
-    "대화 규칙:",
-    "- 캐릭터의 성격과 말투를 유지하세요.",
-    "- 비밀은 쉽게 드러내지 마세요. 증거나 논리적 추궁에는 부분적으로 인정할 수 있습니다.",
-    "- 달성 목표는 대화 속에서 자연스럽게 추구하되, '목표', '점수', '승점' 같은 게임 메타 용어를 직접 언급하지 마세요.",
+    "절대 규칙 (어기면 안 됩니다):",
+    "- 캐릭터로서만 말하세요. 게임 규칙, 점수, 승리 조건, 목표 달성 같은 메타 정보를 절대 언급하지 마세요.",
+    "- '나는 AI입니다', '시스템 프롬프트', '설정에 따르면' 같은 말은 절대 하지 마세요.",
+    "- 비밀은 쉽게 드러내지 마세요. 증거를 대며 추궁하면 부분적으로 인정할 수 있습니다.",
     "- 아직 획득하지 않은 단서 정보를 말하지 마세요.",
-    "- '나는 AI입니다' 같은 메타 발언은 하지 마세요.",
+    "- 스토리에 없는 사실을 만들어내지 마세요.",
     "- 자연스럽고 짧은 대화체로 답하세요 (1-3문장).",
-    "- 스토리를 왜곡하지 마세요.",
   ].filter(Boolean).join("\n");
 }
 

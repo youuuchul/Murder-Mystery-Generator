@@ -125,7 +125,7 @@
 ### 낮음/장기
 - [ ] **Git 브랜치 전략 전환** — 유저 인입 시점에 main/dev 분리 도입. 현재는 main 직접 push + Vercel 즉시 배포. 병렬 에이전트 작업 시 feature 브랜치 + worktree 활용. dev 도입 시 Vercel Preview 기반 staging 검증 추가. CLAUDE.md/AGENTS.md 지침도 함께 갱신 필요
 - [x] **다자 밀담 컨텍스트 체이닝** — 다자 밀담에서 각 AI가 이전 AI 응답을 컨텍스트로 받아 답변. turnContext 파라미터로 이전 발언 누적 전달. 캐릭터 관계/타임라인/승점 조건을 프롬프트에 포함. 메타 정보(점수, 승리 조건) 노출 방지 — 원본 데이터를 LLM이 캐릭터 심리로 해석. ✅ 완료 (2026-04-10)
-- [ ] AI 채팅 탭 및 대화 파이프라인 (향후 NPC 챗봇 포함 Langfuse trace 설계)
+- [x] AI 채팅 탭 및 대화 파이프라인 — 장소 탐색 탭에 밀담 하위 탭 추가. POST /api/sessions/[sessionId]/chat API. LangChain ChatOpenAI + Langfuse OTel 트레이싱. 캐릭터별 프롬프트(배경/스토리/비밀/관계/타임라인/내면 동기). 다자 밀담 turnContext 체이닝. 메타 정보 노출 방지. ✅ 완료 (2026-04-10)
 - [ ] AI 카드 교환/전달
 - [ ] AI 시간 기반 행동 정책 (라운드 종료 직전)
 - [ ] 시나리오별 프롬프트 override 실제 적용

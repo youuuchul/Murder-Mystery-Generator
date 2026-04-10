@@ -1,264 +1,199 @@
 # AI Layer README
 
-메이커용 LLM 제작 도우미와 이후 `RAG + LLM` 확장 기준을 정리한 소스 코드 근처 문서다.
+메이커용 LLM 제작 도우미와 AI 플레이어 채팅 파이프라인을 정리한 소스 코드 근처 문서다.
 
 ## 1. 현재 상태
 
-- 현재 구현 범위는 `메이커 제작 도우미 V1`이다.
-- 현재 구조는 `RAG 없음`이다.
-- 메이커 편집기의 현재 로컬 `game` 상태를 그대로 서버로 보내고, 서버가 축약 컨텍스트를 만든 뒤 OpenAI Responses API를 호출한다.
-- 기본 모델은 `gpt-5-mini`다.
+- **메이커 제작 도우미 V2**: LangChain ChatOpenAI 기반. 스트리밍 응답 지원.
+- **AI 플레이어 채팅**: LangChain ChatOpenAI 기반. 캐릭터별 프롬프트. 다자 밀담 체이닝.
+- **AI 플레이어 자동 행동**: 규칙 기반 (단서 획득, 투표). LLM 미사용.
+- **공통 LLM**: `gpt-5-mini` (reasoning 모델). `@langchain/openai` ChatOpenAI.
+- **트레이싱**: Langfuse OTel (startActiveObservation + span.setAttribute).
+- **DB**: 정규화 테이블 기반 (game_players, game_clues 등 15개 테이블).
 
-즉, 지금은 `retrieval 기반 검색 시스템`이 아니라 `현재 작성 중인 게임 JSON을 직접 읽는 context-injection 구조`다.
+## 2. 아키텍처 개요
 
-## 2. 현재 아키텍처
+```
+[메이커 AI 도우미]
+MakerEditor → useMakerAssistant (stream:true)
+  → POST /api/maker-assistant
+    → buildMakerAssistantContext (step별 최적화)
+    → LangChain ChatOpenAI.stream() → SSE 응답
+    → parseMakerAssistantResult (guide/draft)
+    → Langfuse OTel trace
 
-```mermaid
-flowchart LR
-  A["MakerEditor local game state"] --> B["useMakerAssistant"]
-  B --> C["POST /api/maker-assistant"]
-  C --> D["buildMakerAssistantContext"]
-  D --> E["resolveMakerAssistantResponseMode"]
-  E --> F["buildMakerAssistantSystemPrompt / UserPrompt"]
-  F --> G["OpenAI Responses API (gpt-5-mini)"]
-  G --> H["extractResponseText"]
-  H --> I["parseMakerAssistantResult(mode-aware)"]
-  I --> J["Assistant drawer UI"]
+[AI 플레이어 채팅 (밀담)]
+AiChatPanel → POST /api/sessions/[sessionId]/chat
+  → 권한 검증 (token + AI slot)
+  → buildPlayerAgentVisibleContext (데이터 격리)
+  → buildChatSystemPrompt (캐릭터 프롬프트)
+  → LangChain ChatOpenAI.invoke()
+  → turnContext 체이닝 (다자 밀담)
+  → conversationHistory 세션 저장
+  → Langfuse OTel trace
+
+[AI 플레이어 자동 행동]
+cards/route.ts → applyPlayerAgentAutoAcquireReaction (규칙 기반)
+  → 전 AI 플레이어 루프 (1회 트리거 → N명 획득)
+  → Langfuse trace
 ```
 
-### 처리 흐름
+## 3. LangChain 사용 현황
 
-1. 메이커 화면에서 빠른 액션 또는 자유 질문을 보낸다.
-2. 클라이언트는 현재 저장 전 로컬 `game` 상태를 `/api/maker-assistant`로 전송한다.
-3. 서버는 `game` 전체를 그대로 넘기지 않고, 검증 요약과 핵심 필드만 포함한 축약 컨텍스트를 생성한다.
-4. chat 요청이면 `자동 / 가이드 / 문안` 설정과 질문 문장을 바탕으로 응답 모드를 결정한다.
-5. 후속 질문 맥락은 Responses API 서버 상태 대신 최근 대화 8턴을 직접 prompt에 포함하는 방식으로 유지한다.
-6. `draft` 요청이면 서사형 산문 / 설명형 텍스트 / GM 진행문 프로필 중 하나를 추론해 문체 규칙을 강화한다.
-7. 모델 응답은 우선 그대로 파싱하고, 형식이 깨지면 모드별 line-based 포맷으로 한 번 더 복구한다.
-8. 프론트는 `guide` 면 분석 카드, `draft` 면 붙여넣기용 본문 카드로 분리 렌더링한다.
+| 패키지 | 버전 | 용도 |
+|--------|------|------|
+| `@langchain/core` | 1.1.39 | 메시지 타입 (SystemMessage, HumanMessage) |
+| `@langchain/openai` | 1.4.3 | ChatOpenAI (gpt-5-mini) |
+| `@langfuse/langchain` | 5.1.0 | 설치됨 (OTel 기반으로 트레이싱하므로 직접 사용 안 함) |
 
-## 3. 현재는 왜 RAG가 아닌가
+### gpt-5-mini 호환성 메모
 
-현재 V1 요구사항은 아래 3가지다.
+- reasoning 모델이라 `temperature` 지원 안 함
+- `max_completion_tokens`로 토큰 제어 (reasoning + output 합산)
+- `modelKwargs: { max_completion_tokens: N }` 으로 설정
+- `finish_reason: "length"` 로 토큰 잘림 감지
 
-- 단서 / 타임라인 / 배경 간 모순 점검
-- 현재 입력 기준 단서 제안
-- 지금 무엇부터 작업할지 우선순위 추천
+## 4. 파일 구조
 
-이 세 가지는 모두 `현재 편집 중인 단일 GamePackage` 안에서 해결된다. 별도 문서 검색, 임베딩, 벡터 저장소가 없어도 충분하다. 그래서 지금 구조는 `No-RAG LLM assistant`가 맞다.
-
-## 4. 나중에 확장할 RAG + LLM 구조
-
-아래는 아직 구현되지 않은 Phase 2 방향이다.
-
-```mermaid
-flowchart LR
-  A["Maker / NPC generator request"] --> B["Query builder"]
-  B --> C["Retriever"]
-  C --> D["Embeddings / Vector Store"]
-  C --> E["Scenario source docs / prior cases / NPC templates"]
-  D --> F["Retrieved context"]
-  E --> F
-  F --> G["Prompt composer"]
-  G --> H["LLM"]
-  H --> I["Structured result"]
+```
+src/lib/ai/
+├── langchain-openai.ts          # ChatOpenAI 팩토리 (공용)
+├── openai.ts                    # 레거시 OpenAI SDK client (auto-actions용)
+├── openai-error.ts              # API 에러 분류 (401/429/403)
+├── langfuse.ts                  # Langfuse OTel SDK 초기화
+├── maker-assistant-context.ts   # 메이커 컨텍스트 빌더 (step별 최적화)
+├── maker-assistant-prompts.ts   # 메이커 시스템/유저 프롬프트
+├── maker-assistant-response-mode.ts # guide/draft 자동 감지
+├── maker-assistant-schema.ts    # 요청/응답 Zod 스키마 + 파서
+├── maker-assistant-tracing.ts   # Langfuse trace 이름/태그/입출력 빌더
+├── shared/
+│   ├── player-agent-context.ts  # AI 플레이어 가시 컨텍스트 (데이터 격리)
+│   └── README.md
+└── player-agent/
+    ├── core/
+    │   └── player-agent-state.ts  # AI 슬롯 상태 관리
+    ├── actions/
+    │   └── auto-actions.ts        # 규칙 기반 단서 획득/투표
+    ├── chat/                      # (placeholder - 로직은 API route에)
+    ├── prompts/                   # (placeholder)
+    └── scenario-overrides/        # (placeholder)
 ```
 
-### RAG가 필요한 시점
+## 5. AI 플레이어 채팅 상세
 
-- 여러 시나리오 샘플을 참고해 NPC를 생성하고 싶을 때
-- 긴 참고 문서, 규칙 문서, 설정집을 검색해서 답변해야 할 때
-- 프로젝트 외부 지식이나 축적된 템플릿을 재활용해야 할 때
+### 프롬프트 구성 (`buildChatSystemPrompt`)
 
-현재 메이커 도우미는 여기에 해당하지 않는다. `RAG/LLM 기반 NPC 제작`이 백로그 2순위인 이유도 이 때문이다.
+캐릭터 프롬프트에 포함되는 정보 (모두 DB에서 동적 로드):
 
-### 공통 데이터 재사용 메모
+| 섹션 | 소스 | 설명 |
+|------|------|------|
+| 당신의 배경 | `game_players.background` | 공개 배경 |
+| 당신만 아는 사실 | `game_players.story` | 비공개 스토리 |
+| 당신의 비밀 | `game_players.secret` | 숨겨야 할 정보 |
+| 주변 인물과의 관계 | `player_relationships` → 이름 resolve | 소꿉친구, 라이벌 등 |
+| 사건 당일 행적 | `player_timeline_entries` → slot label resolve | 시간대별 행동 |
+| 내면 | `victoryCondition` + `scoreConditions` | LLM이 심리로 해석 |
+| 현재 가진 단서 | `playerState.inventory` | 획득한 단서 제목 |
+| 대화 상대 | `characterSlots` | 참가 중인 다른 캐릭터 |
 
-향후 플레이어 에이전트를 붙일 때는 메이커 도우미와 완전히 별개 포맷을 만들지 않는다.
+### 메타 정보 노출 방지
 
-- 원본 `game` / `session`은 공유
-- 공통 정규화 계층은 `src/lib/ai/shared/`
-- 메이커 도우미와 플레이어 에이전트는 그 위에서 각자 필요한 공개 범위를 잘라 사용
+- victoryCondition/scoreConditions는 원본 데이터로 전달
+- LLM이 "캐릭터 심리로 해석해서 행동에 반영. 절대 그대로 말하지 마세요" 지시
+- 하드코딩된 심리 매핑 없음 (LLM 자체 해석)
+- 절대 규칙: 점수, 승리 조건, 목표, 입장 같은 게임 메타 용어 언급 금지
 
-즉, 데이터는 최대한 재사용하되, 응답 파이프라인은 분리한다.
+### 다자 밀담 컨텍스트 체이닝
 
-## 5. 모델 / env 설정 위치
-
-### 모델 선택
-
-- 기본 모델: `gpt-5-mini`
-- 설정 코드: [`openai.ts`](./openai.ts)
-- 함수:
-  - `getMakerAssistantModel()`
-  - `getMakerAssistantReasoningEffort()`
-  - `isMakerAssistantEnabled()`
-
-### 관련 env
-
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-- `OPENAI_REASONING_EFFORT`
-- `OPENAI_ASSISTANT_ENABLED`
-- `LANGFUSE_PUBLIC_KEY`
-- `LANGFUSE_SECRET_KEY`
-- `LANGFUSE_BASE_URL`
-- `LANGFUSE_TRACING_ENVIRONMENT`
-- `LANGFUSE_RELEASE`
-
-### Langfuse tracing
-
-- 메이커 도우미 요청은 Langfuse trace 로 남긴다.
-- OpenAI SDK 호출은 `@langfuse/openai` wrapper 로 generation 을 자동 수집한다.
-- 요청 단위 trace 이름, 사용자, 세션, 태그는 `/api/maker-assistant` 에서 직접 붙인다.
-- trace input/output 에는 전체 게임 JSON 대신 요약 정보만 남긴다.
-
-관련 파일:
-
-- [`langfuse.ts`](./langfuse.ts)
-- [`maker-assistant-tracing.ts`](./maker-assistant-tracing.ts)
-- [`openai.ts`](./openai.ts)
-- [`../../app/api/maker-assistant/route.ts`](../../app/api/maker-assistant/route.ts)
-
-## 6. 프롬프트 수정 위치
-
-프롬프트 수정이 필요하면 아래 파일을 본다.
-
-- 시스템 프롬프트: [`maker-assistant-prompts.ts`](./maker-assistant-prompts.ts)
-  - `buildMakerAssistantSystemPrompt()`
-  - `getTaskGuidelines()`
-- 사용자 프롬프트 조립: [`maker-assistant-prompts.ts`](./maker-assistant-prompts.ts)
-  - `buildMakerAssistantUserPrompt()`
-  - `inferDraftIntent()`
-  - `getDraftStyleRules()`
-  - `buildDraftPromptContext()`
-- 축약 컨텍스트 구성: [`maker-assistant-context.ts`](./maker-assistant-context.ts)
-
-실제로 성능에 가장 큰 영향을 주는 곳은 보통 아래 순서다.
-
-1. `buildMakerAssistantContext()`에서 어떤 데이터를 줄지
-2. `buildMakerAssistantSystemPrompt()`에서 어떤 출력 형식을 강제할지
-3. `buildDraftPromptContext()`에서 draft용으로 어떤 메타를 줄일지
-4. task별 가이드라인을 얼마나 구체적으로 쓰는지
-
-### draft 문체 프로필
-
-현재 `draft` 는 아래 3종류를 구분한다.
-
-- `narrative_prose`
-  - 오프닝, 배경, 상세 스토리, 비밀/반전, 엔딩 같은 서사형 입력칸
-  - 게임 설명문 대신 산문형 문체를 강하게 유도
-- `descriptive_copy`
-  - 소개글, 장소 설명, 단서 카드 본문 같은 설명형 입력칸
-- `gm_guide`
-  - 라운드 멘트, GM 진행 가이드, 투표 안내 같은 운영용 텍스트
-
-특히 `narrative_prose` 에서는 플레이어 수, 단서 개수, 라운드 번호, 타임라인 시각, 해금 조건 같은 설계 메타를 본문에 그대로 쓰지 않도록 막고 있다.
-
-## 7. 응답 파싱 / 구조화 수정 위치
-
-모델 응답이 깨질 때는 아래 파일을 본다.
-
-- API 진입점: [`../../app/api/maker-assistant/route.ts`](../../app/api/maker-assistant/route.ts)
-  - `POST()`
-  - `resolveMakerAssistantResult()`
-  - `extractResponseText()`
-- 응답 스키마 / 파서: [`maker-assistant-schema.ts`](./maker-assistant-schema.ts)
-  - `makerAssistantRequestSchema`
-  - `makerAssistantResultSchema`
-  - `parseMakerAssistantResult()`
-
-현재는 `완전 JSON 강제` 대신 아래 포맷도 허용한다.
-
-```text
-SUMMARY:
-...
-FINDINGS:
-FINDING|warning|3|null|null|null|제목|상세
-ACTIONS:
-ACTION|3|작업|이유
-QUESTIONS:
-QUESTION|후속 질문
+```
+[플레이어]: 범인이 누구라고 생각해?
+  → AI-A 호출 (turnContext: [])
+[AI-A]: 나는 김탐정이 의심돼.
+  → AI-B 호출 (turnContext: [{AI-A: "나는 김탐정이 의심돼."}])
+[AI-B]: 김탐정? 오히려 AI-A가 더 수상해.
 ```
 
-draft 모드에서는 아래 포맷도 복구한다.
+- 클라이언트(`AiChatPanel`)가 `turnReplies` 배열을 누적
+- 각 API 호출 시 `turnContext` 파라미터로 이전 AI 응답 전달
+- 서버가 `turnContext` 메시지를 플레이어 메시지 뒤에 추가
 
-```text
-TITLE:
-오프닝 제안
-BODY:
-실제 본문...
-NOTES:
-NOTE|피해자 이름은 현재 데이터 기준으로 가정함
+### 데이터 격리
+
+- `buildPlayerAgentVisibleContext()`가 `buildGameForPlayer()`를 호출
+- 해당 캐릭터가 볼 수 있는 정보만 추출
+- 획득하지 않은 단서, 다른 캐릭터의 비밀은 절대 포함 안 됨
+
+## 6. 메이커 AI 도우미 상세
+
+### 변경 이력 (V1 → V2)
+
+| 항목 | V1 | V2 (현재) |
+|------|----|----|
+| LLM 호출 | OpenAI Responses API 직접 | LangChain ChatOpenAI |
+| 응답 방식 | 동기 (25초 대기) | SSE 스트리밍 + fallback |
+| 컨텍스트 | 전체 GamePackage 전송 | step별 필요 데이터만 |
+| 트레이싱 | @langfuse/openai observeOpenAI | OTel span.setAttribute 직접 |
+| DB | content_json 통 blob | 15개 정규화 테이블 |
+
+### 스트리밍 프로토콜
+
+- `Content-Type: text/event-stream`
+- `event: chunk` + `data: {"text":"..."}` — 텍스트 조각
+- `event: done` + `data: {"task":"...","result":{...}}` — 파싱된 최종 결과
+- `event: error` + `data: {"error":"..."}` — 에러
+- 클라이언트: 청크를 실시간 렌더 → done 시 파싱 결과로 교체
+
+## 7. Langfuse 트레이싱
+
+### 구조
+
+```
+OTel NodeSDK + LangfuseSpanProcessor
+  → startActiveObservation (parent trace)
+    → propagateAttributes (userId, sessionId, tags)
+    → span.setAttribute("langfuse.observation.input/output", ...)
+    → ChatOpenAI 내부 OTel span (자동 포착)
+  → forceFlushLangfuseTracing (서버리스 flush)
 ```
 
-이렇게 둔 이유는 `gpt-5-mini`가 JSON을 가끔 불완전하게 내보내는 경우가 있어, V1에서는 line-based fallback이 더 안정적이기 때문이다.
+### OTel context 유실 방지
 
-### 후속 대화 처리 메모
+`updateActiveObservation`은 `trace.getActiveSpan()`에 의존하므로 `await` 후 유실 가능.
+대신 `await` 전에 `trace.getActiveSpan()`으로 span 참조 캡처 → `span.setAttribute()` 직접 호출.
 
-현재는 `previous_response_id` 를 쓰지 않는다.
+### trace 이름 패턴
 
-- 이유: `store: false` 상태의 Responses API와 섞일 때 후속 질문이 `response not found` 로 끊길 수 있었다.
-- 대안: 클라이언트에서 최근 대화 8턴을 `conversationHistory` 로 보내고, 서버가 이를 user prompt에 직접 포함한다.
-- 관련 파일:
-  - [`../../app/maker/[gameId]/edit/_components/useMakerAssistant.ts`](../../app/maker/[gameId]/edit/_components/useMakerAssistant.ts)
-  - [`maker-assistant-schema.ts`](./maker-assistant-schema.ts)
-  - [`maker-assistant-prompts.ts`](./maker-assistant-prompts.ts)
+| 패턴 | 예시 |
+|------|------|
+| 메이커 AI | `maker-assistant.validate-consistency.guide` |
+| AI 채팅 | `player-agent.chat.리에나 그린벨` |
+| 자동 획득 | `player-agent.auto-acquire` |
 
-## 8. UI / 호출 위치
+## 8. env 설정
 
-- 훅: [`../../app/maker/[gameId]/edit/_components/useMakerAssistant.ts`](../../app/maker/[gameId]/edit/_components/useMakerAssistant.ts)
-- 드로어 UI: [`../../app/maker/[gameId]/edit/_components/MakerAssistantDrawer.tsx`](../../app/maker/[gameId]/edit/_components/MakerAssistantDrawer.tsx)
-- 런처 / 도킹 UI:
-  - [`../../app/maker/[gameId]/edit/_components/MakerAssistantLauncher.tsx`](../../app/maker/[gameId]/edit/_components/MakerAssistantLauncher.tsx)
-  - [`../../app/maker/[gameId]/edit/_components/MakerAssistantDock.tsx`](../../app/maker/[gameId]/edit/_components/MakerAssistantDock.tsx)
+| 변수 | 용도 |
+|------|------|
+| `OPENAI_API_KEY` | OpenAI API 키 |
+| `OPENAI_MODEL` | 모델명 (기본: gpt-5-mini) |
+| `OPENAI_REASONING_EFFORT` | reasoning 강도 (low/medium/high) |
+| `OPENAI_ASSISTANT_ENABLED` | 메이커 AI 기능 토글 |
+| `LANGFUSE_PUBLIC_KEY` | Langfuse 공개 키 |
+| `LANGFUSE_SECRET_KEY` | Langfuse 비밀 키 |
+| `LANGFUSE_BASE_URL` | Langfuse 엔드포인트 |
 
-빠른 액션 기본 문구는 `useMakerAssistant.ts`의 `QUICK_ACTION_PROMPTS`에서 수정한다.
-chat 입력창의 모드 토글과 placeholder는 `MakerAssistantDrawer.tsx`를 보면 된다.
-런처 문구와 하단 액션바 충돌 회피는 `MakerAssistantLauncher.tsx`, `MakerAssistantDock.tsx`, `MakerEditor.tsx`에서 같이 본다.
-
-## 9. 이후 작업 추천
+## 9. 이후 작업
 
 ### 단기
-
-- 특정 입력칸으로 바로 복사하는 UX
-- Step별 draft 템플릿 더 정교화
-- 스토리형 문안의 기계적 사실 나열 추가 보정
+- AI 플레이어 캐릭터 스탠스 강화 (협력/숨기기/인정 판단)
+- 대화 메모리 관리 (라운드별 요약)
+- 메이커 AI 스트리밍 체감 레이턴시 튜닝
 
 ### 중기
-
-- validation 결과와 AI 결과를 묶어 표시하는 패널
-- quick action용 draft 프리셋 도입 여부 검토
-- 라운드/엔딩 전용 초안 프리셋 정리
+- AI 카드 교환/양도 (도구 호출 기반)
+- AI 투표 참여 (대화 흐름 기반)
+- 시나리오별 프롬프트 override
 
 ### 장기
-
-- `RAG + LLM 기반 NPC 제작`
-- 시나리오 템플릿 검색
-- 과거 생성 결과 재활용
-
-## 10. Player Agent 구조 규칙
-
-메이커 도우미와 별개로, 플레이 세션 안에서 동작하는 AI 플레이어는
-아래 폴더 기준으로 분리한다.
-
-```text
-src/lib/ai/
-  maker-assistant-*.ts
-  openai.ts
-  shared/
-  player-agent/
-    core/
-    chat/
-    actions/
-    prompts/
-    scenario-overrides/
-```
-
-규칙:
-
-- 메이커 도우미 로직과 플레이 세션용 AI 플레이어 로직을 섞지 않는다.
-- 공통 데이터 / 메타데이터 규격은 `shared` 아래에서 관리한다.
-- `player-agent` 는 반드시 `상태 해석`, `채팅`, `행동`, `프롬프트`, `시나리오 예외`를 분리한다.
-- 시나리오 전용 예외는 `scenario-overrides` 아래에 두고, 공통 규칙을 먼저 우선한다.
-- 플레이어 응답은 자기에게 공개된 정보만 사용해야 하며, 다음 단계 데이터 누수는 허용하지 않는다.
-- 플레이어 에이전트는 메이커 도우미보다 더 짧고 빠른 응답을 우선하며, 필요하면 회피 응답을 기본 정책으로 사용한다.
+- RAG + LLM 기반 NPC 제작
+- Langfuse score 체계
+- 시나리오 템플릿 검색/재활용

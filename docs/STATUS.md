@@ -106,7 +106,7 @@
 ### 중간
 - [x] **Visibility 3-mode 리팩토링** — draft 제거, `private | unlisted | public` 3-mode 체계로 전환. DB CHECK 제약조건 + RLS 정책 unlisted 포함 마이그레이션. normalizer 버그 수정. UI 워딩 YouTube 스타일(비공개/일부 공개/공개). `/game/[gameId]` 커버 페이지 신규 추가. ✅ 완료 (2026-04-10)
 - [x] **통 JSON DB 컬럼 개선** — `game_content.content_json` 전면 정규화 완료. 15개 신규 테이블 생성(game_stories, game_players, game_locations, game_clues, game_scripts 등). games 테이블에 settings/rules 확장 컬럼 추가. game-repository.ts 완전 재작성(신규 테이블 기반 CRUD). content_json 비우고 backup 보존. LangChain(@langchain/core, @langchain/openai) + Langfuse 연동 검증 완료. ✅ 완료 (2026-04-10)
-- [ ] **메이커 AI 도우미 Langfuse 트레이싱** — `/api/maker-assistant` trace 미적용. 모드(guide/draft), step, 재시도 여부 스팬 추가. 향후 NPC 챗봇도 동일 패턴.
+- [x] **메이커 AI 도우미 LangChain 전환 + Langfuse 트레이싱** — Responses API → LangChain ChatOpenAI 전환. OTel span 직접 참조 방식으로 input/output 트레이싱 안정화. step별 컨텍스트 최적화. API 에러 분류(401/429/403) + UI 표시. AI 플레이어 밀담 채팅 API/UI 신규 추가. ✅ 완료 (2026-04-10)
 - [x] **유저 정보 오버레이 모바일 스크롤 버그** — 오버레이 내부 스크롤 미작동으로 하단 로그아웃 버튼 접근 불가. iOS Safari `overflow-y: scroll` + `-webkit-overflow-scrolling: touch` 또는 body scroll lock 충돌 추정. ✅ 완료 (2026-04-09, 모바일 좌우 정렬 보정 후속 반영)
 - [x] **플레이어 엔딩 이후 종료 동선** — 최종 엔딩 공개 후 게임 종료 액션 ✅ 완료 (2026-04-09)
 - [x] **장소 탐색 첫 획득 카드 상세 팝업** — 첫 획득 시 자동 팝업 오픈 ✅ 이미 구현됨 (acquireClue → setSelectedCard)

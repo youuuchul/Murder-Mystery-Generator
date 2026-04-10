@@ -35,12 +35,18 @@ export async function POST(req: Request, { params }: Params) {
           throw new Error("해당 캐릭터 슬롯 없음");
         }
 
-        if (slot.isAiControlled) {
-          throw new Error("AI가 맡은 자리입니다.");
+        if (slot.isLocked && !slot.isAiControlled) {
+          throw new Error("이미 참가한 슬롯입니다.");
         }
 
-        if (slot.isLocked) {
-          throw new Error("이미 참가한 슬롯입니다.");
+        // AI 슬롯이면 AI를 해제하고 플레이어가 이어받는다.
+        // 기존 인벤토리/카드 소유물은 playerState에 귀속되어 유지된다.
+        if (slot.isAiControlled && session.playerAgentState) {
+          const agentSlot = session.playerAgentState.slots.find((s) => s.playerId === playerId);
+          if (agentSlot) {
+            agentSlot.enabled = false;
+            agentSlot.runtimeStatus = "idle";
+          }
         }
 
         const existingPlayerState = session.playerStates.find((item) => item.playerId === playerId);

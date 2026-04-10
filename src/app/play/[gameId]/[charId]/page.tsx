@@ -91,6 +91,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 type Tab = "shared" | "character" | "inventory" | "locations" | "vote";
+type LocationSubTab = "clues" | "chat";
 type CharacterPanel = "profile" | "people" | "timeline";
 const CHARACTER_PANEL_LABELS: Record<CharacterPanel, string> = {
   profile: "내 정보",
@@ -1567,6 +1568,7 @@ export default function PlayerView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>("character");
+  const [locationSubTab, setLocationSubTab] = useState<LocationSubTab>("clues");
   const [characterPanel, setCharacterPanel] = useState<CharacterPanel>("profile");
   const [acquiring, setAcquiring] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
@@ -1957,11 +1959,13 @@ export default function PlayerView() {
     );
   }
 
+  const hasAiPlayers = sharedState?.characterSlots?.some((slot) => slot.isAiControlled) ?? false;
+
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: "shared", label: "공통화면" },
     { id: "character", label: "캐릭터 카드" },
     { id: "inventory", label: `인벤토리 (${inventory.length})` },
-    { id: "locations", label: "장소 탐색" },
+    { id: "locations", label: hasAiPlayers ? "탐색·밀담" : "장소 탐색" },
     { id: "vote", label: "투표", hidden: phase !== "vote" },
   ];
 
@@ -2257,14 +2261,64 @@ export default function PlayerView() {
           </div>
         )}
 
-        {/* ── 장소 탐색 ── */}
+        {/* ── 장소 탐색 / 밀담 ── */}
         {tab === "locations" && (
           <div className="space-y-3">
-            {!isRound ? (
-              <div className="text-center py-12 text-dark-600 text-sm">
-                조사 페이즈에서 장소를 탐색할 수 있습니다.
+            {/* 하위 탭 (AI 존재 시만) */}
+            {hasAiPlayers && (
+              <div className="flex gap-1 rounded-lg bg-dark-900 border border-dark-800 p-1">
+                {([
+                  { id: "clues" as const, label: "단서 획득" },
+                  { id: "chat" as const, label: "밀담" },
+                ] as const).map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => setLocationSubTab(sub.id)}
+                    className={[
+                      "flex-1 rounded-md py-2 text-xs font-medium transition-colors",
+                      locationSubTab === sub.id
+                        ? "bg-dark-700 text-dark-100"
+                        : "text-dark-500 hover:text-dark-300",
+                    ].join(" ")}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
               </div>
-            ) : (
+            )}
+
+            {/* 밀담 탭 */}
+            {hasAiPlayers && locationSubTab === "chat" && (
+              <div className="space-y-3">
+                <div className="text-center py-12 border-2 border-dashed border-dark-800 rounded-xl">
+                  <p className="text-dark-400 text-sm font-medium">AI 캐릭터와 밀담</p>
+                  <p className="text-dark-600 text-xs mt-2">대화할 캐릭터를 선택하세요</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {sharedState?.characterSlots
+                      ?.filter((slot) => slot.isAiControlled && slot.isLocked)
+                      .map((slot) => (
+                        <button
+                          key={slot.playerId}
+                          type="button"
+                          className="rounded-xl border border-dark-700 bg-dark-900 px-4 py-2.5 text-sm text-dark-200 transition-colors hover:border-mystery-600 hover:text-dark-100"
+                        >
+                          {slot.playerName ?? "AI"}
+                        </button>
+                      )) ?? null}
+                  </div>
+                  <p className="mt-4 text-dark-700 text-[11px]">채팅 기능 준비 중</p>
+                </div>
+              </div>
+            )}
+
+            {/* 단서 획득 (기존 장소 탐색) */}
+            {(!hasAiPlayers || locationSubTab === "clues") && (
+              !isRound ? (
+                <div className="text-center py-12 text-dark-600 text-sm">
+                  조사 페이즈에서 장소를 탐색할 수 있습니다.
+                </div>
+              ) : (
               <>
                 {/* 획득 현황 */}
                 {(() => {
@@ -2471,6 +2525,7 @@ export default function PlayerView() {
                   })
                 )}
               </>
+              )
             )}
           </div>
         )}

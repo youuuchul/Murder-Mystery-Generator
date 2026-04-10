@@ -37,6 +37,7 @@ export default function useMakerAssistant({
   const [responseMode, setResponseMode] = useState<MakerAssistantResponseModePreference>("auto");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isApiIssue, setIsApiIssue] = useState(false);
   const [messages, setMessages] = useState<MakerAssistantChatMessage[]>([]);
   const [clueSuggestionContext, setClueSuggestionContext] = useState<MakerAssistantClueSuggestionContext>(
     () => createDefaultClueSuggestionContext()
@@ -87,6 +88,7 @@ export default function useMakerAssistant({
   function resetConversation() {
     setMessages([]);
     setError(null);
+    setIsApiIssue(false);
   }
 
   async function send(
@@ -103,6 +105,7 @@ export default function useMakerAssistant({
     setOpen(true);
     setPending(true);
     setError(null);
+    setIsApiIssue(false);
 
     const userMessage: MakerAssistantChatMessage = {
       id: crypto.randomUUID(),
@@ -134,14 +137,14 @@ export default function useMakerAssistant({
         }),
       });
 
-      const data = await response.json() as MakerAssistantResponse | { error?: string };
+      const data = await response.json() as MakerAssistantResponse | { error?: string; isApiIssue?: boolean };
 
       if (!response.ok) {
-        throw new Error(
-          typeof data === "object" && data && "error" in data && data.error
-            ? data.error
-            : "제작 도우미 호출 실패"
-        );
+        const errorData = data as { error?: string; isApiIssue?: boolean };
+        if (errorData.isApiIssue) {
+          setIsApiIssue(true);
+        }
+        throw new Error(errorData.error || "제작 도우미 호출 실패");
       }
 
       const payload = data as MakerAssistantResponse;
@@ -181,6 +184,7 @@ export default function useMakerAssistant({
     setResponseMode,
     pending,
     error,
+    isApiIssue,
     messages,
     clueSuggestionContext,
     setClueSuggestionContext,

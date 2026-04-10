@@ -39,6 +39,7 @@ export default function MakerAssistantDock({
         draft={assistant.draft}
         responseMode={assistant.responseMode}
         error={assistant.error}
+        isApiIssue={assistant.isApiIssue}
         messages={assistant.messages}
         clueSuggestionContext={assistant.clueSuggestionContext}
         clueSuggestionReady={assistant.clueSuggestionReady}

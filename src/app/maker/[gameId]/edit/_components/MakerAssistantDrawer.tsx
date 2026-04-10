@@ -46,6 +46,7 @@ interface MakerAssistantDrawerProps {
   draft: string;
   responseMode: MakerAssistantResponseModePreference;
   error: string | null;
+  isApiIssue: boolean;
   messages: MakerAssistantChatMessage[];
   clueSuggestionContext: MakerAssistantClueSuggestionContext;
   clueSuggestionReady: boolean;
@@ -71,6 +72,7 @@ export default function MakerAssistantDrawer({
   draft,
   responseMode,
   error,
+  isApiIssue,
   messages,
   clueSuggestionContext,
   clueSuggestionReady,
@@ -328,7 +330,13 @@ export default function MakerAssistantDrawer({
 
         <footer className="border-t border-dark-800 px-4 py-3 sm:px-5 sm:py-3.5">
           {error ? (
-            <div className="mb-3 rounded-xl border border-red-900/70 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+            <div className={[
+              "mb-3 rounded-xl border px-3 py-2 text-sm",
+              isApiIssue
+                ? "border-amber-800/70 bg-amber-950/30 text-amber-200"
+                : "border-red-900/70 bg-red-950/30 text-red-200",
+            ].join(" ")}>
+              {isApiIssue ? <span className="mr-1 font-medium">[API]</span> : null}
               {error}
             </div>
           ) : null}

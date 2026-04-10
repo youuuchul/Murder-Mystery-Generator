@@ -15,6 +15,7 @@ import {
   getOpenAIClient,
   isMakerAssistantEnabled,
 } from "@/lib/ai/openai";
+import { classifyOpenAIError, isOpenAIApiError } from "@/lib/ai/openai-error";
 import { startLangfuseTracing } from "@/lib/ai/langfuse";
 import { buildMakerAssistantContext } from "@/lib/ai/maker-assistant-context";
 import { resolveMakerAssistantResponseMode } from "@/lib/ai/maker-assistant-response-mode";
@@ -194,8 +195,16 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof Error && error.message.includes("OPENAI_API_KEY")) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY가 설정되지 않았습니다." },
+        { error: "OPENAI_API_KEY가 설정되지 않았습니다.", isApiIssue: true },
         { status: 503 }
+      );
+    }
+
+    if (isOpenAIApiError(error)) {
+      const classified = classifyOpenAIError(error);
+      return NextResponse.json(
+        { error: classified.message, isApiIssue: classified.isApiIssue },
+        { status: classified.status }
       );
     }
 

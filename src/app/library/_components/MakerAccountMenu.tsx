@@ -119,6 +119,7 @@ export default function MakerAccountMenu({
                     <input
                       type="email"
                       name="recoveryEmail"
+                      pattern="[^@\s]+@[^@\s]+\.[^@\s]{2,}"
                       defaultValue={currentAccount.recoveryEmail ?? ""}
                       autoComplete="email"
                       className="w-full rounded-xl border border-red-900 bg-dark-950 px-4 py-3 text-sm text-dark-50 outline-none transition focus:border-red-500 valid:border-emerald-900 valid:focus:border-emerald-500"

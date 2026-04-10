@@ -57,9 +57,13 @@ export default function AiChatPanel({ sessionId, token, callerName, aiSlots, max
     setError(null);
 
     try {
-      // 선택된 모든 AI 캐릭터에게 순차 전송
+      // 이번 턴의 대화를 누적: 각 AI는 이전 AI 응답까지 컨텍스트로 받는다
+      const turnReplies: Array<{ characterName: string; content: string }> = [];
+
       for (const charId of selectedCharIds) {
         const charName = aiSlots.find((s) => s.playerId === charId)?.playerName ?? "AI";
+
+        // turnContext: 이번 턴에서 앞선 AI들의 응답
         const res = await fetch(`/api/sessions/${sessionId}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -67,6 +71,7 @@ export default function AiChatPanel({ sessionId, token, callerName, aiSlots, max
             token,
             targetPlayerId: charId,
             message: userMsg.content,
+            turnContext: turnReplies.length > 0 ? turnReplies : undefined,
           }),
         });
 
@@ -78,12 +83,16 @@ export default function AiChatPanel({ sessionId, token, callerName, aiSlots, max
 
         if (data.reply) {
           const replyText = data.reply;
+          const resolvedName = data.characterName ?? charName;
+
+          turnReplies.push({ characterName: resolvedName, content: replyText });
+
           setMessages((prev) => [
             ...prev,
             {
               id: crypto.randomUUID(),
               role: "assistant" as const,
-              characterName: data.characterName ?? charName,
+              characterName: resolvedName,
               content: replyText,
               createdAt: new Date().toISOString(),
             },

@@ -27,6 +27,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       token: string;
       targetPlayerId: string;
       message: string;
+      turnContext?: Array<{ characterName: string; content: string }>;
     };
 
     if (!body.token || !body.targetPlayerId || !body.message?.trim()) {
@@ -127,6 +128,12 @@ export async function POST(request: NextRequest, { params }: Params) {
         currentSpan?.setAttribute("langfuse.observation.input", JSON.stringify(traceInput));
 
         const systemPrompt = buildChatSystemPrompt(aiContext, aiPlayer.name);
+
+        // 이번 턴에서 앞선 AI 응답을 컨텍스트로 추가 (다자 밀담 체이닝)
+        const turnContextMessages = (body.turnContext ?? []).map((tc) =>
+          new HumanMessage(`[${tc.characterName}]: ${tc.content}`)
+        );
+
         const messages = [
           new SystemMessage(systemPrompt),
           ...conversationHistory.slice(-MAX_CONVERSATION_HISTORY).map((turn) =>
@@ -135,6 +142,7 @@ export async function POST(request: NextRequest, { params }: Params) {
               : new HumanMessage({ content: turn.content, name: "assistant" })
           ),
           new HumanMessage(`[${callerName}]: ${body.message.trim()}`),
+          ...turnContextMessages,
         ];
 
         const chat = getMakerAssistantChat(MAX_COMPLETION_TOKENS);

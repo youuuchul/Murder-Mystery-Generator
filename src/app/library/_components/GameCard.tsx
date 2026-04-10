@@ -215,7 +215,7 @@ export default function GameCard({
   const showAdminReadonlyTools = isAdminViewer && ownershipState === "readonly";
 
   return (
-    <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
+    <div className="flex flex-col bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-mystery-700 hover:shadow-lg hover:shadow-mystery-900/20 transition-all duration-200 group">
       <LibraryCover
         title={game.title}
         imageUrl={game.settings.coverImageUrl}
@@ -223,7 +223,7 @@ export default function GameCard({
       />
 
       {/* 콘텐츠 */}
-      <div className="p-4 space-y-3">
+      <div className="flex flex-1 flex-col p-4 space-y-3">
         <h3 className="font-semibold text-dark-50 text-base leading-tight line-clamp-2 group-hover:text-mystery-300 transition-colors">
           {game.title}
         </h3>
@@ -234,31 +234,27 @@ export default function GameCard({
           </p>
         ) : null}
 
-        {/* 배지 */}
-        <div className="flex flex-wrap gap-1.5">
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full border font-medium ${difficultyColor[diff] ?? "text-dark-400 bg-dark-800 border-dark-600"}`}
-          >
-            {difficultyLabel[diff] ?? diff}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-dark-600 bg-dark-800 text-dark-300">
-            {VISIBILITY_LABELS[game.access.visibility]}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-dark-700 bg-dark-900 text-dark-400">
-            {OWNERSHIP_LABELS[ownershipState]}
-          </span>
-          {tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="text-xs px-2 py-0.5 rounded-full border text-dark-300 bg-dark-800 border-dark-600">
-              #{tag}
-            </span>
-          ))}
+        {/* 메타 */}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-dark-400">
+          <span>인원 {game.settings.playerCount}인</span>
+          <span>시간 {game.settings.estimatedDuration}분</span>
+          <span>난이도 {difficultyLabel[diff] ?? diff}</span>
         </div>
 
-        {/* 통계 */}
-        <div className="flex items-center gap-3 text-xs text-dark-400">
-          <span title="인원 수">인원 {game.settings.playerCount}인</span>
-          <span title="소요 시간">시간 {game.settings.estimatedDuration}분</span>
-        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.slice(0, 5).map((tag) => (
+              <span key={tag} className="text-xs px-2 py-0.5 rounded-full border text-dark-300 bg-dark-800 border-dark-600">
+                # {tag}
+              </span>
+            ))}
+            {tags.length > 5 && (
+              <span className="text-xs px-2 py-0.5 rounded-full border border-dark-700 bg-dark-900 text-dark-500">
+                +{tags.length - 5}
+              </span>
+            )}
+          </div>
+        )}
 
         {ownershipState === "readonly" ? (
           <p className="rounded-lg border border-dark-800 bg-dark-950/80 px-3 py-2 text-xs leading-5 text-dark-400">
@@ -354,7 +350,7 @@ export default function GameCard({
         ) : null}
 
         {showAdminReadonlyTools ? (
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
             <Link
               href={`/maker/${game.id}/edit`}
               className="text-center text-xs py-2 px-3 rounded bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-dark-50 border border-dark-600 transition-colors"
@@ -384,7 +380,7 @@ export default function GameCard({
             </button>
           </div>
         ) : (
-          <div className="flex gap-2 pt-1">
+          <div className="mt-auto flex gap-2 pt-1">
             {canEdit ? (
               <Link
                 href={`/maker/${game.id}/edit`}

@@ -35,13 +35,6 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
 
       <div className="space-y-4 p-5">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${difficultyColor[diff] ?? "text-dark-300 bg-dark-800 border-dark-700"}`}
-            >
-              {difficultyLabel[diff] ?? diff}
-            </span>
-          </div>
           <h3 className="text-lg font-semibold leading-tight text-dark-50 transition-colors group-hover:text-mystery-300">
             {game.title}
           </h3>
@@ -53,7 +46,8 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
         <div className="flex flex-wrap gap-2 text-xs text-dark-400">
           <span>인원 {game.settings.playerCount}인</span>
           <span>시간 {game.settings.estimatedDuration}분</span>
-          {ownerDisplayName ? <span>제작자 : {ownerDisplayName}</span> : null}
+          <span>난이도 {difficultyLabel[diff] ?? diff}</span>
+          {ownerDisplayName ? <span>제작자 {ownerDisplayName}</span> : null}
         </div>
 
         {tags.length > 0 && (
@@ -88,7 +82,7 @@ function TagBadges({ tags, max, visibleMax }: { tags: string[]; max: number; vis
     <div className="group/tags relative flex flex-wrap gap-1.5 text-xs">
       {visible.map((tag) => (
         <span key={tag} className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-dark-300">
-          #{tag}
+          # {tag}
         </span>
       ))}
       {hiddenCount > 0 && (
@@ -100,7 +94,7 @@ function TagBadges({ tags, max, visibleMax }: { tags: string[]; max: number; vis
         <div className="pointer-events-none absolute left-0 top-full z-10 mt-1 hidden flex-wrap gap-1.5 rounded-xl border border-dark-700 bg-dark-900 p-2 shadow-lg group-hover/tags:flex">
           {capped.slice(visibleMax).map((tag) => (
             <span key={tag} className="rounded-full border border-dark-700 bg-dark-800 px-2 py-0.5 text-dark-300">
-              #{tag}
+              # {tag}
             </span>
           ))}
         </div>

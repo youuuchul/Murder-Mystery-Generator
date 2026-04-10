@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isPubliclyAccessible } from "@/lib/game-access";
 import { getGame } from "@/lib/game-repository";
+import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { isMakerAdmin } from "@/lib/maker-role";
 import type { CoverImagePosition } from "@/types/game";
@@ -53,6 +54,12 @@ export default async function GameCoverPage({
     );
   }
 
+  const makerAuthGateway = getMakerAuthGateway();
+  const ownerAccount = game.access.ownerId
+    ? await makerAuthGateway.getAccountById(game.access.ownerId)
+    : null;
+  const ownerDisplayName = ownerAccount?.displayName;
+
   const coverUrl = game.settings.coverImageUrl;
   const coverPos = game.settings.coverImagePosition;
   const diff = game.settings.difficulty;
@@ -71,20 +78,7 @@ export default async function GameCoverPage({
 
       <div className="mx-auto max-w-2xl px-4 pb-16">
         <div className="-mt-12 relative z-10 rounded-3xl border border-dark-800 bg-dark-900/95 p-6 shadow-2xl backdrop-blur-sm sm:p-8">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${difficultyColor[diff] ?? "text-dark-300 bg-dark-800 border-dark-700"}`}
-            >
-              {difficultyLabel[diff] ?? diff}
-            </span>
-            {game.access.visibility === "unlisted" && (
-              <span className="rounded-full border border-sky-900 bg-sky-950/40 px-2.5 py-1 text-[11px] font-medium text-sky-300">
-                일부 공개
-              </span>
-            )}
-          </div>
-
-          <h1 className="mt-4 text-2xl font-bold leading-tight sm:text-3xl">
+          <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
             {game.title}
           </h1>
 
@@ -93,22 +87,20 @@ export default async function GameCoverPage({
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3 text-sm text-dark-400">
-            <span className="flex items-center gap-1.5">
-              <span className="text-dark-500">인원</span> {game.settings.playerCount}인
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-dark-500">시간</span> {game.settings.estimatedDuration}분
-            </span>
+            <span>인원 {game.settings.playerCount}인</span>
+            <span>시간 {game.settings.estimatedDuration}분</span>
+            <span>난이도 {difficultyLabel[diff] ?? diff}</span>
+            {ownerDisplayName && <span>제작자 {ownerDisplayName}</span>}
           </div>
 
           {tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {tags.map((tag) => (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {tags.slice(0, 10).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-dark-700 bg-dark-900 px-2.5 py-1 text-xs text-dark-300"
+                  className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-xs text-dark-300"
                 >
-                  #{tag}
+                  # {tag}
                 </span>
               ))}
             </div>

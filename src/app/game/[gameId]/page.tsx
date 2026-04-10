@@ -60,6 +60,13 @@ export default async function GameCoverPage({
 
   return (
     <div className="min-h-screen bg-dark-950 text-dark-50">
+      <header className="sticky top-0 z-20 border-b border-dark-800 bg-dark-950/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          <Link href="/library" className="text-lg font-semibold text-dark-50 transition-colors hover:text-mystery-300">
+            Murder Mystery
+          </Link>
+        </div>
+      </header>
       <CoverHero title={game.title} imageUrl={coverUrl} imagePosition={coverPos} />
 
       <div className="mx-auto max-w-2xl px-4 pb-16">

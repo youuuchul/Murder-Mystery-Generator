@@ -57,11 +57,7 @@ function resolveEndingBranchId(
     return game.ending.branches.find((branch) => branch.triggerType === "culprit-captured")?.id;
   }
 
-  return game.ending.branches.find((branch) => (
-    branch.triggerType === "specific-player-arrested"
-    && branch.targetPlayerId === arrestedPlayerId
-  ))?.id
-    ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
+  return game.ending.branches.find((branch) => branch.triggerType === "culprit-escaped")?.id;
 }
 
 /** 고급 투표: 주 질문의 최다 득표 선택지 기반으로 엔딩 분기를 찾는다. */
@@ -69,31 +65,36 @@ function resolveAdvancedEndingBranchId(
   game: LoadedGame,
   questionTallies: QuestionTally[]
 ): string | undefined {
-  const primaryQuestion = game.voteQuestions.find((q) => q.isPrimary);
+  const primaryQuestion = game.voteQuestions.find((q) => q.isPrimary && q.purpose === "ending");
   if (!primaryQuestion) return undefined;
 
   const primaryTally = questionTallies.find((qt) => qt.questionId === primaryQuestion.id);
   if (!primaryTally || primaryTally.tally.length === 0) return undefined;
 
-  const topChoiceId = primaryTally.tally[0].playerId; // playerId 필드에 targetId가 저장됨
+  const topTargetId = primaryTally.tally[0].playerId; // playerId 필드에 targetId가 저장됨
 
-  // custom-choice-selected 분기 매칭
-  const customBranch = game.ending.branches.find((b) =>
-    b.triggerType === "custom-choice-selected"
+  // n:1 매칭: 여러 선택지가 하나의 분기에 연결
+  const matchedBranch = game.ending.branches.find((b) =>
+    b.triggerType === "custom-choice-matched"
     && b.targetQuestionId === primaryQuestion.id
-    && b.targetChoiceId === topChoiceId
+    && (b.targetChoiceIds ?? []).includes(topTargetId)
   );
-  if (customBranch) return customBranch.id;
+  if (matchedBranch) return matchedBranch.id;
 
-  // players-only/players-and-npcs 모드: 기존 로직으로 fallback
+  // custom-choice-fallback: 매칭 안 된 나머지
+  const fallbackBranch = game.ending.branches.find((b) =>
+    b.triggerType === "custom-choice-fallback"
+    && b.targetQuestionId === primaryQuestion.id
+  );
+  if (fallbackBranch) return fallbackBranch.id;
+
+  // players-only/players-and-npcs 모드: 범인 검거/미검거로 fallback
   if (primaryQuestion.targetMode !== "custom-choices") {
     const culpritPlayerId = game.story.culpritPlayerId;
-    if (topChoiceId === culpritPlayerId) {
+    if (topTargetId === culpritPlayerId) {
       return game.ending.branches.find((b) => b.triggerType === "culprit-captured")?.id;
     }
-    return game.ending.branches.find((b) =>
-      b.triggerType === "specific-player-arrested" && b.targetPlayerId === topChoiceId
-    )?.id ?? game.ending.branches.find((b) => b.triggerType === "wrong-arrest-fallback")?.id;
+    return game.ending.branches.find((b) => b.triggerType === "culprit-escaped")?.id;
   }
 
   return undefined;

@@ -144,11 +144,7 @@ function resolveEndingBranchId(
     return game.ending.branches.find((branch) => branch.triggerType === "culprit-captured")?.id;
   }
 
-  return game.ending.branches.find((branch) => (
-    branch.triggerType === "specific-player-arrested"
-    && branch.targetPlayerId === arrestedPlayerId
-  ))?.id
-    ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
+  return game.ending.branches.find((branch) => branch.triggerType === "culprit-escaped")?.id;
 }
 
 function pickDeterministicArrestedPlayerId(sessionId: string, candidates: string[]): string {

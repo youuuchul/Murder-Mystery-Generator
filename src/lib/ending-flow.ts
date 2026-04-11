@@ -104,10 +104,7 @@ export function resolveActiveEndingBranch(
   }
 
   if (reveal.arrestedPlayerId) {
-    return game.ending.branches.find((branch) => (
-      branch.triggerType === "specific-player-arrested"
-      && branch.targetPlayerId === reveal.arrestedPlayerId
-    )) ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback");
+    return game.ending.branches.find((branch) => branch.triggerType === "culprit-escaped");
   }
 
   return undefined;

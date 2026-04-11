@@ -443,6 +443,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
         targetPlayerId: b.target_player_id ?? undefined,
         targetQuestionId: b.trigger_question_id ?? undefined,
         targetChoiceId: b.trigger_choice_id ?? undefined,
+        targetChoiceIds: Array.isArray(b.trigger_choice_ids) ? b.trigger_choice_ids : [],
         storyText: b.story_text,
         personalEndingsEnabled: b.personal_endings_enabled ?? false,
         personalEndings: peByBranch.get(b.id) ?? [],
@@ -466,6 +467,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       description: q.description ?? undefined,
       targetMode: q.target_mode ?? "players-only",
       isPrimary: q.is_primary ?? false,
+      purpose: q.purpose ?? "ending",
       sortOrder: q.sort_order ?? 0,
       triggerCondition: q.trigger_condition ?? undefined,
       preStoryText: q.pre_story_text ?? undefined,
@@ -685,6 +687,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
         video_url: b.videoUrl ?? null, background_music: b.backgroundMusic ?? null,
         trigger_question_id: b.targetQuestionId ?? null,
         trigger_choice_id: b.targetChoiceId ?? null,
+        trigger_choice_ids: b.targetChoiceIds ?? [],
         sort_order: i,
       }))
     );
@@ -722,7 +725,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       normalizedGame.voteQuestions.map((q, i) => ({
         id: q.id, game_id: gameId, vote_round: q.voteRound,
         label: q.label, description: q.description ?? null,
-        target_mode: q.targetMode, is_primary: q.isPrimary,
+        target_mode: q.targetMode, is_primary: q.isPrimary, purpose: q.purpose ?? "ending",
         sort_order: i, trigger_condition: q.triggerCondition ?? null,
         pre_story_text: q.preStoryText ?? null,
         pre_story_video_url: q.preStoryVideoUrl ?? null,

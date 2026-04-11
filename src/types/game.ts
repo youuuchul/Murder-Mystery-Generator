@@ -296,17 +296,22 @@ export interface Scripts {
 
 export type EndingBranchTriggerType =
   | "culprit-captured"
-  | "specific-player-arrested"
-  | "wrong-arrest-fallback"
-  | "custom-choice-selected";
+  | "culprit-escaped"
+  | "custom-choice-matched"
+  | "custom-choice-fallback"
+  | "vote-round-2-matched"
+  | "vote-round-2-fallback";
 
 export interface EndingBranch {
   id: string;
   label: string;
   triggerType: EndingBranchTriggerType;
+  /** @deprecated 하위호환용 — culprit-escaped에서 사용했던 대상 캐릭터 */
   targetPlayerId?: string;
-  targetQuestionId?: string;  // custom-choice-selected: 연결된 질문 ID
-  targetChoiceId?: string;    // custom-choice-selected: 연결된 선택지 ID
+  targetQuestionId?: string;   // 연결된 투표 질문 ID
+  /** @deprecated 단수 매핑 — targetChoiceIds로 대체 */
+  targetChoiceId?: string;
+  targetChoiceIds?: string[];  // n:1 매핑 (여러 선택지 → 이 분기)
   storyText: string;
   personalEndingsEnabled?: boolean;
   personalEndings?: PersonalEnding[];
@@ -352,6 +357,8 @@ export interface VoteQuestionTriggerCondition {
   resultEquals: string;  // targetId가 이 값과 일치할 때 트리거
 }
 
+export type VoteQuestionPurpose = "ending" | "personal";
+
 export interface VoteQuestion {
   id: string;
   voteRound: number;                         // 1 = 1차 투표, 2 = 2차 투표
@@ -359,6 +366,7 @@ export interface VoteQuestion {
   description?: string;
   targetMode: VoteTargetMode;
   isPrimary: boolean;                        // 엔딩 분기 결정용 주 질문
+  purpose: VoteQuestionPurpose;              // ending = 엔딩 결정, personal = 개인 목표
   sortOrder: number;
   triggerCondition?: VoteQuestionTriggerCondition; // 2차 투표 트리거 조건
   preStoryText?: string;                     // 2차 투표 전 스토리 텍스트

@@ -534,13 +534,14 @@ const TARGET_MODE_LABELS: Record<VoteTargetMode, string> = {
   "custom-choices": "커스텀 선택지",
 };
 
-function createVoteQuestion(voteRound: number): VoteQuestion {
+function createVoteQuestion(voteRound: number, purpose: "ending" | "personal" = "ending"): VoteQuestion {
   return {
     id: crypto.randomUUID(),
     voteRound,
     label: "",
     targetMode: "players-only",
     isPrimary: false,
+    purpose,
     sortOrder: 0,
     choices: [],
   };

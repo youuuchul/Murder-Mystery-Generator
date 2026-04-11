@@ -73,12 +73,18 @@ function normalizeVictoryCondition(value: unknown): Player["victoryCondition"] {
 }
 
 function normalizeEndingTriggerType(value: unknown): EndingBranch["triggerType"] {
+  // 하위호환: 구형 trigger_type → 신형으로 변환
+  if (value === "wrong-arrest-fallback" || value === "specific-player-arrested") return "culprit-escaped";
+  if (value === "custom-choice-selected") return "custom-choice-matched";
+
   return value === "culprit-captured"
-    || value === "specific-player-arrested"
-    || value === "wrong-arrest-fallback"
-    || value === "custom-choice-selected"
+    || value === "culprit-escaped"
+    || value === "custom-choice-matched"
+    || value === "custom-choice-fallback"
+    || value === "vote-round-2-matched"
+    || value === "vote-round-2-fallback"
     ? value
-    : "wrong-arrest-fallback";
+    : "culprit-escaped";
 }
 
 /**
@@ -220,19 +226,25 @@ function normalizeEndingBranch(
         ))
       : fallbackPersonalEndingsEnabled);
 
+  const needsQuestion = triggerType === "custom-choice-matched"
+    || triggerType === "vote-round-2-matched";
+  const needsChoiceIds = triggerType === "custom-choice-matched"
+    || triggerType === "vote-round-2-matched";
+
+  // 단수 targetChoiceId → 배열로 마이그레이션
+  const choiceIds = Array.isArray(branch?.targetChoiceIds) && branch.targetChoiceIds.length > 0
+    ? branch.targetChoiceIds.filter(Boolean)
+    : branch?.targetChoiceId
+      ? [branch.targetChoiceId]
+      : [];
+
   return {
     id: asTrimmedString(branch?.id) || crypto.randomUUID(),
     label: asTrimmedString(branch?.label),
     triggerType,
-    targetPlayerId: triggerType === "specific-player-arrested"
-      ? asOptionalString(branch?.targetPlayerId)
-      : undefined,
-    targetQuestionId: triggerType === "custom-choice-selected"
-      ? asOptionalString(branch?.targetQuestionId)
-      : undefined,
-    targetChoiceId: triggerType === "custom-choice-selected"
-      ? asOptionalString(branch?.targetChoiceId)
-      : undefined,
+    targetPlayerId: asOptionalString(branch?.targetPlayerId),
+    targetQuestionId: needsQuestion ? asOptionalString(branch?.targetQuestionId) : undefined,
+    targetChoiceIds: needsChoiceIds ? choiceIds : undefined,
     storyText: asTrimmedString(branch?.storyText),
     personalEndingsEnabled: derivedPersonalEndingsEnabled,
     personalEndings: normalizedPersonalEndings,
@@ -380,7 +392,7 @@ function buildLegacyEndingBranches(scripts: GamePackage["scripts"] | undefined):
     branches.push({
       id: crypto.randomUUID(),
       label: "오검거 기본 분기",
-      triggerType: "wrong-arrest-fallback",
+      triggerType: "culprit-escaped",
       storyText: asTrimmedString(scripts?.endingFail?.narration),
       videoUrl: asOptionalString(scripts?.endingFail?.videoUrl),
       backgroundMusic: asOptionalString(scripts?.endingFail?.backgroundMusic),

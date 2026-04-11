@@ -152,9 +152,9 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     addIssue(issues, 6, "warning", "범인 검거 분기가 아직 없습니다.");
   }
 
-  const hasWrongArrestFallback = game.ending.branches.some((branch) => branch.triggerType === "wrong-arrest-fallback");
-  if (!hasWrongArrestFallback) {
-    addIssue(issues, 6, "warning", "오검거 기본 분기가 아직 없습니다.");
+  const hasCulpritEscaped = game.ending.branches.some((branch) => branch.triggerType === "culprit-escaped");
+  if (!hasCulpritEscaped) {
+    addIssue(issues, 6, "warning", "미검거 분기가 아직 없습니다.");
   }
 
   game.ending.branches.forEach((branch, index) => {

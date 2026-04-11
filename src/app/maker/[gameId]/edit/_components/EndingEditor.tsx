@@ -25,7 +25,7 @@ function createEndingBranch(): EndingBranch {
   return {
     id: crypto.randomUUID(),
     label: "",
-    triggerType: "wrong-arrest-fallback",
+    triggerType: "culprit-escaped",
     targetPlayerId: undefined,
     storyText: "",
     personalEndingsEnabled: false,
@@ -183,76 +183,94 @@ export default function EndingEditor({
                         const tt = e.target.value as EndingBranch["triggerType"];
                         updateBranch(index, {
                           triggerType: tt,
-                          targetPlayerId: tt === "specific-player-arrested" ? branch.targetPlayerId : undefined,
-                          targetQuestionId: tt === "custom-choice-selected" ? branch.targetQuestionId : undefined,
-                          targetChoiceId: tt === "custom-choice-selected" ? branch.targetChoiceId : undefined,
+                          targetQuestionId: (tt === "custom-choice-matched" || tt === "vote-round-2-matched")
+                            ? branch.targetQuestionId : undefined,
+                          targetChoiceIds: (tt === "custom-choice-matched" || tt === "vote-round-2-matched")
+                            ? branch.targetChoiceIds : undefined,
                         });
                       }}
                       className={inp}
                     >
                       <option value="culprit-captured">범인 검거</option>
-                      <option value="specific-player-arrested">특정 캐릭터 검거</option>
-                      <option value="wrong-arrest-fallback">오검거 기본 분기</option>
+                      <option value="culprit-escaped">미검거</option>
                       {advancedVotingEnabled && (
-                        <option value="custom-choice-selected">커스텀 선택지 결과</option>
+                        <>
+                          <option value="custom-choice-matched">커스텀 투표 결과 (선택지 지정)</option>
+                          <option value="custom-choice-fallback">커스텀 투표 나머지 (fallback)</option>
+                          <option value="vote-round-2-matched">2차 투표 결과 (진엔딩)</option>
+                          <option value="vote-round-2-fallback">2차 투표 나머지 (실패)</option>
+                        </>
                       )}
                     </select>
                   </div>
                 </div>
 
-                {branch.triggerType === "specific-player-arrested" && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-dark-400">대상 캐릭터</label>
-                    <select
-                      value={branch.targetPlayerId ?? ""}
-                      onChange={(e) => updateBranch(index, { targetPlayerId: e.target.value || undefined })}
-                      className={inp}
-                    >
-                      <option value="">— 캐릭터 선택 —</option>
-                      {players.map((player) => (
-                        <option key={player.id} value={player.id}>
-                          {player.name || "(이름 없음)"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {branch.triggerType === "custom-choice-selected" && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {(branch.triggerType === "custom-choice-matched" || branch.triggerType === "vote-round-2-matched") && (
+                  <div className="space-y-3">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-dark-400">투표 질문</label>
                       <select
                         value={branch.targetQuestionId ?? ""}
                         onChange={(e) => updateBranch(index, {
                           targetQuestionId: e.target.value || undefined,
-                          targetChoiceId: undefined,
+                          targetChoiceIds: [],
                         })}
                         className={inp}
                       >
                         <option value="">— 질문 선택 —</option>
-                        {voteQuestions.map((q) => (
+                        {voteQuestions
+                          .filter((q) => branch.triggerType === "vote-round-2-matched" ? q.voteRound === 2 : q.voteRound === 1)
+                          .map((q) => (
+                            <option key={q.id} value={q.id}>
+                              {q.label || `질문 (${q.voteRound}차)`}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-dark-400">
+                        이 분기로 연결할 선택지 (복수 선택 가능)
+                      </label>
+                      <div className="space-y-1 max-h-36 overflow-y-auto bg-dark-800/40 rounded-lg p-2">
+                        {(voteQuestions.find((q) => q.id === branch.targetQuestionId)?.choices ?? []).map((c) => (
+                          <label key={c.id} className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded hover:bg-dark-700/50">
+                            <input
+                              type="checkbox"
+                              checked={(branch.targetChoiceIds ?? []).includes(c.id)}
+                              onChange={(e) => {
+                                const ids = e.target.checked
+                                  ? [...(branch.targetChoiceIds ?? []), c.id]
+                                  : (branch.targetChoiceIds ?? []).filter((id) => id !== c.id);
+                                updateBranch(index, { targetChoiceIds: ids });
+                              }}
+                              className="accent-mystery-500 w-3.5 h-3.5 shrink-0"
+                            />
+                            <span className="text-xs text-dark-300">{c.label || "(선택지 없음)"}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(branch.triggerType === "custom-choice-fallback" || branch.triggerType === "vote-round-2-fallback") && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-dark-400">투표 질문</label>
+                    <select
+                      value={branch.targetQuestionId ?? ""}
+                      onChange={(e) => updateBranch(index, { targetQuestionId: e.target.value || undefined })}
+                      className={inp}
+                    >
+                      <option value="">— 질문 선택 —</option>
+                      {voteQuestions
+                        .filter((q) => branch.triggerType === "vote-round-2-fallback" ? q.voteRound === 2 : q.voteRound === 1)
+                        .map((q) => (
                           <option key={q.id} value={q.id}>
                             {q.label || `질문 (${q.voteRound}차)`}
                           </option>
                         ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-dark-400">선택지 결과</label>
-                      <select
-                        value={branch.targetChoiceId ?? ""}
-                        onChange={(e) => updateBranch(index, { targetChoiceId: e.target.value || undefined })}
-                        className={inp}
-                      >
-                        <option value="">— 선택지 선택 —</option>
-                        {(voteQuestions.find((q) => q.id === branch.targetQuestionId)?.choices ?? []).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label || "(선택지 없음)"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    </select>
+                    <p className="text-xs text-dark-600 mt-1">위 질문에서 다른 분기에 연결되지 않은 나머지 선택지가 이 분기로 들어옵니다.</p>
                   </div>
                 )}
 

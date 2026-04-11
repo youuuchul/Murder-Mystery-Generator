@@ -3,6 +3,8 @@ import type { EndingStage, VoteReveal } from "@/types/session";
 
 export const ENDING_STAGE_LABELS: Record<EndingStage, string> = {
   branch: "분기 엔딩",
+  "vote-round-2": "2차 투표",
+  "branch-2": "2차 분기 엔딩",
   personal: "개인 엔딩",
   "author-notes": "작가 노트",
   complete: "공개 완료",
@@ -14,7 +16,8 @@ function hasText(value?: string): boolean {
 
 /** 세션에 저장된 엔딩 단계를 안전한 기본값과 함께 정규화한다. */
 export function normalizeEndingStage(stage?: EndingStage): EndingStage {
-  if (stage === "personal" || stage === "author-notes" || stage === "complete") {
+  if (stage === "personal" || stage === "author-notes" || stage === "complete"
+    || stage === "vote-round-2" || stage === "branch-2") {
     return stage;
   }
 

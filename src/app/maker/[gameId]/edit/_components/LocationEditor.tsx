@@ -250,6 +250,7 @@ function LocationBlock({
       : null,
     location.imageUrl ? "이미지 연결" : null,
     location.accessCondition ? "입장 조건" : null,
+    location.previewCluesEnabled ? "단서 미리보기" : null,
   ].filter(Boolean) as string[];
   const summaryText = location.description.trim() || "장소 설명이 아직 없습니다.";
 
@@ -431,6 +432,32 @@ function LocationBlock({
             />
           </section>
 
+          {/* 획득 전 단서 미리보기 */}
+          <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-dark-100">획득 전 단서 미리보기</p>
+                <p className="mt-1 text-xs text-dark-500">
+                  활성화하면 미획득 단서에 제작자가 입력한 텍스트를 미리 표시합니다.
+                  조사 포인트 힌트나 NPC 대화 선택지 등으로 활용할 수 있습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => update("previewCluesEnabled", !location.previewCluesEnabled)}
+                className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
+                  location.previewCluesEnabled ? "bg-mystery-600" : "bg-dark-700"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                    location.previewCluesEnabled ? "translate-x-4" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </section>
+
           {/* 장소 입장 조건 */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <label className="block text-xs font-medium text-dark-400 mb-2">
@@ -477,6 +504,7 @@ function LocationBlock({
                     allClues={allClues}
                     allLocations={allLocations}
                     allCharacters={allCharacters}
+                    previewEnabled={location.previewCluesEnabled ?? false}
                     onChange={onChangeClue}
                     onDelete={() => onDeleteClue(clue.id)}
                   />
@@ -497,6 +525,7 @@ function ClueForm({
   allClues,
   allLocations,
   allCharacters,
+  previewEnabled,
   onChange,
   onDelete,
 }: {
@@ -505,6 +534,7 @@ function ClueForm({
   allClues: Clue[];
   allLocations: Location[];
   allCharacters: Player[];
+  previewEnabled: boolean;
   onChange: (c: Clue) => void;
   onDelete: () => void;
 }) {
@@ -569,6 +599,11 @@ function ClueForm({
               {clue.condition && !isSceneClue && (
                 <span className="rounded-full border border-mystery-800 bg-mystery-950/30 px-2 py-0.5 text-[11px] text-mystery-400">
                   잠금 조건
+                </span>
+              )}
+              {previewEnabled && (clue.previewTitle || clue.previewDescription) && (
+                <span className="rounded-full border border-amber-800 bg-amber-950/30 px-2 py-0.5 text-[11px] text-amber-400">
+                  미리보기
                 </span>
               )}
             </div>
@@ -661,6 +696,30 @@ function ClueForm({
               emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
             />
           </div>
+
+          {/* 획득 전 미리보기 텍스트 */}
+          {previewEnabled && (
+            <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-3 space-y-2">
+              <label className="block text-xs font-medium text-amber-300/80">
+                획득 전 표시 텍스트
+                <span className="text-dark-600 font-normal ml-1">— 비워두면 기본 "? 카드 #N" 표시</span>
+              </label>
+              <input
+                type="text"
+                value={clue.previewTitle ?? ""}
+                onChange={(e) => update("previewTitle", e.target.value || undefined)}
+                placeholder="예: 책상 위의 편지, 정원사에게 말을 건다"
+                className={inputClass}
+              />
+              <textarea
+                rows={2}
+                value={clue.previewDescription ?? ""}
+                onChange={(e) => update("previewDescription", e.target.value || undefined)}
+                placeholder="미획득 상태에서 플레이어에게 보여줄 부가 설명 (선택)"
+                className={inputClass + " resize-none"}
+              />
+            </div>
+          )}
 
           {/* 단서 획득 조건 */}
           {!isSceneClue && (

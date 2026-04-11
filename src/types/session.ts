@@ -77,7 +77,13 @@ export interface VoteTally {
   voterNames: string[]; // 투표한 실제 참여자 이름 목록
 }
 
-export type EndingStage = "branch" | "personal" | "author-notes" | "complete";
+export type EndingStage = "branch" | "vote-round-2" | "branch-2" | "personal" | "author-notes" | "complete";
+
+/** 질문별 투표 집계 결과 (고급 투표 모드) */
+export interface QuestionTally {
+  questionId: string;
+  tally: VoteTally[];
+}
 
 export interface VoteReveal {
   tally: VoteTally[];
@@ -90,6 +96,10 @@ export interface VoteReveal {
   resolvedBranchId?: string;
   /** legacy field — 기존 데이터 호환용 */
   majorityCorrect?: boolean;
+  /** 고급 투표: 투표 라운드 번호 */
+  voteRound?: number;
+  /** 고급 투표: 질문별 집계 결과 */
+  questionTallies?: QuestionTally[];
 }
 
 /** GM/호스트가 시작한 서버 기반 타이머 상태 */
@@ -118,8 +128,12 @@ export interface SharedState {
   /** 다음 단계 진행 요청을 누른 플레이어 ID 목록 */
   phaseAdvanceRequestPlayerIds: string[];
   voteCount: number;
+  /** 현재 투표 라운드 (고급 투표 모드). 기본값 1. */
+  currentVoteRound?: number;
   endingStage?: EndingStage;
   voteReveal?: VoteReveal;
+  /** 이전 투표 라운드 결과 (2차 투표 시 1차 결과 보존) */
+  previousVoteReveals?: VoteReveal[];
 }
 
 /** 인벤토리에 보유한 단서 카드 1장 */
@@ -167,7 +181,9 @@ export interface GameSession {
   pendingArrestOptions?: string[];
   sharedState: SharedState;
   playerStates: PlayerState[];
-  votes: Record<string, string>; // token → targetPlayerId (비공개, 서버 전용)
+  votes: Record<string, string>; // token → targetPlayerId (비공개, 서버 전용, 기본 투표)
+  /** 고급 투표: token → questionId → targetId */
+  advancedVotes?: Record<string, Record<string, string>>;
   /** AI 플레이어 내부 상태 — 세션 저장에는 포함되지만 플레이어 응답에는 직접 노출하지 않는다. */
   playerAgentState?: PlayerAgentSessionState;
 }

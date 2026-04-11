@@ -24,6 +24,9 @@ export interface GamePackage {
   cards: CardSet;
   scripts: Scripts;
   ending: EndingConfig;
+
+  advancedVotingEnabled: boolean;
+  voteQuestions: VoteQuestion[];
 }
 
 // ─── 설정 ────────────────────────────────────────────────────
@@ -214,6 +217,7 @@ export interface Location {
   clueIds: string[];
   ownerPlayerId?: string;         // 이 장소 소유자 — 해당 플레이어는 접근 불가
   accessCondition?: ClueCondition; // 입장 조건 (없으면 자유 입장)
+  previewCluesEnabled?: boolean;  // 획득 전 단서 미리보기 활성화
 }
 
 export interface Clue {
@@ -228,6 +232,8 @@ export interface Clue {
   /** legacy field — 기존 데이터 호환용 */
   isSecret?: boolean;
   condition?: ClueCondition;   // 획득 조건 (없으면 자유 획득)
+  previewTitle?: string;       // 획득 전 표시 제목 (미리보기 활성화 시)
+  previewDescription?: string; // 획득 전 표시 설명 (미리보기 활성화 시)
 }
 
 // ─── 카드셋 ──────────────────────────────────────────────────
@@ -291,13 +297,16 @@ export interface Scripts {
 export type EndingBranchTriggerType =
   | "culprit-captured"
   | "specific-player-arrested"
-  | "wrong-arrest-fallback";
+  | "wrong-arrest-fallback"
+  | "custom-choice-selected";
 
 export interface EndingBranch {
   id: string;
   label: string;
   triggerType: EndingBranchTriggerType;
   targetPlayerId?: string;
+  targetQuestionId?: string;  // custom-choice-selected: 연결된 질문 ID
+  targetChoiceId?: string;    // custom-choice-selected: 연결된 선택지 ID
   storyText: string;
   personalEndingsEnabled?: boolean;
   personalEndings?: PersonalEnding[];
@@ -325,6 +334,37 @@ export interface EndingConfig {
   personalEndings: PersonalEnding[];
   authorNotesEnabled: boolean;
   authorNotes: AuthorNote[];
+}
+
+// ─── 투표 질문/선택지 ────────────────────────────────────────
+
+export type VoteTargetMode = "players-only" | "players-and-npcs" | "custom-choices";
+
+export interface VoteQuestionChoice {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface VoteQuestionTriggerCondition {
+  requiresVoteRound: number;
+  questionId: string;
+  resultEquals: string;  // targetId가 이 값과 일치할 때 트리거
+}
+
+export interface VoteQuestion {
+  id: string;
+  voteRound: number;                         // 1 = 1차 투표, 2 = 2차 투표
+  label: string;                             // 질문 텍스트
+  description?: string;
+  targetMode: VoteTargetMode;
+  isPrimary: boolean;                        // 엔딩 분기 결정용 주 질문
+  sortOrder: number;
+  triggerCondition?: VoteQuestionTriggerCondition; // 2차 투표 트리거 조건
+  preStoryText?: string;                     // 2차 투표 전 스토리 텍스트
+  preStoryVideoUrl?: string;
+  preStoryBackgroundMusic?: string;
+  choices: VoteQuestionChoice[];             // custom-choices 모드일 때
 }
 
 // ─── 메타데이터 ──────────────────────────────────────────────

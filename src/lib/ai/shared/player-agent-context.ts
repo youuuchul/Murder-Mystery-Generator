@@ -12,6 +12,19 @@ export interface PlayerAgentVisibleCard {
   fromPlayerId?: string;
 }
 
+export interface PlayerAgentVisibleCluePreview {
+  clueId: string;
+  previewTitle: string;
+  previewDescription?: string;
+  acquired: boolean;
+}
+
+export interface PlayerAgentVisibleLocation {
+  id: string;
+  name: string;
+  cluePreview: PlayerAgentVisibleCluePreview[];
+}
+
 export interface PlayerAgentVisibleContext {
   session: {
     id: string;
@@ -39,6 +52,8 @@ export interface PlayerAgentVisibleContext {
     sharedBoard: PlayerSharedBoardContent | null;
   };
   inventory: PlayerAgentVisibleCard[];
+  /** 미리보기가 활성화된 장소의 단서 미리보기 정보 */
+  locationPreviews: PlayerAgentVisibleLocation[];
   conversationHistory: PlayerAgentConversationTurn[];
 }
 
@@ -70,6 +85,8 @@ export function buildPlayerAgentVisibleContext(input: {
       fromPlayerId: item.fromPlayerId,
     };
   });
+
+  const inventoryIds = new Set(input.playerState.inventory.map((item) => item.cardId));
 
   return {
     session: {
@@ -121,6 +138,21 @@ export function buildPlayerAgentVisibleContext(input: {
       sharedBoard: buildPlayerSharedBoardContent(input.game, input.session.sharedState),
     },
     inventory,
+    locationPreviews: input.game.locations
+      .filter((loc) => loc.previewCluesEnabled)
+      .map((loc) => ({
+        id: loc.id,
+        name: loc.name,
+        cluePreview: input.game.clues
+          .filter((c) => c.locationId === loc.id && c.previewTitle)
+          .map((c) => ({
+            clueId: c.id,
+            previewTitle: c.previewTitle!,
+            previewDescription: c.previewDescription,
+            acquired: inventoryIds.has(c.id),
+          })),
+      }))
+      .filter((loc) => loc.cluePreview.length > 0),
     conversationHistory: input.conversationHistory ?? [],
   };
 }

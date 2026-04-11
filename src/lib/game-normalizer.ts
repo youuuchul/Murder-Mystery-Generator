@@ -76,6 +76,7 @@ function normalizeEndingTriggerType(value: unknown): EndingBranch["triggerType"]
   return value === "culprit-captured"
     || value === "specific-player-arrested"
     || value === "wrong-arrest-fallback"
+    || value === "custom-choice-selected"
     ? value
     : "wrong-arrest-fallback";
 }
@@ -226,6 +227,12 @@ function normalizeEndingBranch(
     targetPlayerId: triggerType === "specific-player-arrested"
       ? asOptionalString(branch?.targetPlayerId)
       : undefined,
+    targetQuestionId: triggerType === "custom-choice-selected"
+      ? asOptionalString(branch?.targetQuestionId)
+      : undefined,
+    targetChoiceId: triggerType === "custom-choice-selected"
+      ? asOptionalString(branch?.targetChoiceId)
+      : undefined,
     storyText: asTrimmedString(branch?.storyText),
     personalEndingsEnabled: derivedPersonalEndingsEnabled,
     personalEndings: normalizedPersonalEndings,
@@ -311,6 +318,7 @@ function normalizeLocation(location: Location | undefined): Location {
       : [],
     ownerPlayerId: asOptionalString(location?.ownerPlayerId),
     accessCondition: normalizeClueCondition(location?.accessCondition),
+    previewCluesEnabled: location?.previewCluesEnabled ?? false,
   };
 }
 
@@ -331,6 +339,8 @@ function normalizeClue(clue: Clue | undefined): Clue {
     condition: normalizeClueType(clue?.type) === "scene"
       ? undefined
       : normalizeClueCondition(clue?.condition),
+    previewTitle: asOptionalString(clue?.previewTitle),
+    previewDescription: asOptionalString(clue?.previewDescription),
   };
 }
 
@@ -561,6 +571,8 @@ export function normalizeGame(game: GamePackage): GamePackage {
     },
     scripts,
     ending: normalizeEndingConfig(game.ending, game.scripts),
+    advancedVotingEnabled: game.advancedVotingEnabled ?? false,
+    voteQuestions: Array.isArray(game.voteQuestions) ? game.voteQuestions : [],
   };
 }
 

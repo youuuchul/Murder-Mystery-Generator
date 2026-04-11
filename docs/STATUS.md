@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-10 (DB 전면 정규화 + LangChain 설치 + Langfuse 검증)
+> 마지막 업데이트: 2026-04-11 (고급 게임플레이 백로그 3건 추가 — 단서 미리보기, 투표 확장, 엔딩 분기)
 
 ---
 
@@ -98,6 +98,8 @@
 ## 미착수 — 우선순위순
 
 ### 높음
+- [ ] **획득 전 단서 표시 설정** — 장소별 "획득 전 미리보기" 토글 + 단서별 preview_title/preview_description 입력. 기본 OFF("? 카드 #N" 유지). ON 시 조사 포인트 힌트·NPC 대화 선택지 용도 활용. DB 컬럼 추가(game_locations.preview_clues_enabled, game_clues.preview_title/preview_description). 메이커 LocationEditor, 플레이어 UI, AI 어시스턴트/플레이어 연동. → `docs/plans/20260411_ADVANCED_GAMEPLAY_PLAN.md` §A
+- [ ] **투표 대상 확장 + 다중 질문 + 2차 투표** — (1) 투표 대상: 플레이어만(기본) / +NPC / 커스텀 선택지. (2) 다중 질문 투표: 1차 투표에 여러 질문 포함(범인·도구·개인목표 등). (3) 2차 투표: 1차 결과 조건부로 추가 스토리 공개 후 2차 투표 진행(진엔딩 루트). game_vote_questions + game_vote_question_choices 테이블 신설. 엔딩 분기 트리거 확장. 메이커 투표 설정 UI, 플레이어 VoteScreen, GM Dashboard, ending-flow, AI 플레이어 투표 로직 전면 수정. → `docs/plans/20260411_ADVANCED_GAMEPLAY_PLAN.md` §B+C
 - [x] **서버 기반 공용 타이머** — `SharedState.timerState`로 라운드 타이머 서버 기반 통합. GM/호스트가 시작·일시정지·재개 가능. 플레이어 공통화면 탭에서 카운트다운 표시. 합의 모드 호스트 조작 지원. 비로그인 세션 삭제 권한 수정 ✅ 완료 (2026-04-09)
 - [x] **계정별 동시 세션 수 제한** — 로그인 유저 최대 3개(admin 면제), 비로그인 유저 1개(쿠키 기반 추적). 한도 초과 시 모달로 기존 세션 관리 + `/library/manage/my-sessions` 페이지 추가 ✅ 완료 (2026-04-09)
 - [x] **인물 설정 관계 탭 복구** — 메이커 Step3 관계 탭 정상 확인. 플레이어 인물 정보에서 관계/인상 미입력 시 불필요한 placeholder 텍스트 제거 ✅ 완료 (2026-04-09)
@@ -131,7 +133,7 @@
 - [ ] 시나리오별 프롬프트 override 실제 적용
 - [ ] Langfuse score 체계
 - [ ] 협업자 모델
-- [ ] 엔딩 투표 세부 분기 확장
+- [x] ~~엔딩 투표 세부 분기 확장~~ → 높음 "투표 대상 확장 + 다중 질문 + 2차 투표"로 통합
 
 ---
 

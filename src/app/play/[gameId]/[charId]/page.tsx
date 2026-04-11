@@ -2449,7 +2449,7 @@ export default function PlayerView() {
                                       ? "border-red-900/40 bg-dark-900/40"
                                       : clue.condition
                                       ? "border-yellow-900/50 bg-dark-800/40"
-                                      : "border-dark-700 bg-dark-800/40"
+                                      : "border-amber-900/40 bg-amber-950/10"
                                   }`}
                                 >
                                   <div className="min-w-0 flex-1">
@@ -2480,8 +2480,14 @@ export default function PlayerView() {
                                       </>
                                     ) : (
                                       <>
-                                        <p className="text-sm text-dark-500">? 카드 #{idx + 1}</p>
-                                        <p className="text-xs text-dark-700">획득 후 내용 확인 가능</p>
+                                        <p className="text-sm text-amber-300/90 font-medium break-words">
+                                          {loc.previewCluesEnabled && clue.previewTitle
+                                            ? clue.previewTitle
+                                            : `${loc.name || "장소"} #${idx + 1}`}
+                                        </p>
+                                        {loc.previewCluesEnabled && clue.previewDescription && (
+                                          <p className="text-xs mt-0.5 break-words text-dark-500">{clue.previewDescription}</p>
+                                        )}
                                       </>
                                     )}
                                   </div>

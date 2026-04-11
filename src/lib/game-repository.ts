@@ -47,6 +47,7 @@ interface GamesRow {
   card_trading_enabled: boolean;
   clues_per_round: number;
   allow_location_revisit: boolean;
+  advanced_voting_enabled: boolean;
 }
 
 // ─── Helpers ───────────────────────────────────────────────
@@ -137,6 +138,7 @@ function buildGamesRowFromPackage(game: GamePackage): Record<string, unknown> {
     card_trading_enabled: game.rules.cardTrading.enabled,
     clues_per_round: game.rules.cluesPerRound,
     allow_location_revisit: game.rules.allowLocationRevisit,
+    advanced_voting_enabled: game.advancedVotingEnabled ?? false,
   };
 }
 
@@ -173,6 +175,8 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
     branchesResult,
     personalEndingsResult,
     authorNotesResult,
+    voteQuestionsResult,
+    voteQuestionChoicesResult,
   ] = await Promise.all([
     supabase.from("game_stories").select("*").eq("game_id", gameId).maybeSingle(),
     supabase.from("game_timeline_slots").select("*").eq("game_id", gameId).order("sort_order"),
@@ -189,6 +193,8 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
     supabase.from("game_ending_branches").select("*").eq("game_id", gameId).order("sort_order"),
     supabase.from("branch_personal_endings").select("*").eq("game_id", gameId),
     supabase.from("game_author_notes").select("*").eq("game_id", gameId).order("sort_order"),
+    supabase.from("game_vote_questions").select("*").eq("game_id", gameId).order("sort_order"),
+    supabase.from("game_vote_question_choices").select("*").eq("game_id", gameId).order("sort_order"),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,6 +226,10 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
   const personalEndingRows = (personalEndingsResult.data ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const authorNoteRows = (authorNotesResult.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const voteQuestionRows = (voteQuestionsResult.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const voteChoiceRows = (voteQuestionChoicesResult.data ?? []) as any[];
 
   // 3. 인덱스 맵 구축
   const timelineByPlayer = new Map<string, Array<{ slotId: string; action: string }>>();
@@ -248,6 +258,14 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
     const list = peByBranch.get(pe.branch_id) ?? [];
     list.push({ playerId: pe.player_id, title: pe.title ?? undefined, text: pe.body_text });
     peByBranch.set(pe.branch_id, list);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const choicesByQuestion = new Map<string, any[]>();
+  for (const vc of voteChoiceRows) {
+    const list = choicesByQuestion.get(vc.question_id) ?? [];
+    list.push(vc);
+    choicesByQuestion.set(vc.question_id, list);
   }
 
   // 4. GamePackage 조합
@@ -365,6 +383,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       clueIds: clueIdsByLocation.get(l.id) ?? [],
       ownerPlayerId: l.owner_player_id ?? undefined,
       accessCondition: l.access_condition ?? undefined,
+      previewCluesEnabled: l.preview_clues_enabled ?? false,
     })),
     clues: clueRows.map((c) => ({
       id: c.id,
@@ -374,6 +393,8 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       imageUrl: c.image_url ?? undefined,
       locationId: c.location_id ?? "",
       condition: c.condition ?? undefined,
+      previewTitle: c.preview_title ?? undefined,
+      previewDescription: c.preview_description ?? undefined,
     })),
     cards: {
       characterCards: cardRows
@@ -420,6 +441,8 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
         label: b.label,
         triggerType: b.trigger_type,
         targetPlayerId: b.target_player_id ?? undefined,
+        targetQuestionId: b.trigger_question_id ?? undefined,
+        targetChoiceId: b.trigger_choice_id ?? undefined,
         storyText: b.story_text,
         personalEndingsEnabled: b.personal_endings_enabled ?? false,
         personalEndings: peByBranch.get(b.id) ?? [],
@@ -435,6 +458,25 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
         content: n.content,
       })),
     },
+    advancedVotingEnabled: g.advanced_voting_enabled ?? false,
+    voteQuestions: voteQuestionRows.map((q) => ({
+      id: q.id,
+      voteRound: q.vote_round ?? 1,
+      label: q.label ?? "",
+      description: q.description ?? undefined,
+      targetMode: q.target_mode ?? "players-only",
+      isPrimary: q.is_primary ?? false,
+      sortOrder: q.sort_order ?? 0,
+      triggerCondition: q.trigger_condition ?? undefined,
+      preStoryText: q.pre_story_text ?? undefined,
+      preStoryVideoUrl: q.pre_story_video_url ?? undefined,
+      preStoryBackgroundMusic: q.pre_story_background_music ?? undefined,
+      choices: (choicesByQuestion.get(q.id) ?? []).map((c: { id: string; label: string; description?: string }) => ({
+        id: c.id,
+        label: c.label ?? "",
+        description: c.description ?? undefined,
+      })),
+    })),
   };
 
   return normalizeGame(rawPackage);
@@ -554,6 +596,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
         id: l.id, game_id: gameId, name: l.name, description: l.description,
         image_url: l.imageUrl ?? null, unlocks_at_round: l.unlocksAtRound ?? null,
         owner_player_id: l.ownerPlayerId ?? null, access_condition: l.accessCondition ?? null,
+        preview_clues_enabled: l.previewCluesEnabled ?? false,
         sort_order: i,
       }))
     );
@@ -567,7 +610,9 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       normalizedGame.clues.map((c, i) => ({
         id: c.id, game_id: gameId, title: c.title, description: c.description,
         type: c.type, image_url: c.imageUrl ?? null, location_id: c.locationId ?? null,
-        condition: c.condition ?? null, sort_order: i,
+        condition: c.condition ?? null,
+        preview_title: c.previewTitle ?? null, preview_description: c.previewDescription ?? null,
+        sort_order: i,
       }))
     );
     if (error) throw new Error(`Failed to insert game_clues: ${error.message}`);
@@ -638,6 +683,8 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
         target_player_id: b.targetPlayerId ?? null, story_text: b.storyText,
         personal_endings_enabled: b.personalEndingsEnabled ?? false,
         video_url: b.videoUrl ?? null, background_music: b.backgroundMusic ?? null,
+        trigger_question_id: b.targetQuestionId ?? null,
+        trigger_choice_id: b.targetChoiceId ?? null,
         sort_order: i,
       }))
     );
@@ -664,6 +711,37 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       }))
     );
     if (error) throw new Error(`Failed to insert game_author_notes: ${error.message}`);
+  }
+
+  // 13. vote questions + choices — delete + insert
+  await supabase.from("game_vote_question_choices").delete().eq("game_id", gameId);
+  await supabase.from("game_vote_questions").delete().eq("game_id", gameId);
+
+  if (normalizedGame.voteQuestions.length > 0) {
+    const { error: vqError } = await supabase.from("game_vote_questions").insert(
+      normalizedGame.voteQuestions.map((q, i) => ({
+        id: q.id, game_id: gameId, vote_round: q.voteRound,
+        label: q.label, description: q.description ?? null,
+        target_mode: q.targetMode, is_primary: q.isPrimary,
+        sort_order: i, trigger_condition: q.triggerCondition ?? null,
+        pre_story_text: q.preStoryText ?? null,
+        pre_story_video_url: q.preStoryVideoUrl ?? null,
+        pre_story_background_music: q.preStoryBackgroundMusic ?? null,
+      }))
+    );
+    if (vqError) throw new Error(`Failed to insert game_vote_questions: ${vqError.message}`);
+
+    const choiceRows = normalizedGame.voteQuestions.flatMap((q) =>
+      q.choices.map((c, ci) => ({
+        id: c.id, game_id: gameId, question_id: q.id,
+        label: c.label, description: c.description ?? null,
+        sort_order: ci,
+      }))
+    );
+    if (choiceRows.length > 0) {
+      const { error: vcError } = await supabase.from("game_vote_question_choices").insert(choiceRows);
+      if (vcError) throw new Error(`Failed to insert game_vote_question_choices: ${vcError.message}`);
+    }
   }
 }
 

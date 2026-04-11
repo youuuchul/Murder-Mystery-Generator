@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
         authorNotesEnabled: false,
         authorNotes: [],
       },
+      advancedVotingEnabled: false,
+      voteQuestions: [],
     };
 
     await saveGame(game);

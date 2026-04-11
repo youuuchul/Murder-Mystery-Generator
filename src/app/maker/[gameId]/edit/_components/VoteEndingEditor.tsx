@@ -30,7 +30,6 @@ function createVoteQuestion(voteRound: number, purpose: "ending" | "personal" = 
     voteRound,
     label: "",
     targetMode: "players-only",
-    isPrimary: false,
     purpose,
     sortOrder: 0,
     choices: [],
@@ -70,11 +69,6 @@ function VoteQuestionForm({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              {question.isPrimary && (
-                <span className="rounded-full border border-mystery-800 bg-mystery-950/30 px-2 py-0.5 text-[11px] text-mystery-400">
-                  주 질문
-                </span>
-              )}
               <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400">
                 {TARGET_MODE_LABELS[question.targetMode]}
               </span>
@@ -141,19 +135,6 @@ function VoteQuestionForm({
                   <option key={m} value={m}>{TARGET_MODE_LABELS[m]}</option>
                 ))}
               </select>
-            </div>
-            <div className="flex items-end">
-              {question.purpose === "ending" && (
-                <label className="flex items-center gap-2 cursor-pointer py-2">
-                  <input
-                    type="checkbox"
-                    checked={question.isPrimary}
-                    onChange={(e) => onChange({ isPrimary: e.target.checked })}
-                    className="accent-mystery-500 w-3.5 h-3.5"
-                  />
-                  <span className="text-xs text-dark-400">엔딩 분기 결정용 (주 질문)</span>
-                </label>
-              )}
             </div>
           </div>
 
@@ -356,26 +337,18 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
           {/* 투표 안내 텍스트 */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-3">
             <p className="text-sm font-semibold text-dark-100">투표 안내</p>
-            <div>
-              <label className="block text-xs text-dark-500 mb-1">투표 안내 텍스트</label>
-              <textarea
-                rows={3}
-                value={voteScript.narration}
-                onChange={(e) => updateVoteScript({ ...voteScript, narration: e.target.value })}
-                placeholder="투표 규칙을 짧고 분명하게 안내하세요."
-                className={inp + " resize-none"}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-500 mb-1">GM 노트 (선택)</label>
-              <textarea
-                rows={2}
-                value={voteScript.gmNote ?? ""}
-                onChange={(e) => updateVoteScript({ ...voteScript, gmNote: e.target.value || undefined })}
-                placeholder="GM 전용 메모"
-                className={inp + " resize-none"}
-              />
-            </div>
+            <p className="text-xs text-dark-500">
+              {advancedVotingEnabled
+                ? "투표 시작 시 플레이어 전원에게 표시되는 공통 안내입니다. 각 질문 텍스트는 아래에서 별도로 입력합니다."
+                : "투표 시작 시 플레이어 전원에게 표시됩니다."}
+            </p>
+            <textarea
+              rows={3}
+              value={voteScript.narration}
+              onChange={(e) => updateVoteScript({ ...voteScript, narration: e.target.value })}
+              placeholder={advancedVotingEnabled ? "예: 모든 조사가 끝났습니다. 이제 최종 투표를 시작합니다." : "예: 범인이라 생각하는 인물에게 투표하세요."}
+              className={inp + " resize-none"}
+            />
           </section>
 
           {/* 고급 투표 설정 */}

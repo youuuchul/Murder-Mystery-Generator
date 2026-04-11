@@ -65,7 +65,7 @@ function resolveAdvancedEndingBranchId(
   game: LoadedGame,
   questionTallies: QuestionTally[]
 ): string | undefined {
-  const primaryQuestion = game.voteQuestions.find((q) => q.isPrimary && q.purpose === "ending");
+  const primaryQuestion = game.voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
   if (!primaryQuestion) return undefined;
 
   const primaryTally = questionTallies.find((qt) => qt.questionId === primaryQuestion.id);
@@ -218,7 +218,7 @@ async function revealVotes(
         const resolvedBranchId = resolveAdvancedEndingBranchId(game, questionTallies);
 
         // primary question의 최다 득표로 arrestedPlayerId 결정 (players 모드일 때)
-        const primaryQ = game.voteQuestions.find((q) => q.isPrimary);
+        const primaryQ = game.voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
         const primaryTally = questionTallies.find((qt) => qt.questionId === primaryQ?.id);
         const topTargetId = primaryTally?.tally[0]?.playerId;
 

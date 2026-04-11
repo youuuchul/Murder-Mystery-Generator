@@ -365,7 +365,6 @@ export interface VoteQuestion {
   label: string;                             // 질문 텍스트
   description?: string;
   targetMode: VoteTargetMode;
-  isPrimary: boolean;                        // 엔딩 분기 결정용 주 질문
   purpose: VoteQuestionPurpose;              // ending = 엔딩 결정, personal = 개인 목표
   sortOrder: number;
   triggerCondition?: VoteQuestionTriggerCondition; // 2차 투표 트리거 조건

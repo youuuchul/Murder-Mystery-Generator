@@ -466,7 +466,6 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       label: q.label ?? "",
       description: q.description ?? undefined,
       targetMode: q.target_mode ?? "players-only",
-      isPrimary: q.is_primary ?? false,
       purpose: q.purpose ?? "ending",
       sortOrder: q.sort_order ?? 0,
       triggerCondition: q.trigger_condition ?? undefined,
@@ -725,7 +724,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       normalizedGame.voteQuestions.map((q, i) => ({
         id: q.id, game_id: gameId, vote_round: q.voteRound,
         label: q.label, description: q.description ?? null,
-        target_mode: q.targetMode, is_primary: q.isPrimary, purpose: q.purpose ?? "ending",
+        target_mode: q.targetMode, purpose: q.purpose ?? "ending",
         sort_order: i, trigger_condition: q.triggerCondition ?? null,
         pre_story_text: q.preStoryText ?? null,
         pre_story_video_url: q.preStoryVideoUrl ?? null,

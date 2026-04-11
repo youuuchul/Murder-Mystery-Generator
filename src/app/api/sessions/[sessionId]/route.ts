@@ -212,7 +212,7 @@ async function recoverConsensusVoteTieIfNeeded(sessionId: string, session: GameS
       latestSession.pendingArrestOptions = undefined;
       latestSession.sharedState.voteReveal = reveal;
       latestSession.sharedState.phase = "ending";
-      latestSession.sharedState.endingStage = "branch";
+      latestSession.sharedState.endingStage = "vote-result";
       markPhaseStarted(latestSession.sharedState, now);
 
       if (latestSession.playerAgentState) {
@@ -469,6 +469,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           }
 
           sharedState.endingStage = nextStage;
+
+          // 2차 투표 진입 시 투표 상태 리셋
+          if (nextStage === "vote-round-2") {
+            sharedState.currentVoteRound = 2;
+            sharedState.voteCount = 0;
+            latestSession.advancedVotes = {};
+          }
+
           message = `${ENDING_STAGE_LABELS[nextStage]} 단계가 공개됩니다.`;
         } else if (body.action === "end_session") {
           if (sharedState.phase !== "ending") {

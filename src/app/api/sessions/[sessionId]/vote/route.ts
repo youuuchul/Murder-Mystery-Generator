@@ -100,6 +100,33 @@ function resolveAdvancedEndingBranchId(
   return undefined;
 }
 
+/** 2차 투표: 주 질문의 최다 득표 선택지 기반으로 2차 엔딩 분기를 찾는다. */
+function resolveRound2EndingBranchId(
+  game: LoadedGame,
+  questionTallies: QuestionTally[]
+): string | undefined {
+  const round2Question = game.voteQuestions.find((q) => q.voteRound === 2 && q.purpose === "ending");
+  if (!round2Question) return undefined;
+
+  const round2Tally = questionTallies.find((qt) => qt.questionId === round2Question.id);
+  if (!round2Tally || round2Tally.tally.length === 0) return undefined;
+
+  const topTargetId = round2Tally.tally[0].playerId;
+
+  const matchedBranch = game.ending.branches.find((b) =>
+    b.triggerType === "vote-round-2-matched"
+    && b.targetQuestionId === round2Question.id
+    && (b.targetChoiceIds ?? []).includes(topTargetId)
+  );
+  if (matchedBranch) return matchedBranch.id;
+
+  const fallbackBranch = game.ending.branches.find((b) =>
+    b.triggerType === "vote-round-2-fallback"
+    && b.targetQuestionId === round2Question.id
+  );
+  return fallbackBranch?.id;
+}
+
 /** 고급 투표: targetId가 유효한 대상인지 검증 */
 function validateVoteTarget(game: GamePackage, targetMode: VoteTargetMode, targetId: string): boolean {
   switch (targetMode) {
@@ -235,7 +262,7 @@ async function revealVotes(
         latestSession.pendingArrestOptions = undefined;
         latestSession.sharedState.voteReveal = reveal;
         latestSession.sharedState.phase = "ending";
-        latestSession.sharedState.endingStage = "branch";
+        latestSession.sharedState.endingStage = "vote-result";
         markPhaseStarted(latestSession.sharedState, now);
         if (latestSession.playerAgentState) {
           latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
@@ -255,32 +282,55 @@ async function revealVotes(
       // 기본 투표 로직
       const tally = buildVoteTally(latestSession as LoadedSession);
       const tiedCandidates = resolveTiedCandidates(tally);
-      const resolvedForcedArrestedPlayerId = forcedArrestedPlayerId
-        || (
-          tiedCandidates.length > 1 && latestSession.mode === "player-consensus"
-            ? pickDeterministicArrestedPlayerId(latestSession.id, tiedCandidates)
-            : undefined
-        );
+      const revoteCount = latestSession.sharedState.revoteCount ?? 0;
+      let resolvedArrestedId = forcedArrestedPlayerId;
 
-      if (!resolvedForcedArrestedPlayerId && tiedCandidates.length > 1) {
-        latestSession.pendingArrestOptions = tiedCandidates;
-        latestSession.sharedState.eventLog.push({
-          id: crypto.randomUUID(),
-          timestamp: now,
-          message: "최다 득표 동률입니다. GM이 최종 검거 대상을 선택해야 합니다.",
-          type: "system",
-        });
+      // 동점 처리: 재투표 또는 랜덤 확정
+      if (!resolvedArrestedId && tiedCandidates.length > 1) {
+        if (revoteCount >= 1) {
+          // 재투표에서도 동점 → 랜덤 확정
+          const randomIdx = Math.floor(Math.random() * tiedCandidates.length);
+          resolvedArrestedId = tiedCandidates[randomIdx];
 
-        return {
-          requiresTieBreak: true,
-          pendingArrestOptions: tiedCandidates,
-        };
+          latestSession.sharedState.revoteCandidateIds = undefined;
+          latestSession.sharedState.revoteCount = undefined;
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: now,
+            message: `재투표에서도 동률이 발생해 무작위로 검거 대상이 확정됐습니다.`,
+            type: "system",
+          });
+        } else {
+          // 첫 동점 → 재투표 진입
+          latestSession.votes = {};
+          latestSession.sharedState.voteCount = 0;
+          latestSession.sharedState.revoteCandidateIds = tiedCandidates;
+          latestSession.sharedState.revoteCount = 1;
+          latestSession.sharedState.eventLog.push({
+            id: crypto.randomUUID(),
+            timestamp: now,
+            message: `최다 득표 동률입니다. 동점 후보 ${tiedCandidates.length}명에 대해 재투표를 진행합니다.`,
+            type: "system",
+          });
+
+          return {
+            requiresTieBreak: false,
+            pendingArrestOptions: [] as string[],
+            isRevote: true,
+          };
+        }
+      }
+
+      // 재투표 상태 정리
+      if (latestSession.sharedState.revoteCandidateIds) {
+        latestSession.sharedState.revoteCandidateIds = undefined;
+        latestSession.sharedState.revoteCount = undefined;
       }
 
       const totalVotes = Object.keys(latestSession.votes).length;
       const culpritVotes = tally.find((entry) => entry.playerId === culpritPlayerId)?.count ?? 0;
       const majorityCorrect = totalVotes > 0 && culpritVotes > totalVotes / 2;
-      const arrestedPlayerId = resolvedForcedArrestedPlayerId ?? tally[0]?.playerId ?? "";
+      const arrestedPlayerId = resolvedArrestedId ?? tally[0]?.playerId ?? "";
       const resultType = arrestedPlayerId === culpritPlayerId
         ? "culprit-captured"
         : "wrong-arrest";
@@ -299,7 +349,7 @@ async function revealVotes(
       latestSession.pendingArrestOptions = undefined;
       latestSession.sharedState.voteReveal = reveal;
       latestSession.sharedState.phase = "ending";
-      latestSession.sharedState.endingStage = "branch";
+      latestSession.sharedState.endingStage = "vote-result";
       markPhaseStarted(latestSession.sharedState, now);
       if (latestSession.playerAgentState) {
         latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
@@ -345,6 +395,61 @@ async function revealVotes(
   };
 }
 
+/** 2차 투표 결과 공개: advancedVotes에서 voteRound=2 질문만 집계 후 엔딩 분기 결정 */
+async function revealRound2Votes(sessionId: string, session: LoadedSession | null) {
+  if (!session) return;
+
+  const { session: persistedSession } = await mutateSessionWithRetry(
+    sessionId,
+    async (latestSession) => {
+      const now = new Date().toISOString();
+      const game = await getGame(latestSession.gameId);
+      if (!game) throw new Error("Game not found");
+
+      const questionTallies = buildAdvancedVoteTallies(latestSession as LoadedSession);
+      // 2차 질문만 필터
+      const round2Q = game.voteQuestions.find((q) => q.voteRound === 2 && q.purpose === "ending");
+      const round2Tally = questionTallies.find((qt) => qt.questionId === round2Q?.id);
+
+      const resolvedBranchId = resolveRound2EndingBranchId(game, questionTallies);
+
+      // 1차 reveal을 previousVoteReveals에 보존
+      const prevReveal = latestSession.sharedState.voteReveal;
+      if (prevReveal) {
+        latestSession.sharedState.previousVoteReveals = [
+          ...(latestSession.sharedState.previousVoteReveals ?? []),
+          prevReveal,
+        ];
+      }
+
+      const reveal: VoteReveal = {
+        tally: round2Tally?.tally ?? [],
+        culpritPlayerId: game.story.culpritPlayerId ?? "",
+        resolvedBranchId,
+        voteRound: 2,
+        questionTallies,
+      };
+
+      latestSession.sharedState.voteReveal = reveal;
+      latestSession.sharedState.endingStage = "branch-2";
+      latestSession.sharedState.voteCount = 0;
+      // advancedVotes 초기화 (2차 투표 데이터 제거)
+      latestSession.advancedVotes = {};
+
+      latestSession.sharedState.eventLog.push({
+        id: crypto.randomUUID(),
+        timestamp: now,
+        message: "2차 투표 결과가 공개됐습니다.",
+        type: "vote_revealed",
+      });
+
+      return {};
+    }
+  );
+
+  broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+}
+
 /** POST /api/sessions/[sessionId]/vote — 투표 제출 */
 export async function POST(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
@@ -364,7 +469,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { session: persistedSession, result } = await mutateSessionWithRetry(
       sessionId,
       async (latestSession) => {
-        if (latestSession.sharedState.phase !== "vote") {
+        const isVotePhase = latestSession.sharedState.phase === "vote";
+        const isRound2Vote = latestSession.sharedState.phase === "ending"
+          && latestSession.sharedState.endingStage === "vote-round-2";
+        if (!isVotePhase && !isRound2Vote) {
           throw new Error("투표 페이즈가 아닙니다");
         }
 
@@ -435,6 +543,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           allVoted: (latestSession.sharedState.voteCount ?? 0) >= totalPlayers,
           forcedArrestedPlayerId: undefined,
           isAdvanced,
+          isRound2Vote,
         };
       }
     );
@@ -443,7 +552,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     let revealState: Awaited<ReturnType<typeof revealVotes>> | null = null;
     if (result.allVoted) {
-      revealState = await revealVotes(sessionId, persistedSession, result.forcedArrestedPlayerId);
+      if (result.isRound2Vote) {
+        await revealRound2Votes(sessionId, persistedSession);
+      } else {
+        revealState = await revealVotes(sessionId, persistedSession, result.forcedArrestedPlayerId);
+      }
     }
 
     return NextResponse.json({

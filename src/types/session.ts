@@ -77,7 +77,15 @@ export interface VoteTally {
   voterNames: string[]; // 투표한 실제 참여자 이름 목록
 }
 
-export type EndingStage = "branch" | "vote-round-2" | "branch-2" | "personal" | "author-notes" | "complete";
+export type EndingStage =
+  | "vote-result"
+  | "branch"
+  | "vote-round-2-pre-story"
+  | "vote-round-2"
+  | "branch-2"
+  | "personal"
+  | "author-notes"
+  | "complete";
 
 /** 질문별 투표 집계 결과 (고급 투표 모드) */
 export interface QuestionTally {
@@ -134,6 +142,10 @@ export interface SharedState {
   voteReveal?: VoteReveal;
   /** 이전 투표 라운드 결과 (2차 투표 시 1차 결과 보존) */
   previousVoteReveals?: VoteReveal[];
+  /** 동점 재투표: 재투표 대상 캐릭터 ID 목록. 설정 시 투표 화면에서 이 목록만 선택 가능. */
+  revoteCandidateIds?: string[];
+  /** 동점 재투표 횟수. 0=최초 투표, 1=1차 재투표. 2차 재투표도 동점이면 랜덤 확정. */
+  revoteCount?: number;
 }
 
 /** 인벤토리에 보유한 단서 카드 1장 */

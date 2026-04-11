@@ -2,11 +2,13 @@ import type { EndingBranch, GamePackage, PersonalEnding } from "@/types/game";
 import type { EndingStage, VoteReveal } from "@/types/session";
 
 export const ENDING_STAGE_LABELS: Record<EndingStage, string> = {
+  "vote-result": "투표 결과",
   branch: "분기 엔딩",
+  "vote-round-2-pre-story": "2차 투표 안내",
   "vote-round-2": "2차 투표",
   "branch-2": "2차 분기 엔딩",
   personal: "개인 엔딩",
-  "author-notes": "작가 노트",
+  "author-notes": "작가 후기",
   complete: "공개 완료",
 };
 
@@ -16,12 +18,20 @@ function hasText(value?: string): boolean {
 
 /** 세션에 저장된 엔딩 단계를 안전한 기본값과 함께 정규화한다. */
 export function normalizeEndingStage(stage?: EndingStage): EndingStage {
-  if (stage === "personal" || stage === "author-notes" || stage === "complete"
-    || stage === "vote-round-2" || stage === "branch-2") {
+  if (
+    stage === "vote-result"
+    || stage === "branch"
+    || stage === "vote-round-2-pre-story"
+    || stage === "vote-round-2"
+    || stage === "branch-2"
+    || stage === "personal"
+    || stage === "author-notes"
+    || stage === "complete"
+  ) {
     return stage;
   }
 
-  return "branch";
+  return "vote-result";
 }
 
 /** 개인 엔딩 단계가 실제로 필요한지 판단한다. */
@@ -45,9 +55,13 @@ function hasSecondVoteRound(game: GamePackage): boolean {
 
 /** 현재 게임 설정에서 가능한 엔딩 단계 순서를 계산한다. */
 export function getEndingStageOrder(game: GamePackage, reveal?: VoteReveal): EndingStage[] {
-  const stages: EndingStage[] = ["branch"];
+  const stages: EndingStage[] = ["vote-result", "branch"];
 
   if (hasSecondVoteRound(game)) {
+    const round2Q = game.voteQuestions.find((q) => q.voteRound === 2);
+    if (round2Q?.preStoryText?.trim()) {
+      stages.push("vote-round-2-pre-story");
+    }
     stages.push("vote-round-2");
     stages.push("branch-2");
   }

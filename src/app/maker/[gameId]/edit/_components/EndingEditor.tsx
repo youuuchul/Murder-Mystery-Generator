@@ -4,6 +4,7 @@ import { useState } from "react";
 import type {
   AuthorNote,
   EndingBranch,
+  EndingBranchTriggerType,
   EndingConfig,
   Player,
   PersonalEnding,
@@ -37,6 +38,15 @@ function getEffectiveChoices(
   return players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
 }
 
+const TRIGGER_TYPE_LABELS: Record<EndingBranchTriggerType, string> = {
+  "culprit-captured": "범인 검거",
+  "culprit-escaped": "미검거",
+  "custom-choice-matched": "1차 투표",
+  "custom-choice-fallback": "1차 나머지",
+  "vote-round-2-matched": "2차 투표",
+  "vote-round-2-fallback": "2차 나머지",
+};
+
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 const ta = `${inp} resize-none`;
 
@@ -54,91 +64,187 @@ function normalizeBranchPersonalEndings(
   });
 }
 
-/** 분기를 찾거나 없으면 새로 만든다 */
-function ensureBranch(
-  branches: EndingBranch[],
-  triggerType: EndingBranch["triggerType"],
-  label: string,
-  extra?: Partial<EndingBranch>
-): EndingBranch {
-  const existing = branches.find((b) => {
-    if (b.triggerType !== triggerType) return false;
-    if (extra?.targetQuestionId && b.targetQuestionId !== extra.targetQuestionId) return false;
-    if (extra?.targetChoiceIds?.length && !extra.targetChoiceIds.every((id) => (b.targetChoiceIds ?? []).includes(id))) return false;
-    return true;
-  });
-  return existing ?? {
-    id: crypto.randomUUID(),
-    label,
-    triggerType,
-    storyText: "",
-    ...extra,
-  };
-}
-
-// ─── 엔딩 분기 1개 편집 폼 ─────────────────────────────────
+// ─── 엔딩 분기 스토리 폼 ─────────────────────────────────
 
 function BranchStoryForm({
   branch,
   label,
   sublabel,
+  badge,
   onChangeStory,
   onChangeVideo,
   onChangeMusic,
+  onDelete,
+  children,
 }: {
   branch: EndingBranch;
   label: string;
   sublabel?: string;
+  badge?: string;
   onChangeStory: (v: string) => void;
   onChangeVideo: (v: string | undefined) => void;
   onChangeMusic: (v: string | undefined) => void;
+  onDelete?: () => void;
+  children?: React.ReactNode;
 }) {
   const [showMedia, setShowMedia] = useState(Boolean(branch.videoUrl || branch.backgroundMusic));
+  const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-4 space-y-3">
-      <div>
-        <p className="text-sm font-medium text-dark-100">{label}</p>
-        {sublabel && <p className="text-xs text-dark-500 mt-0.5">{sublabel}</p>}
-      </div>
-      <textarea
-        rows={5}
-        value={branch.storyText}
-        onChange={(e) => onChangeStory(e.target.value)}
-        placeholder="이 분기에서 플레이어에게 보여줄 엔딩 텍스트"
-        className={ta}
-      />
+    <div className="rounded-xl border border-dark-700/70 bg-dark-900/40 overflow-hidden">
       <button
         type="button"
-        onClick={() => setShowMedia(!showMedia)}
-        className="text-xs text-dark-500 hover:text-dark-300 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-4 py-3 text-left hover:bg-dark-900/60 transition-colors"
       >
-        {showMedia ? "미디어 접기" : "영상/음악 URL 추가"}
-      </button>
-      {showMedia && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs text-dark-500">영상 URL</label>
-            <input
-              type="url"
-              value={branch.videoUrl ?? ""}
-              onChange={(e) => onChangeVideo(e.target.value || undefined)}
-              placeholder="https://..."
-              className={inp}
-            />
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-2">
+            {badge && (
+              <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400 shrink-0">
+                {badge}
+              </span>
+            )}
+            <div>
+              <p className="text-sm font-medium text-dark-100">{label}</p>
+              {sublabel && <p className="text-xs text-dark-500 mt-0.5">{sublabel}</p>}
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-dark-500">배경 음악 URL</label>
-            <input
-              type="url"
-              value={branch.backgroundMusic ?? ""}
-              onChange={(e) => onChangeMusic(e.target.value || undefined)}
-              placeholder="https://..."
-              className={inp}
-            />
+          <div className="flex items-center gap-2 shrink-0">
+            {onDelete && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="rounded-lg border border-dark-700 px-2.5 py-1.5 text-xs text-dark-500 hover:border-red-900/50 hover:text-red-400 transition-colors"
+              >
+                삭제
+              </button>
+            )}
+            <span className="text-xs text-dark-500">{expanded ? "접기" : "열기"}</span>
           </div>
         </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-dark-800/80 px-4 pb-4 pt-3 space-y-3">
+          {children}
+          <textarea
+            rows={5}
+            value={branch.storyText}
+            onChange={(e) => onChangeStory(e.target.value)}
+            placeholder="이 분기에서 플레이어에게 보여줄 엔딩 텍스트"
+            className={ta}
+          />
+          <button
+            type="button"
+            onClick={() => setShowMedia(!showMedia)}
+            className="text-xs text-dark-500 hover:text-dark-300 transition-colors"
+          >
+            {showMedia ? "미디어 접기" : "영상/음악 URL 추가"}
+          </button>
+          {showMedia && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-dark-500">영상 URL</label>
+                <input
+                  type="url"
+                  value={branch.videoUrl ?? ""}
+                  onChange={(e) => onChangeVideo(e.target.value || undefined)}
+                  placeholder="https://..."
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-dark-500">배경 음악 URL</label>
+                <input
+                  type="url"
+                  value={branch.backgroundMusic ?? ""}
+                  onChange={(e) => onChangeMusic(e.target.value || undefined)}
+                  placeholder="https://..."
+                  className={inp}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+// ─── 선택지 매핑 체크박스 ────────────────────────────────
+
+function ChoiceMapper({
+  choices,
+  branchId,
+  selectedIds,
+  otherBranches,
+  disabledIds,
+  disabledLabel,
+  onChange,
+}: {
+  choices: { id: string; label: string }[];
+  branchId: string;
+  selectedIds: string[];
+  otherBranches: EndingBranch[];
+  disabledIds: Set<string>;
+  disabledLabel: string;
+  onChange: (ids: string[]) => void;
+}) {
+  // 다른 분기에 매핑된 선택지 추적
+  const otherBranchMap = new Map<string, string>();
+  for (const b of otherBranches) {
+    if (b.id === branchId) continue;
+    for (const cId of b.targetChoiceIds ?? []) {
+      otherBranchMap.set(cId, b.label || "(이름 없음)");
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-dark-500">선택지 매핑</p>
+      {choices.map((c) => {
+        const isSelected = selectedIds.includes(c.id);
+        const isDisabled = disabledIds.has(c.id);
+        const mappedTo = otherBranchMap.get(c.id);
+        const isOtherMapped = Boolean(mappedTo) && !isSelected;
+
+        return (
+          <label
+            key={c.id}
+            className={[
+              "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+              isDisabled
+                ? "border-dark-800 bg-dark-950/30 text-dark-600 cursor-not-allowed"
+                : isOtherMapped
+                  ? "border-dark-800 bg-dark-950/20 text-dark-500 cursor-not-allowed"
+                  : isSelected
+                    ? "border-mystery-700 bg-mystery-950/20 text-dark-100"
+                    : "border-dark-700 bg-dark-900/30 text-dark-300 hover:border-dark-600 cursor-pointer",
+            ].join(" ")}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              disabled={isDisabled || isOtherMapped}
+              onChange={() => {
+                if (isSelected) {
+                  onChange(selectedIds.filter((id) => id !== c.id));
+                } else {
+                  onChange([...selectedIds, c.id]);
+                }
+              }}
+              className="accent-mystery-500"
+            />
+            <span className="flex-1">{c.label}</span>
+            {isDisabled && (
+              <span className="text-[11px] text-yellow-400/70">{disabledLabel}</span>
+            )}
+            {isOtherMapped && (
+              <span className="text-[11px] text-dark-600">{mappedTo}</span>
+            )}
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -176,6 +282,13 @@ export default function EndingEditor({
     });
   }
 
+  function deleteBranch(branchId: string) {
+    onChange({
+      ...ending,
+      branches: ending.branches.filter((b) => b.id !== branchId),
+    });
+  }
+
   function updateBranchPersonalEnding(branchId: string, playerId: string, patch: Partial<PersonalEnding>) {
     const branch = ending.branches.find((b) => b.id === branchId);
     if (!branch) return;
@@ -197,7 +310,7 @@ export default function EndingEditor({
     });
   }
 
-  // ── 1차 투표 엔딩 질문 + 선택지 ──
+  // ── 투표 질문/선택지 정보 ──
 
   const endingQuestion1 = voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
   const round2Questions = voteQuestions.filter((q) => q.voteRound === 2);
@@ -210,17 +323,69 @@ export default function EndingEditor({
       .filter(Boolean) as string[]
   );
 
+  // 1차 엔딩 분기들 (custom-choice-matched + fallback)
+  const round1Branches = ending.branches.filter(
+    (b) => b.triggerType === "custom-choice-matched" && b.targetQuestionId === endingQuestion1?.id
+  );
+  const round1Fallback = ending.branches.find(
+    (b) => b.triggerType === "custom-choice-fallback" && b.targetQuestionId === endingQuestion1?.id
+  );
+
+  // 2차 엔딩 분기들
+  function getRound2Branches(questionId: string) {
+    return ending.branches.filter(
+      (b) => b.triggerType === "vote-round-2-matched" && b.targetQuestionId === questionId
+    );
+  }
+  function getRound2Fallback(questionId: string) {
+    return ending.branches.find(
+      (b) => b.triggerType === "vote-round-2-fallback" && b.targetQuestionId === questionId
+    );
+  }
+
+  function addBranch(triggerType: EndingBranchTriggerType, questionId: string) {
+    const branch: EndingBranch = {
+      id: crypto.randomUUID(),
+      label: "",
+      triggerType,
+      targetQuestionId: questionId,
+      targetChoiceIds: [],
+      storyText: "",
+    };
+    onChange({ ...ending, branches: [...ending.branches, branch] });
+  }
+
+  function ensureFallback(triggerType: EndingBranchTriggerType, questionId: string, label: string): EndingBranch {
+    const existing = ending.branches.find(
+      (b) => b.triggerType === triggerType && b.targetQuestionId === questionId
+    );
+    if (existing) return existing;
+    const fb: EndingBranch = {
+      id: crypto.randomUUID(),
+      label,
+      triggerType,
+      targetQuestionId: questionId,
+      storyText: "",
+    };
+    // side-effect: 자동 추가
+    onChange({ ...ending, branches: [...ending.branches, fb] });
+    return fb;
+  }
+
   return (
     <div className="space-y-8">
 
-      {/* ═══ 분기 엔딩 ═══ */}
+      {/* === 분기 엔딩 === */}
       {showBranches && (
         <div className="space-y-6">
 
-          {/* ── 기본 투표 모드 (고급 OFF) ── */}
+          {/* -- 기본 투표 모드 (2차 투표 OFF) -- */}
           {!advancedVotingEnabled && (() => {
-            const captured = ensureBranch(ending.branches, "culprit-captured", "범인 검거");
-            const escaped = ensureBranch(ending.branches, "culprit-escaped", "미검거");
+            // 기본 모드에서 커스텀 선택지가 있으면 고급 엔딩 UI 대신 기본 2분기
+            const captured = ending.branches.find((b) => b.triggerType === "culprit-captured")
+              ?? { id: crypto.randomUUID(), label: "범인 검거", triggerType: "culprit-captured" as const, storyText: "" };
+            const escaped = ending.branches.find((b) => b.triggerType === "culprit-escaped")
+              ?? { id: crypto.randomUUID(), label: "미검거", triggerType: "culprit-escaped" as const, storyText: "" };
 
             // 초기 분기 자동 생성
             if (!ending.branches.find((b) => b.triggerType === "culprit-captured")) {
@@ -243,6 +408,7 @@ export default function EndingEditor({
                   branch={capturedBranch}
                   label="범인 검거"
                   sublabel="투표로 진범이 특정된 경우"
+                  badge="범인 검거"
                   onChangeStory={(v) => updateBranchField(capturedBranch.id, { storyText: v })}
                   onChangeVideo={(v) => updateBranchField(capturedBranch.id, { videoUrl: v })}
                   onChangeMusic={(v) => updateBranchField(capturedBranch.id, { backgroundMusic: v })}
@@ -251,6 +417,7 @@ export default function EndingEditor({
                   branch={escapedBranch}
                   label="미검거"
                   sublabel="범인이 특정되지 않은 경우"
+                  badge="미검거"
                   onChangeStory={(v) => updateBranchField(escapedBranch.id, { storyText: v })}
                   onChangeVideo={(v) => updateBranchField(escapedBranch.id, { videoUrl: v })}
                   onChangeMusic={(v) => updateBranchField(escapedBranch.id, { backgroundMusic: v })}
@@ -259,115 +426,121 @@ export default function EndingEditor({
             );
           })()}
 
-          {/* ── 고급 투표 모드 ── */}
+          {/* -- 2차 투표 모드 (advancedVotingEnabled) -- */}
           {advancedVotingEnabled && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-dark-100">분기 엔딩</h3>
                 <p className="mt-1 text-xs text-dark-500">
-                  투표 선택지별로 엔딩을 작성합니다. 2차 투표로 넘어가는 선택지는 자동 제외됩니다.
+                  투표 선택지를 분기에 매핑합니다. 여러 선택지를 하나의 분기에 묶을 수 있습니다.
                 </p>
               </div>
 
               {/* 1차 투표 엔딩들 */}
-              {endingQuestion1 && (
+              {endingQuestion1 ? (
                 <div className="space-y-3">
-                  <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">
-                    1차 투표 결과 엔딩
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">
+                      1차 투표 결과 엔딩
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => addBranch("custom-choice-matched", endingQuestion1.id)}
+                      className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                    >
+                      + 엔딩 분기 추가
+                    </button>
+                  </div>
 
-                  {(() => {
+                  {round1Branches.length === 0 && (
+                    <p className="text-xs text-dark-600 text-center py-3 border border-dashed border-dark-700 rounded-xl">
+                      엔딩 분기를 추가하고, 각 분기에 선택지를 매핑하세요.
+                    </p>
+                  )}
+
+                  {/* 매핑된 분기들 */}
+                  {round1Branches.map((branch) => {
                     const choices = getEffectiveChoices(endingQuestion1, players, allNpcs);
                     return (
-                    <>
-                      {choices
-                        .filter((c) => !round2TriggerChoiceIds.has(c.id))
-                        .map((choice) => {
-                          const existingBranch = ending.branches.find((b) =>
-                            b.triggerType === "custom-choice-matched"
-                            && b.targetQuestionId === endingQuestion1.id
-                            && (b.targetChoiceIds ?? []).includes(choice.id)
-                          ) ?? ensureBranch(
-                            ending.branches,
-                            "custom-choice-matched",
-                            choice.label,
-                            { targetQuestionId: endingQuestion1.id, targetChoiceIds: [choice.id] }
-                          );
-
-                          return (
-                            <BranchStoryForm
-                              key={choice.id}
-                              branch={existingBranch}
-                              label={`"${choice.label}" 선택 시`}
-                              onChangeStory={(v) => {
-                                if (!ending.branches.find((b) => b.id === existingBranch.id)) {
-                                  upsertBranch({ ...existingBranch, storyText: v });
-                                } else {
-                                  updateBranchField(existingBranch.id, { storyText: v });
-                                }
-                              }}
-                              onChangeVideo={(v) => {
-                                if (!ending.branches.find((b) => b.id === existingBranch.id)) {
-                                  upsertBranch({ ...existingBranch, videoUrl: v });
-                                } else {
-                                  updateBranchField(existingBranch.id, { videoUrl: v });
-                                }
-                              }}
-                              onChangeMusic={(v) => {
-                                if (!ending.branches.find((b) => b.id === existingBranch.id)) {
-                                  upsertBranch({ ...existingBranch, backgroundMusic: v });
-                                } else {
-                                  updateBranchField(existingBranch.id, { backgroundMusic: v });
-                                }
-                              }}
-                            />
-                          );
-                        })}
-
-                      {/* fallback 엔딩 */}
-                      {(() => {
-                        const fb = ensureBranch(ending.branches, "custom-choice-fallback", "나머지 결과", { targetQuestionId: endingQuestion1.id });
-                        const existing = ending.branches.find((b) => b.triggerType === "custom-choice-fallback" && b.targetQuestionId === endingQuestion1.id) ?? fb;
-                        return (
-                          <BranchStoryForm
-                            branch={existing}
-                            label="나머지 결과 (fallback)"
-                            sublabel="위 선택지 외 결과일 때 표시"
-                            onChangeStory={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, storyText: v });
-                              else updateBranchField(existing.id, { storyText: v });
-                            }}
-                            onChangeVideo={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, videoUrl: v });
-                              else updateBranchField(existing.id, { videoUrl: v });
-                            }}
-                            onChangeMusic={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, backgroundMusic: v });
-                              else updateBranchField(existing.id, { backgroundMusic: v });
-                            }}
+                      <BranchStoryForm
+                        key={branch.id}
+                        branch={branch}
+                        label={branch.label || "(분기 이름 없음)"}
+                        badge="1차 투표"
+                        onChangeStory={(v) => updateBranchField(branch.id, { storyText: v })}
+                        onChangeVideo={(v) => updateBranchField(branch.id, { videoUrl: v })}
+                        onChangeMusic={(v) => updateBranchField(branch.id, { backgroundMusic: v })}
+                        onDelete={() => deleteBranch(branch.id)}
+                      >
+                        {/* 분기 이름 입력 */}
+                        <div>
+                          <label className="block text-xs text-dark-500 mb-1">분기 이름</label>
+                          <input
+                            type="text"
+                            value={branch.label}
+                            onChange={(e) => updateBranchField(branch.id, { label: e.target.value })}
+                            placeholder="예: 범인 검거 엔딩"
+                            className={inp}
                           />
-                        );
-                      })()}
+                        </div>
+                        {/* 선택지 체크박스 매핑 */}
+                        <ChoiceMapper
+                          choices={choices}
+                          branchId={branch.id}
+                          selectedIds={branch.targetChoiceIds ?? []}
+                          otherBranches={round1Branches}
+                          disabledIds={round2TriggerChoiceIds}
+                          disabledLabel="2차 투표 진입"
+                          onChange={(ids) => updateBranchField(branch.id, { targetChoiceIds: ids })}
+                        />
+                      </BranchStoryForm>
+                    );
+                  })}
 
-                      {/* 2차 투표로 넘어가는 선택지 */}
-                      {choices
-                        .filter((c) => round2TriggerChoiceIds.has(c.id))
-                        .map((choice) => (
-                          <div key={choice.id} className="rounded-xl border border-dark-700/40 bg-dark-900/20 p-3">
-                            <p className="text-sm text-dark-500">
-                              "{choice.label}" → 2차 투표로 진행 (아래에서 작성)
-                            </p>
-                          </div>
-                        ))}
-                    </>
+                  {/* 2차 투표로 넘어가는 선택지 안내 */}
+                  {round2TriggerChoiceIds.size > 0 && (() => {
+                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs);
+                    const triggerChoices = choices.filter((c) => round2TriggerChoiceIds.has(c.id));
+                    return triggerChoices.length > 0 ? (
+                      <div className="rounded-xl border border-yellow-900/30 bg-yellow-950/10 p-3">
+                        <p className="text-xs text-yellow-300/80">
+                          2차 투표 진입 선택지: {triggerChoices.map((c) => c.label).join(", ")}
+                        </p>
+                        <p className="text-xs text-dark-600 mt-0.5">
+                          이 선택지가 최다 득표 시 2차 투표로 진행됩니다. 아래에서 2차 엔딩을 작성하세요.
+                        </p>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Fallback 엔딩 */}
+                  {(() => {
+                    const fb = round1Fallback ?? ensureFallback("custom-choice-fallback", endingQuestion1.id, "나머지 결과");
+                    return (
+                      <BranchStoryForm
+                        branch={fb}
+                        label="나머지 결과 (fallback)"
+                        sublabel="위 분기에 매핑되지 않은 선택지가 최다 득표 시 표시"
+                        badge="1차 나머지"
+                        onChangeStory={(v) => {
+                          if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, storyText: v });
+                          else updateBranchField(fb.id, { storyText: v });
+                        }}
+                        onChangeVideo={(v) => {
+                          if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, videoUrl: v });
+                          else updateBranchField(fb.id, { videoUrl: v });
+                        }}
+                        onChangeMusic={(v) => {
+                          if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, backgroundMusic: v });
+                          else updateBranchField(fb.id, { backgroundMusic: v });
+                        }}
+                      />
                     );
                   })()}
                 </div>
-              )}
-
-              {!endingQuestion1 && (
+              ) : (
                 <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
-                  <p className="text-xs text-dark-600">투표 탭에서 엔딩 결정 투표 질문을 먼저 추가하세요.</p>
+                  <p className="text-xs text-dark-600">투표 탭에서 기본 투표 질문의 선택지를 설정하세요.</p>
                 </div>
               )}
 
@@ -375,78 +548,85 @@ export default function EndingEditor({
               {round2Questions.length > 0 && (
                 <div className="space-y-3 border-t border-dark-700 pt-4">
                   <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">
-                    2차 투표 결과 엔딩 (진엔딩)
+                    2차 투표 결과 엔딩
                   </p>
-                  {round2Questions.map((q2) => (
-                    <div key={q2.id} className="space-y-3">
-                      <p className="text-xs text-dark-400 font-medium">{q2.label || "2차 투표 질문"}</p>
-                      {getEffectiveChoices(q2, players, allNpcs).map((choice) => {
-                        const branch = ensureBranch(
-                          ending.branches,
-                          "vote-round-2-matched",
-                          choice.label || "(선택지)",
-                          { targetQuestionId: q2.id, targetChoiceIds: [choice.id] }
-                        );
-                        const existingBranch = ending.branches.find((b) =>
-                          b.triggerType === "vote-round-2-matched"
-                          && b.targetQuestionId === q2.id
-                          && (b.targetChoiceIds ?? []).includes(choice.id)
-                        ) ?? branch;
+                  {round2Questions.map((q2) => {
+                    const choices = getEffectiveChoices(q2, players, allNpcs);
+                    const r2Branches = getRound2Branches(q2.id);
+                    const r2Fallback = getRound2Fallback(q2.id);
 
-                        return (
+                    return (
+                      <div key={q2.id} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-dark-400 font-medium">{q2.label || "2차 투표 질문"}</p>
+                          <button
+                            type="button"
+                            onClick={() => addBranch("vote-round-2-matched", q2.id)}
+                            className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                          >
+                            + 엔딩 분기 추가
+                          </button>
+                        </div>
+
+                        {r2Branches.map((branch) => (
                           <BranchStoryForm
-                            key={choice.id}
-                            branch={existingBranch}
-                            label={`"${choice.label}" 선택 시 (진엔딩)`}
-                            onChangeStory={(v) => {
-                              if (!ending.branches.find((b) => b.id === existingBranch.id)) upsertBranch({ ...existingBranch, storyText: v });
-                              else updateBranchField(existingBranch.id, { storyText: v });
-                            }}
-                            onChangeVideo={(v) => {
-                              if (!ending.branches.find((b) => b.id === existingBranch.id)) upsertBranch({ ...existingBranch, videoUrl: v });
-                              else updateBranchField(existingBranch.id, { videoUrl: v });
-                            }}
-                            onChangeMusic={(v) => {
-                              if (!ending.branches.find((b) => b.id === existingBranch.id)) upsertBranch({ ...existingBranch, backgroundMusic: v });
-                              else updateBranchField(existingBranch.id, { backgroundMusic: v });
-                            }}
-                          />
-                        );
-                      })}
+                            key={branch.id}
+                            branch={branch}
+                            label={branch.label || "(분기 이름 없음)"}
+                            badge="2차 투표"
+                            onChangeStory={(v) => updateBranchField(branch.id, { storyText: v })}
+                            onChangeVideo={(v) => updateBranchField(branch.id, { videoUrl: v })}
+                            onChangeMusic={(v) => updateBranchField(branch.id, { backgroundMusic: v })}
+                            onDelete={() => deleteBranch(branch.id)}
+                          >
+                            <div>
+                              <label className="block text-xs text-dark-500 mb-1">분기 이름</label>
+                              <input
+                                type="text"
+                                value={branch.label}
+                                onChange={(e) => updateBranchField(branch.id, { label: e.target.value })}
+                                placeholder="예: 진엔딩"
+                                className={inp}
+                              />
+                            </div>
+                            <ChoiceMapper
+                              choices={choices}
+                              branchId={branch.id}
+                              selectedIds={branch.targetChoiceIds ?? []}
+                              otherBranches={r2Branches}
+                              disabledIds={new Set()}
+                              disabledLabel=""
+                              onChange={(ids) => updateBranchField(branch.id, { targetChoiceIds: ids })}
+                            />
+                          </BranchStoryForm>
+                        ))}
 
-                      {/* 2차 투표 fallback */}
-                      {(() => {
-                        const fb = ensureBranch(
-                          ending.branches,
-                          "vote-round-2-fallback",
-                          "2차 투표 실패",
-                          { targetQuestionId: q2.id }
-                        );
-                        const existing = ending.branches.find((b) =>
-                          b.triggerType === "vote-round-2-fallback" && b.targetQuestionId === q2.id
-                        ) ?? fb;
-
-                        return (
-                          <BranchStoryForm
-                            branch={existing}
-                            label="나머지 결과 (2차 실패 엔딩)"
-                            onChangeStory={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, storyText: v });
-                              else updateBranchField(existing.id, { storyText: v });
-                            }}
-                            onChangeVideo={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, videoUrl: v });
-                              else updateBranchField(existing.id, { videoUrl: v });
-                            }}
-                            onChangeMusic={(v) => {
-                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, backgroundMusic: v });
-                              else updateBranchField(existing.id, { backgroundMusic: v });
-                            }}
-                          />
-                        );
-                      })()}
-                    </div>
-                  ))}
+                        {/* 2차 fallback */}
+                        {(() => {
+                          const fb = r2Fallback ?? ensureFallback("vote-round-2-fallback", q2.id, "2차 나머지 결과");
+                          return (
+                            <BranchStoryForm
+                              branch={fb}
+                              label="나머지 결과 (2차 fallback)"
+                              badge="2차 나머지"
+                              onChangeStory={(v) => {
+                                if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, storyText: v });
+                                else updateBranchField(fb.id, { storyText: v });
+                              }}
+                              onChangeVideo={(v) => {
+                                if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, videoUrl: v });
+                                else updateBranchField(fb.id, { videoUrl: v });
+                              }}
+                              onChangeMusic={(v) => {
+                                if (!ending.branches.find((b) => b.id === fb.id)) upsertBranch({ ...fb, backgroundMusic: v });
+                                else updateBranchField(fb.id, { backgroundMusic: v });
+                              }}
+                            />
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -454,7 +634,7 @@ export default function EndingEditor({
         </div>
       )}
 
-      {/* ═══ 개인 엔딩 ═══ */}
+      {/* === 개인 엔딩 === */}
       {showPersonal && (
         <div className="space-y-4">
           <div>
@@ -463,6 +643,42 @@ export default function EndingEditor({
               분기 엔딩 공개 후 각 플레이어에게 개별 표시되는 엔딩입니다. 분기를 선택해서 해당 분기의 개인 엔딩을 작성하세요.
             </p>
           </div>
+
+          {/* 레거시 데이터 마이그레이션 안내 */}
+          {ending.personalEndingsEnabled
+            && ending.personalEndings.some((pe) => pe.text.trim())
+            && !ending.branches.some((b) => b.personalEndingsEnabled) && (
+            <div className="rounded-xl border border-yellow-900/30 bg-yellow-950/10 p-4 space-y-3">
+              <p className="text-xs font-medium text-yellow-300/80">
+                기존 형식의 개인 엔딩 데이터가 있습니다
+              </p>
+              <p className="text-xs text-dark-500">
+                이전 버전에서 작성한 공통 개인 엔딩을 모든 분기의 개인 엔딩으로 복사합니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const updatedBranches = ending.branches.map((b) => ({
+                    ...b,
+                    personalEndingsEnabled: true,
+                    personalEndings: normalizeBranchPersonalEndings(
+                      players,
+                      ending.personalEndings.length > 0 ? ending.personalEndings : b.personalEndings
+                    ),
+                  }));
+                  onChange({
+                    ...ending,
+                    branches: updatedBranches,
+                    personalEndingsEnabled: false,
+                    personalEndings: [],
+                  });
+                }}
+                className="rounded-lg border border-yellow-700 bg-yellow-900/20 px-3 py-1.5 text-xs font-medium text-yellow-200 hover:bg-yellow-900/40 transition-colors"
+              >
+                분기별로 이동
+              </button>
+            </div>
+          )}
 
           {ending.branches.length === 0 ? (
             <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
@@ -484,7 +700,7 @@ export default function EndingEditor({
         </div>
       )}
 
-      {/* ═══ 작가 후기 ═══ */}
+      {/* === 작가 후기 === */}
       {showAuthor && (
         <div className="rounded-xl border border-dark-700 p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
@@ -582,6 +798,7 @@ function PersonalEndingsPerBranch({
       {branches.map((branch) => {
         const isExpanded = expandedBranchId === branch.id;
         const personalEndings = normalizeBranchPersonalEndings(players, branch.personalEndings);
+        const triggerLabel = TRIGGER_TYPE_LABELS[branch.triggerType] ?? branch.triggerType;
 
         return (
           <div key={branch.id} className="rounded-xl border border-dark-700/70 bg-dark-900/40 overflow-hidden">
@@ -591,11 +808,16 @@ function PersonalEndingsPerBranch({
               className="w-full px-4 py-3 text-left hover:bg-dark-900/60 transition-colors"
             >
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-dark-100">{branch.label || "(분기 이름 없음)"}</p>
-                  <p className="text-xs text-dark-500 mt-0.5">
-                    개인 엔딩: {branch.personalEndingsEnabled ? "사용 중" : "사용 안 함"}
-                  </p>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400 shrink-0">
+                    {triggerLabel}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-dark-100">{branch.label || "(분기 이름 없음)"}</p>
+                    <p className="text-xs text-dark-500 mt-0.5">
+                      개인 엔딩: {branch.personalEndingsEnabled ? "사용 중" : "사용 안 함"}
+                    </p>
+                  </div>
                 </div>
                 <span className="text-xs text-dark-500">{isExpanded ? "접기" : "열기"}</span>
               </div>
@@ -620,24 +842,15 @@ function PersonalEndingsPerBranch({
 
                 {branch.personalEndingsEnabled && personalEndings.map((pe) => {
                   const player = players.find((p) => p.id === pe.playerId);
+                  const hasContent = Boolean(pe.title?.trim() || pe.text.trim());
                   return (
-                    <div key={pe.playerId} className="rounded-xl border border-dark-700/50 bg-dark-950/30 p-3 space-y-2">
-                      <p className="text-sm font-medium text-dark-200">{player?.name || "(이름 없음)"}</p>
-                      <input
-                        type="text"
-                        value={pe.title ?? ""}
-                        onChange={(e) => onUpdatePersonalEnding(branch.id, pe.playerId, { title: e.target.value || undefined })}
-                        placeholder="제목 (선택)"
-                        className={inp}
-                      />
-                      <textarea
-                        rows={3}
-                        value={pe.text}
-                        onChange={(e) => onUpdatePersonalEnding(branch.id, pe.playerId, { text: e.target.value })}
-                        placeholder="이 캐릭터만 확인할 개인 엔딩"
-                        className={inp + " resize-none"}
-                      />
-                    </div>
+                    <PersonalEndingCard
+                      key={pe.playerId}
+                      playerName={player?.name || "(이름 없음)"}
+                      pe={pe}
+                      hasContent={hasContent}
+                      onUpdate={(patch) => onUpdatePersonalEnding(branch.id, pe.playerId, patch)}
+                    />
                   );
                 })}
               </div>
@@ -645,6 +858,57 @@ function PersonalEndingsPerBranch({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─── 개인 엔딩 카드 (빈 텍스트 접기 지원) ──────────────────
+
+function PersonalEndingCard({
+  playerName,
+  pe,
+  hasContent,
+  onUpdate,
+}: {
+  playerName: string;
+  pe: PersonalEnding;
+  hasContent: boolean;
+  onUpdate: (patch: Partial<PersonalEnding>) => void;
+}) {
+  const [expanded, setExpanded] = useState(hasContent);
+
+  return (
+    <div className="rounded-xl border border-dark-700/50 bg-dark-950/30 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-3 py-2.5 text-left hover:bg-dark-900/40 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-dark-200">{playerName}</p>
+          <span className="text-xs text-dark-600">
+            {hasContent ? (expanded ? "접기" : "작성됨") : (expanded ? "접기" : "미작성")}
+          </span>
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-dark-800/50 px-3 pb-3 pt-2 space-y-2">
+          <input
+            type="text"
+            value={pe.title ?? ""}
+            onChange={(e) => onUpdate({ title: e.target.value || undefined })}
+            placeholder="제목 (선택)"
+            className={inp}
+          />
+          <textarea
+            rows={3}
+            value={pe.text}
+            onChange={(e) => onUpdate({ text: e.target.value })}
+            placeholder="이 캐릭터만 확인할 개인 엔딩"
+            className={inp + " resize-none"}
+          />
+        </div>
+      )}
     </div>
   );
 }

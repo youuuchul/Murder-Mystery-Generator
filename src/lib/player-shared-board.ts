@@ -82,16 +82,13 @@ export function buildPlayerSharedBoardContent(
   }
 
   if (phase === "ending") {
+    // 엔딩 텍스트는 퍼널별 패널에서 표시하므로 공통 화면에서는 제외
     const branch = resolveActiveEndingBranch(game, sharedState.voteReveal);
 
     return {
       title: "엔딩",
       badge: "Ending",
-      narrationBlocks: branch?.storyText
-        ? [{ label: branch.label || "엔딩", text: branch.storyText }]
-        : game.scripts.ending.narration
-          ? [{ label: "엔딩", text: game.scripts.ending.narration }]
-          : [],
+      narrationBlocks: [],
       videoUrl: branch?.videoUrl ?? game.scripts.ending.videoUrl,
       backgroundMusic: branch?.backgroundMusic ?? game.scripts.ending.backgroundMusic,
     };

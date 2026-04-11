@@ -103,6 +103,13 @@ export async function POST(req: Request, { params }: Params) {
             latestSession.sharedState.endingStage = nextStage;
             clearPhaseAdvanceRequests(latestSession.sharedState);
 
+            // 2차 투표 진입 시 투표 상태 리셋
+            if (nextStage === "vote-round-2") {
+              latestSession.sharedState.currentVoteRound = 2;
+              latestSession.sharedState.voteCount = 0;
+              latestSession.advancedVotes = {};
+            }
+
             if (nextStage === "complete") {
               latestSession.endedAt = new Date().toISOString();
             }

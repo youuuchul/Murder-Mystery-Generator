@@ -573,42 +573,23 @@ function SceneClueModal({
   );
 }
 
-// ── 투표 결과 화면 ──────────────────────────────────────────────
-function VoteResultScreen({
+// ── 퍼널별 엔딩 패널 ──────────────────────────────────────────────
+
+/** 투표 결과 패널: 득표 현황 + 진범 공개 */
+function VoteResultPanel({
   reveal,
   game,
-  myPlayerId,
-  endingStage,
-  sessionMode,
 }: {
   reveal: VoteReveal;
   game: GamePackage;
-  myPlayerId: string;
-  endingStage: EndingStage;
-  sessionMode: SessionMode;
 }) {
   const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
   const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
-  const branch = resolveActiveEndingBranch(game, reveal);
-  const branchPersonalEndings = resolveBranchPersonalEndings(branch);
-  const personalEnding = branchPersonalEndings.find((ending) => ending.playerId === myPlayerId)
-    ?? branchPersonalEndings[0];
-  const showPersonalEnding = endingStage !== "branch" && Boolean(personalEnding?.text.trim());
-  const hasPersonalEndingForPlayer = Boolean(branch?.personalEndingsEnabled) && branchPersonalEndings.length > 0;
   const totalVotes = reveal.tally.reduce((s, t) => s + t.count, 0);
 
   return (
     <div className="space-y-5">
-      {/* 1. 분기 엔딩 */}
-      {branch?.storyText && (
-        <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-4">
-          <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">엔딩</p>
-          {branch.label && <p className="text-sm font-medium text-mystery-300">{branch.label}</p>}
-          <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branch.storyText}</p>
-        </div>
-      )}
-
-      {/* 2. 진범 공개 */}
+      {/* 진범 공개 */}
       <div className="bg-dark-900 border border-mystery-800 rounded-xl p-4">
         <p className="text-xs text-mystery-500 mb-2">진범</p>
         <p className="text-xl font-bold text-mystery-300">
@@ -623,7 +604,7 @@ function VoteResultScreen({
         </div>
       )}
 
-      {/* 3. 득표 현황 */}
+      {/* 득표 현황 */}
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
         <p className="text-xs text-dark-500">득표 현황 ({totalVotes}표)</p>
         {reveal.tally.map((t) => {
@@ -654,23 +635,55 @@ function VoteResultScreen({
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      {/* 4. 승점 조건 */}
-      {(game.players.find((p) => p.id === myPlayerId)?.scoreConditions?.length ?? 0) > 0 && (
-        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-          <p className="text-xs text-dark-500">내 승점 조건</p>
-          {game.players
-            .find((p) => p.id === myPlayerId)
-            ?.scoreConditions.map((sc, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-dark-300">{sc.description}</span>
-                <span className="text-mystery-400 font-bold">+{sc.points}점</span>
-              </div>
-            ))}
-        </div>
-      )}
+/** 분기 엔딩 스토리 패널 */
+function BranchEndingPanel({
+  game,
+  reveal,
+}: {
+  game: GamePackage;
+  reveal: VoteReveal;
+}) {
+  const branch = resolveActiveEndingBranch(game, reveal);
+  if (!branch?.storyText) {
+    return (
+      <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 text-center">
+        <p className="text-sm text-dark-500">엔딩 스토리가 설정되지 않았습니다.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-4">
+      <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">엔딩</p>
+      {branch.label && <p className="text-sm font-medium text-mystery-300">{branch.label}</p>}
+      <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branch.storyText}</p>
+    </div>
+  );
+}
 
-      {showPersonalEnding && personalEnding && (
+/** 개인 엔딩 + 점수 패널 */
+function PersonalEndingPanel({
+  game,
+  reveal,
+  myPlayerId,
+}: {
+  game: GamePackage;
+  reveal: VoteReveal;
+  myPlayerId: string;
+}) {
+  const branch = resolveActiveEndingBranch(game, reveal);
+  const branchPersonalEndings = resolveBranchPersonalEndings(branch);
+  const personalEnding = branchPersonalEndings.find((ending) => ending.playerId === myPlayerId)
+    ?? branchPersonalEndings[0];
+  const myPlayer = game.players.find((p) => p.id === myPlayerId);
+  const hasScore = (myPlayer?.scoreConditions?.length ?? 0) > 0;
+
+  return (
+    <div className="space-y-5">
+      {personalEnding?.text.trim() && (
         <div className="bg-dark-900 border border-mystery-800 rounded-xl p-5 space-y-3">
           <p className="text-xs text-mystery-500">개인 엔딩</p>
           {personalEnding.title && (
@@ -680,15 +693,53 @@ function VoteResultScreen({
         </div>
       )}
 
-      {endingStage === "branch" && hasPersonalEndingForPlayer && (
-        <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 text-center">
-          <p className="text-xs text-dark-500">
-            {sessionMode === "player-consensus"
-              ? "참가자 합의로 다음 단계를 열면 개인 엔딩이 공개됩니다."
-              : "GM이 다음 단계를 공개하면 개인 엔딩이 열립니다."}
-          </p>
+      {hasScore && (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
+          <p className="text-xs text-dark-500">내 승점 조건</p>
+          {myPlayer?.scoreConditions.map((sc, i) => (
+            <div key={i} className="flex items-center justify-between text-sm">
+              <span className="text-dark-300">{sc.description}</span>
+              <span className="text-mystery-400 font-bold">+{sc.points}점</span>
+            </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** 작가 후기 패널 */
+function AuthorNotesPanel({ game }: { game: GamePackage }) {
+  const notes = game.ending.authorNotes.filter((n) => n.title.trim() || n.content.trim());
+  if (notes.length === 0) {
+    return (
+      <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 text-center">
+        <p className="text-sm text-dark-500">작가 후기가 없습니다.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {notes.map((note) => (
+        <div key={note.id} className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-3">
+          <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">작가 후기</p>
+          {note.title && <p className="text-sm font-medium text-mystery-300">{note.title}</p>}
+          <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{note.content}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 2차 투표 전 스토리 패널 */
+function VoteRound2PreStoryPanel({ game }: { game: GamePackage }) {
+  const round2Q = game.voteQuestions.find((q) => q.voteRound === 2);
+  const text = round2Q?.preStoryText?.trim();
+  if (!text) return null;
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-3">
+      <p className="text-xs text-yellow-500 font-medium tracking-wide uppercase">2차 투표 안내</p>
+      <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{text}</p>
     </div>
   );
 }
@@ -713,12 +764,27 @@ function VoteScreen({
     ? game.voteQuestions.filter((q) => q.voteRound === currentVoteRound)
     : [];
 
+  const revoteCandidateIds = sharedState.revoteCandidateIds;
+  const revoteCount = sharedState.revoteCount ?? 0;
+  const isRevote = Boolean(revoteCandidateIds?.length);
+
   // 기본 투표: 단일 선택
   const [selectedId, setSelectedId] = useState("");
   // 고급 투표: 질문별 선택 { questionId → targetId }
   const [questionSelections, setQuestionSelections] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 재투표 진입 시 submitted 상태 리셋 (SSE로 sharedState 갱신 시)
+  const [lastRevoteCount, setLastRevoteCount] = useState(revoteCount);
+  if (revoteCount !== lastRevoteCount) {
+    setLastRevoteCount(revoteCount);
+    if (isRevote && submitted) {
+      setSubmitted(false);
+      setSelectedId("");
+      setQuestionSelections({});
+    }
+  }
 
   const totalPlayers = sharedState.characterSlots.filter((s) => s.isLocked && !s.isAiControlled).length;
 
@@ -846,11 +912,17 @@ function VoteScreen({
   }
 
   // 기본 투표 모드
-  const votablePlayers = game.players;
+  const votablePlayers = isRevote
+    ? game.players.filter((p) => revoteCandidateIds!.includes(p.id))
+    : game.players;
+
+  // 1차 투표의 질문 텍스트 (메이커가 설정한 경우)
+  const primaryQuestion = game.voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
+  const questionLabel = primaryQuestion?.label?.trim() || "범인이라 생각하는 사람은?";
 
   return (
     <div className="space-y-4">
-      {game.scripts.vote.narration && (
+      {!isRevote && game.scripts.vote.narration && (
         <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
           <p className="text-xs text-yellow-500 mb-2">투표 안내</p>
           <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
@@ -859,8 +931,20 @@ function VoteScreen({
         </div>
       )}
 
+      {isRevote && (
+        <div className="bg-dark-900 border border-yellow-800 rounded-xl p-4 space-y-2">
+          <p className="text-xs text-yellow-500 font-medium">재투표</p>
+          <p className="text-sm text-dark-200">
+            동점 후보 {votablePlayers.length}명에 대해 재투표를 진행합니다.
+          </p>
+          <p className="text-xs text-dark-500">
+            재투표에서도 동점이면 무작위로 결과가 확정됩니다.
+          </p>
+        </div>
+      )}
+
       <div className="text-center py-4">
-        <p className="text-dark-200 font-semibold">범인이라 생각하는 사람은?</p>
+        <p className="text-dark-200 font-semibold">{questionLabel}</p>
         <p className="text-dark-500 text-xs mt-1">
           {sharedState.voteCount} / {totalPlayers}명 투표 완료
         </p>
@@ -1670,6 +1754,16 @@ export default function PlayerView() {
   const [phaseRequestSubmitting, setPhaseRequestSubmitting] = useState(false);
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const prevEndingStageRef = useRef<string | null>(null);
+
+  // 엔딩 단계 변경 시 스크롤 상단으로
+  useEffect(() => {
+    const currentStage = sharedState?.endingStage;
+    if (currentStage && prevEndingStageRef.current !== null && prevEndingStageRef.current !== currentStage) {
+      window.scrollTo(0, 0);
+    }
+    prevEndingStageRef.current = currentStage ?? null;
+  }, [sharedState?.endingStage]);
 
   useEffect(() => {
     const t = localStorage.getItem(`mm_${sessionId}`) ?? "";
@@ -1919,14 +2013,23 @@ export default function PlayerView() {
   const canAdvanceEndingByConsensus =
     sessionMode === "player-consensus"
     && phase === "ending"
-    && endingStage !== "complete";
+    && endingStage !== "complete"
+    && endingStage !== "vote-round-2";
   const canRequestAdvance = phase !== "vote" && (phase !== "ending" || canAdvanceEndingByConsensus);
   const advanceRequestLabel = getPlayerAdvanceRequestLabel({ sharedState }, game);
-  const endingAdvanceRequestLabel = endingStage === "branch"
-    ? "개인 엔딩 공개 요청"
-    : endingStage === "personal"
-      ? "작가 노트 공개 요청"
-      : "엔딩 종료 요청";
+  const hasRound2 = game.advancedVotingEnabled && game.voteQuestions.some((q) => q.voteRound === 2);
+  const endingAdvanceRequestLabel =
+    endingStage === "vote-result"
+      ? "엔딩 스토리 공개 요청"
+      : endingStage === "branch"
+        ? hasRound2 ? "2차 투표 진입 요청" : "개인 엔딩 공개 요청"
+        : endingStage === "vote-round-2-pre-story"
+          ? "2차 투표 시작 요청"
+          : endingStage === "branch-2"
+            ? "개인 엔딩 공개 요청"
+            : endingStage === "personal"
+              ? "작가 후기 공개 요청"
+              : "엔딩 종료 요청";
   const isAccessible = game.access.visibility === "public" || game.access.visibility === "unlisted";
   const leavePath = isAccessible ? `/play/${gameId}/join` : "/join";
   const leaveLabel = isAccessible ? "세션 목록" : "코드 입장";
@@ -1979,26 +2082,40 @@ export default function PlayerView() {
             {ENDING_STAGE_LABELS[endingStage]}
           </span>
         </div>
-        <div className="p-4 max-w-lg mx-auto pb-8">
-          {sharedBoard ? (
-            <div className="mb-4">
-              <SharedBoardPanel
-                content={sharedBoard}
-                timerState={sharedState.timerState}
-                isHost={isHost}
-                sessionId={sessionId}
-                sessionMode={sessionMode}
-                phase={sharedState.phase}
-              />
+        <div key={endingStage} className="p-4 max-w-lg mx-auto pb-8 space-y-5">
+          {/* 퍼널별 엔딩 패널 */}
+          {endingStage === "vote-result" && (
+            <VoteResultPanel reveal={sharedState.voteReveal} game={game} />
+          )}
+          {endingStage === "branch" && (
+            <BranchEndingPanel game={game} reveal={sharedState.voteReveal} />
+          )}
+          {endingStage === "vote-round-2-pre-story" && (
+            <VoteRound2PreStoryPanel game={game} />
+          )}
+          {endingStage === "vote-round-2" && (
+            <VoteScreen
+              game={game}
+              sharedState={sharedState}
+              myPlayerId={charId}
+              sessionId={sessionId}
+              token={token}
+            />
+          )}
+          {endingStage === "branch-2" && (
+            <div className="space-y-5">
+              {sharedState.previousVoteReveals?.[0] && (
+                <VoteResultPanel reveal={sharedState.voteReveal} game={game} />
+              )}
+              <BranchEndingPanel game={game} reveal={sharedState.voteReveal} />
             </div>
-          ) : null}
-          <VoteResultScreen
-            reveal={sharedState.voteReveal}
-            game={game}
-            myPlayerId={charId}
-            endingStage={endingStage}
-            sessionMode={sessionMode}
-          />
+          )}
+          {endingStage === "personal" && (
+            <PersonalEndingPanel game={game} reveal={sharedState.voteReveal} myPlayerId={charId} />
+          )}
+          {endingStage === "author-notes" && (
+            <AuthorNotesPanel game={game} />
+          )}
           {canAdvanceEndingByConsensus && (
             <PhaseAdvanceRequestPanel
               label={endingAdvanceRequestLabel}
@@ -2010,7 +2127,7 @@ export default function PlayerView() {
             />
           )}
           {endingStage === "complete" && (
-            <div className="mt-6 rounded-2xl border border-mystery-800 bg-dark-900 p-5 text-center space-y-4">
+            <div className="rounded-2xl border border-mystery-800 bg-dark-900 p-5 text-center space-y-4">
               <p className="text-sm font-semibold text-mystery-300">
                 {endedAt ? "게임이 종료됐습니다" : "모든 엔딩이 공개됐습니다"}
               </p>

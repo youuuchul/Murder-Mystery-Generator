@@ -7,16 +7,34 @@ import type {
   EndingConfig,
   Player,
   PersonalEnding,
+  StoryNpc,
   VoteQuestion,
 } from "@/types/game";
 
 interface EndingEditorProps {
   ending: EndingConfig;
   players: Player[];
+  npcs?: StoryNpc[];
   voteQuestions: VoteQuestion[];
   advancedVotingEnabled: boolean;
   onChange: (ending: EndingConfig) => void;
   section?: "branches" | "personal" | "author";
+}
+
+/** 투표 대상 모드에 따른 실제 선택지 */
+function getEffectiveChoices(
+  q: VoteQuestion,
+  players: Player[],
+  npcs: StoryNpc[]
+): { id: string; label: string }[] {
+  if (q.targetMode === "custom-choices") return q.choices;
+  if (q.targetMode === "players-and-npcs") {
+    return [
+      ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
+      ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
+    ];
+  }
+  return players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
 }
 
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
@@ -130,11 +148,13 @@ function BranchStoryForm({
 export default function EndingEditor({
   ending,
   players,
+  npcs,
   voteQuestions,
   advancedVotingEnabled,
   onChange,
   section,
 }: EndingEditorProps) {
+  const allNpcs = npcs ?? [];
   const showBranches = !section || section === "branches";
   const showPersonal = section === "personal";
   const showAuthor = !section || section === "author";
@@ -256,32 +276,29 @@ export default function EndingEditor({
                     1차 투표 결과 엔딩
                   </p>
 
-                  {endingQuestion1.targetMode === "custom-choices" ? (
-                    // 커스텀 선택지: 각 선택지별 엔딩
+                  {(() => {
+                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs);
+                    return (
                     <>
-                      {endingQuestion1.choices
+                      {choices
                         .filter((c) => !round2TriggerChoiceIds.has(c.id))
                         .map((choice) => {
-                          const branch = ensureBranch(
-                            ending.branches,
-                            "custom-choice-matched",
-                            choice.label || "(선택지)",
-                            { targetQuestionId: endingQuestion1.id, targetChoiceIds: [choice.id] }
-                          );
-                          if (!ending.branches.find((b) => b.id === branch.id)) {
-                            // lazy upsert는 렌더 중 setState 방지 — 저장 시 정리
-                          }
                           const existingBranch = ending.branches.find((b) =>
                             b.triggerType === "custom-choice-matched"
                             && b.targetQuestionId === endingQuestion1.id
                             && (b.targetChoiceIds ?? []).includes(choice.id)
-                          ) ?? branch;
+                          ) ?? ensureBranch(
+                            ending.branches,
+                            "custom-choice-matched",
+                            choice.label,
+                            { targetQuestionId: endingQuestion1.id, targetChoiceIds: [choice.id] }
+                          );
 
                           return (
                             <BranchStoryForm
                               key={choice.id}
                               branch={existingBranch}
-                              label={`"${choice.label || "(선택지)"}" 선택 시`}
+                              label={`"${choice.label}" 선택 시`}
                               onChangeStory={(v) => {
                                 if (!ending.branches.find((b) => b.id === existingBranch.id)) {
                                   upsertBranch({ ...existingBranch, storyText: v });
@@ -307,8 +324,33 @@ export default function EndingEditor({
                           );
                         })}
 
-                      {/* 2차 투표로 넘어가는 선택지 표시 */}
-                      {endingQuestion1.choices
+                      {/* fallback 엔딩 */}
+                      {(() => {
+                        const fb = ensureBranch(ending.branches, "custom-choice-fallback", "나머지 결과", { targetQuestionId: endingQuestion1.id });
+                        const existing = ending.branches.find((b) => b.triggerType === "custom-choice-fallback" && b.targetQuestionId === endingQuestion1.id) ?? fb;
+                        return (
+                          <BranchStoryForm
+                            branch={existing}
+                            label="나머지 결과 (fallback)"
+                            sublabel="위 선택지 외 결과일 때 표시"
+                            onChangeStory={(v) => {
+                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, storyText: v });
+                              else updateBranchField(existing.id, { storyText: v });
+                            }}
+                            onChangeVideo={(v) => {
+                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, videoUrl: v });
+                              else updateBranchField(existing.id, { videoUrl: v });
+                            }}
+                            onChangeMusic={(v) => {
+                              if (!ending.branches.find((b) => b.id === existing.id)) upsertBranch({ ...existing, backgroundMusic: v });
+                              else updateBranchField(existing.id, { backgroundMusic: v });
+                            }}
+                          />
+                        );
+                      })()}
+
+                      {/* 2차 투표로 넘어가는 선택지 */}
+                      {choices
                         .filter((c) => round2TriggerChoiceIds.has(c.id))
                         .map((choice) => (
                           <div key={choice.id} className="rounded-xl border border-dark-700/40 bg-dark-900/20 p-3">
@@ -318,54 +360,8 @@ export default function EndingEditor({
                           </div>
                         ))}
                     </>
-                  ) : (
-                    // 플레이어/NPC 모드: 검거/미검거
-                    <>
-                      {(() => {
-                        const captured = ensureBranch(ending.branches, "culprit-captured", "범인 검거");
-                        const escaped = ensureBranch(ending.branches, "culprit-escaped", "미검거");
-                        const capturedBranch = ending.branches.find((b) => b.triggerType === "culprit-captured") ?? captured;
-                        const escapedBranch = ending.branches.find((b) => b.triggerType === "culprit-escaped") ?? escaped;
-
-                        return (
-                          <>
-                            <BranchStoryForm
-                              branch={capturedBranch}
-                              label="범인 검거"
-                              onChangeStory={(v) => {
-                                if (!ending.branches.find((b) => b.id === capturedBranch.id)) upsertBranch({ ...capturedBranch, storyText: v });
-                                else updateBranchField(capturedBranch.id, { storyText: v });
-                              }}
-                              onChangeVideo={(v) => {
-                                if (!ending.branches.find((b) => b.id === capturedBranch.id)) upsertBranch({ ...capturedBranch, videoUrl: v });
-                                else updateBranchField(capturedBranch.id, { videoUrl: v });
-                              }}
-                              onChangeMusic={(v) => {
-                                if (!ending.branches.find((b) => b.id === capturedBranch.id)) upsertBranch({ ...capturedBranch, backgroundMusic: v });
-                                else updateBranchField(capturedBranch.id, { backgroundMusic: v });
-                              }}
-                            />
-                            <BranchStoryForm
-                              branch={escapedBranch}
-                              label="미검거"
-                              onChangeStory={(v) => {
-                                if (!ending.branches.find((b) => b.id === escapedBranch.id)) upsertBranch({ ...escapedBranch, storyText: v });
-                                else updateBranchField(escapedBranch.id, { storyText: v });
-                              }}
-                              onChangeVideo={(v) => {
-                                if (!ending.branches.find((b) => b.id === escapedBranch.id)) upsertBranch({ ...escapedBranch, videoUrl: v });
-                                else updateBranchField(escapedBranch.id, { videoUrl: v });
-                              }}
-                              onChangeMusic={(v) => {
-                                if (!ending.branches.find((b) => b.id === escapedBranch.id)) upsertBranch({ ...escapedBranch, backgroundMusic: v });
-                                else updateBranchField(escapedBranch.id, { backgroundMusic: v });
-                              }}
-                            />
-                          </>
-                        );
-                      })()}
-                    </>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
@@ -384,7 +380,7 @@ export default function EndingEditor({
                   {round2Questions.map((q2) => (
                     <div key={q2.id} className="space-y-3">
                       <p className="text-xs text-dark-400 font-medium">{q2.label || "2차 투표 질문"}</p>
-                      {q2.targetMode === "custom-choices" && q2.choices.map((choice) => {
+                      {getEffectiveChoices(q2, players, allNpcs).map((choice) => {
                         const branch = ensureBranch(
                           ending.branches,
                           "vote-round-2-matched",

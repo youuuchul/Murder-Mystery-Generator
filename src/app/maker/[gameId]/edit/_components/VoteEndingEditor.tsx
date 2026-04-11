@@ -40,24 +40,59 @@ function createVoteChoice(): VoteQuestionChoice {
   return { id: crypto.randomUUID(), label: "" };
 }
 
+/** 투표 대상이 플레이어/NPC 모드일 때 자동 선택지 목록 생성 */
+function buildAutoTargets(
+  targetMode: VoteTargetMode,
+  players: Player[],
+  npcs: StoryNpc[]
+): { id: string; label: string }[] {
+  if (targetMode === "players-only") {
+    return players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
+  }
+  if (targetMode === "players-and-npcs") {
+    return [
+      ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
+      ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
+    ];
+  }
+  return []; // custom-choices는 직접 입력
+}
+
+/** 질문의 실제 선택지 목록 (커스텀이면 choices, 아니면 자동 생성) */
+function getEffectiveChoices(
+  q: VoteQuestion,
+  players: Player[],
+  npcs: StoryNpc[]
+): { id: string; label: string }[] {
+  if (q.targetMode === "custom-choices") return q.choices;
+  return buildAutoTargets(q.targetMode, players, npcs);
+}
+
 // ─── VoteQuestionForm ─────────────────────────────────────
 
 function VoteQuestionForm({
   question,
   isSecondRound,
-  firstRoundQuestions,
+  firstRoundQuestion,
+  players,
+  npcs,
   onChange,
   onDelete,
   onChangeChoices,
 }: {
   question: VoteQuestion;
   isSecondRound?: boolean;
-  firstRoundQuestions?: VoteQuestion[];
+  firstRoundQuestion?: VoteQuestion;
+  players: Player[];
+  npcs: StoryNpc[];
   onChange: (patch: Partial<VoteQuestion>) => void;
   onDelete: () => void;
   onChangeChoices: (c: VoteQuestionChoice[]) => void;
 }) {
   const [expanded, setExpanded] = useState(!question.label);
+  const firstRoundChoices = firstRoundQuestion
+    ? getEffectiveChoices(firstRoundQuestion, players, npcs)
+    : [];
 
   return (
     <div className="rounded-xl border border-dark-700/70 bg-dark-950/45 overflow-hidden">
@@ -95,47 +130,83 @@ function VoteQuestionForm({
 
       {expanded && (
         <div className="space-y-3 border-t border-dark-800/80 bg-black/10 px-3 pb-3 pt-3">
+
+          {/* 2차 투표: 트리거 조건 (맨 위) */}
+          {isSecondRound && firstRoundQuestion && (
+            <div className="space-y-3 rounded-xl border border-yellow-900/30 bg-yellow-950/10 p-3">
+              <p className="text-xs font-medium text-yellow-300/80">2차 투표 발동 조건</p>
+              <div>
+                <label className="block text-xs text-dark-500 mb-1">1차 투표에서 어떤 결과일 때 2차 투표를 시작할까요?</label>
+                <select
+                  value={question.triggerCondition?.resultEquals ?? ""}
+                  onChange={(e) => {
+                    const choiceId = e.target.value;
+                    onChange({
+                      triggerCondition: choiceId
+                        ? { requiresVoteRound: 1, questionId: firstRoundQuestion.id, resultEquals: choiceId }
+                        : undefined,
+                    });
+                  }}
+                  className={inp}
+                >
+                  <option value="">— 1차 투표 선택지 선택 —</option>
+                  {firstRoundChoices.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 2차 투표: 스토리 텍스트 (트리거 다음) */}
+          {isSecondRound && (
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">2차 투표 전 스토리 텍스트</label>
+              <textarea
+                rows={4}
+                value={question.preStoryText ?? ""}
+                onChange={(e) => onChange({ preStoryText: e.target.value || undefined })}
+                placeholder="1차 투표 결과 공개 후, 2차 투표 전에 보여줄 추가 스토리"
+                className={inp + " resize-none"}
+              />
+            </div>
+          )}
+
+          {/* 질문 텍스트 */}
           <div>
             <label className="block text-xs text-dark-500 mb-1">질문 텍스트</label>
             <input
               type="text"
               value={question.label}
               onChange={(e) => onChange({ label: e.target.value })}
-              placeholder="예: 범인은 누구인가?, 당신의 비밀 임무 대상은?"
+              placeholder="예: 범인은 누구인가?"
               className={inp}
             />
           </div>
 
+          {/* 투표 대상 */}
           <div>
-            <label className="block text-xs text-dark-500 mb-1">보충 설명 (선택)</label>
-            <input
-              type="text"
-              value={question.description ?? ""}
-              onChange={(e) => onChange({ description: e.target.value || undefined })}
-              placeholder="질문에 대한 추가 안내"
+            <label className="block text-xs text-dark-500 mb-1">투표 대상</label>
+            <select
+              value={question.targetMode}
+              onChange={(e) => {
+                const mode = e.target.value as VoteTargetMode;
+                onChange({
+                  targetMode: mode,
+                  choices: mode === "custom-choices" ? question.choices : [],
+                });
+              }}
               className={inp}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-dark-500 mb-1">투표 대상</label>
-              <select
-                value={question.targetMode}
-                onChange={(e) => {
-                  const mode = e.target.value as VoteTargetMode;
-                  onChange({
-                    targetMode: mode,
-                    choices: mode === "custom-choices" ? question.choices : [],
-                  });
-                }}
-                className={inp}
-              >
-                {(Object.keys(TARGET_MODE_LABELS) as VoteTargetMode[]).map((m) => (
-                  <option key={m} value={m}>{TARGET_MODE_LABELS[m]}</option>
-                ))}
-              </select>
-            </div>
+            >
+              {(Object.keys(TARGET_MODE_LABELS) as VoteTargetMode[]).map((m) => (
+                <option key={m} value={m}>{TARGET_MODE_LABELS[m]}</option>
+              ))}
+            </select>
+            {question.targetMode !== "custom-choices" && (
+              <p className="text-xs text-dark-600 mt-1">
+                선택지: {buildAutoTargets(question.targetMode, players, npcs).map((t) => t.label).join(", ") || "없음"}
+              </p>
+            )}
           </div>
 
           {/* 커스텀 선택지 */}
@@ -176,66 +247,6 @@ function VoteQuestionForm({
               ))}
             </div>
           )}
-
-          {/* 2차 투표: 트리거 조건 + 스토리 텍스트 */}
-          {isSecondRound && firstRoundQuestions && firstRoundQuestions.length > 0 && (
-            <div className="space-y-3 border-t border-dark-700 pt-3">
-              <div>
-                <label className="block text-xs text-dark-500 mb-1">트리거 조건 — 1차 투표 결과가 다음일 때 2차 투표 시작</label>
-                <select
-                  value={question.triggerCondition?.questionId ?? ""}
-                  onChange={(e) => {
-                    const qId = e.target.value;
-                    onChange({
-                      triggerCondition: qId
-                        ? { requiresVoteRound: 1, questionId: qId, resultEquals: question.triggerCondition?.resultEquals ?? "" }
-                        : undefined,
-                    });
-                  }}
-                  className={inp}
-                >
-                  <option value="">— 1차 질문 선택 —</option>
-                  {firstRoundQuestions.map((fq) => (
-                    <option key={fq.id} value={fq.id}>{fq.label || "(질문 없음)"}</option>
-                  ))}
-                </select>
-              </div>
-              {question.triggerCondition?.questionId && (() => {
-                const refQ = firstRoundQuestions.find((fq) => fq.id === question.triggerCondition?.questionId);
-                if (!refQ || refQ.targetMode !== "custom-choices") return null;
-                return (
-                  <div>
-                    <label className="block text-xs text-dark-500 mb-1">1차 투표 결과 선택지</label>
-                    <select
-                      value={question.triggerCondition?.resultEquals ?? ""}
-                      onChange={(e) => onChange({
-                        triggerCondition: {
-                          ...question.triggerCondition!,
-                          resultEquals: e.target.value,
-                        },
-                      })}
-                      className={inp}
-                    >
-                      <option value="">— 선택지 선택 —</option>
-                      {refQ.choices.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label || "(선택지 없음)"}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })()}
-              <div>
-                <label className="block text-xs text-dark-500 mb-1">2차 투표 전 스토리 텍스트</label>
-                <textarea
-                  rows={4}
-                  value={question.preStoryText ?? ""}
-                  onChange={(e) => onChange({ preStoryText: e.target.value || undefined })}
-                  placeholder="1차 투표 결과 공개 후, 2차 투표 전에 보여줄 추가 스토리"
-                  className={inp + " resize-none"}
-                />
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -251,6 +262,7 @@ interface VoteEndingEditorProps {
 
 export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("vote");
+  const [showPreStory, setShowPreStory] = useState(Boolean(game.scripts.vote.narration?.trim()));
 
   const ending = game.ending;
   const players = game.players ?? [];
@@ -275,8 +287,8 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
     onUpdate({ voteQuestions: questions });
   }
 
-  // 질문 CRUD
   const endingQuestions = voteQuestions.filter((q) => q.purpose === "ending" && q.voteRound === 1);
+  const endingQuestion1 = endingQuestions[0]; // 1차 엔딩 결정 투표
   const personalQuestions = voteQuestions.filter((q) => q.purpose === "personal");
   const round2Questions = voteQuestions.filter((q) => q.voteRound === 2);
 
@@ -334,21 +346,38 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
       {/* ─── 투표 탭 ─── */}
       {activeTab === "vote" && (
         <div className="space-y-6">
-          {/* 투표 안내 텍스트 */}
+
+          {/* 투표 전 스토리 텍스트 (on/off) */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-3">
-            <p className="text-sm font-semibold text-dark-100">투표 안내</p>
-            <p className="text-xs text-dark-500">
-              {advancedVotingEnabled
-                ? "투표 시작 시 플레이어 전원에게 표시되는 공통 안내입니다. 각 질문 텍스트는 아래에서 별도로 입력합니다."
-                : "투표 시작 시 플레이어 전원에게 표시됩니다."}
-            </p>
-            <textarea
-              rows={3}
-              value={voteScript.narration}
-              onChange={(e) => updateVoteScript({ ...voteScript, narration: e.target.value })}
-              placeholder={advancedVotingEnabled ? "예: 모든 조사가 끝났습니다. 이제 최종 투표를 시작합니다." : "예: 범인이라 생각하는 인물에게 투표하세요."}
-              className={inp + " resize-none"}
-            />
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-dark-100">투표 전 안내</p>
+                <p className="text-xs text-dark-500 mt-0.5">투표 시작 전 플레이어에게 표시할 안내 텍스트입니다.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPreStory(!showPreStory);
+                  if (showPreStory) updateVoteScript({ ...voteScript, narration: "" });
+                }}
+                className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
+                  showPreStory ? "bg-mystery-600" : "bg-dark-700"
+                }`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                  showPreStory ? "translate-x-4" : ""
+                }`} />
+              </button>
+            </div>
+            {showPreStory && (
+              <textarea
+                rows={3}
+                value={voteScript.narration}
+                onChange={(e) => updateVoteScript({ ...voteScript, narration: e.target.value })}
+                placeholder="예: 모든 조사가 끝났습니다. 이제 최종 투표를 시작합니다."
+                className={inp + " resize-none"}
+              />
+            )}
           </section>
 
           {/* 고급 투표 설정 */}
@@ -382,10 +411,12 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                       <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">엔딩 결정 투표</p>
                       <p className="text-xs text-dark-600 mt-0.5">투표 결과가 엔딩 분기를 결정합니다.</p>
                     </div>
-                    <button type="button" onClick={() => addQuestion(1, "ending")}
-                      className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors">
-                      + 질문 추가
-                    </button>
+                    {endingQuestions.length === 0 && (
+                      <button type="button" onClick={() => addQuestion(1, "ending")}
+                        className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors">
+                        + 질문 추가
+                      </button>
+                    )}
                   </div>
                   {endingQuestions.length === 0 && (
                     <p className="text-xs text-dark-600 text-center py-3 border border-dashed border-dark-700 rounded-xl">
@@ -396,6 +427,8 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                     <VoteQuestionForm
                       key={q.id}
                       question={q}
+                      players={players}
+                      npcs={npcs}
                       onChange={(patch) => updateQuestion(q.id, patch)}
                       onDelete={() => deleteQuestion(q.id)}
                       onChangeChoices={(c) => updateChoices(q.id, c)}
@@ -420,7 +453,9 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                       key={q.id}
                       question={q}
                       isSecondRound
-                      firstRoundQuestions={endingQuestions}
+                      firstRoundQuestion={endingQuestion1}
+                      players={players}
+                      npcs={npcs}
                       onChange={(patch) => updateQuestion(q.id, patch)}
                       onDelete={() => deleteQuestion(q.id)}
                       onChangeChoices={(c) => updateChoices(q.id, c)}
@@ -444,6 +479,8 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                     <VoteQuestionForm
                       key={q.id}
                       question={q}
+                      players={players}
+                      npcs={npcs}
                       onChange={(patch) => updateQuestion(q.id, patch)}
                       onDelete={() => deleteQuestion(q.id)}
                       onChangeChoices={(c) => updateChoices(q.id, c)}
@@ -461,6 +498,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
         <EndingEditor
           ending={ending}
           players={players}
+          npcs={npcs}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}
@@ -473,6 +511,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
         <EndingEditor
           ending={ending}
           players={players}
+          npcs={npcs}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}
@@ -485,6 +524,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
         <EndingEditor
           ending={ending}
           players={players}
+          npcs={npcs}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}

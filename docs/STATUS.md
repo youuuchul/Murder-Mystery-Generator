@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-11 (고급 게임플레이 백로그 3건 추가 — 단서 미리보기, 투표 확장, 엔딩 분기)
+> 마지막 업데이트: 2026-04-11 (단서 미리보기 완료, 투표&엔딩 고급 시스템 진행중 — 메이커 UI 재작업 필요)
 
 ---
 
@@ -99,7 +99,7 @@
 
 ### 높음
 - [x] **획득 전 단서 표시 설정** — 장소별 "획득 전 미리보기" 토글 + 단서별 preview_title/preview_description 입력. 기본 OFF 시 `{장소명} #N` 표시. ON 시 조사 포인트 힌트·NPC 대화 선택지 용도 활용. DB 컬럼 추가. 메이커 LocationEditor, 플레이어 UI, AI 플레이어 연동. 카드 상세에서 유형 라벨을 획득 장소로 교체. ✅ 완료 (2026-04-11)
-- [x] **투표 대상 확장 + 다중 질문 + 2차 투표** — (1) 투표 대상: 플레이어만(기본) / +NPC / 커스텀 선택지. (2) 다중 질문 투표. (3) 2차 투표 + 엔딩 stage 삽입. DB: game_vote_questions + game_vote_question_choices 테이블. 엔딩 분기에 custom-choice-selected 트리거. 메이커 VoteSettingsPanel, 플레이어 VoteScreen 다중 질문 UI, 투표 API advancedVotes 분기, ending-flow 2차 투표 stage. 기본 투표 하위호환 유지. ✅ 완료 (2026-04-11, GM Dashboard 질문별 결과 표시는 후속)
+- [ ] **투표 & 엔딩 고급 시스템** — DB 스키마 완료 (game_vote_questions, game_vote_question_choices, trigger_type 6종, trigger_choice_ids n:1, purpose). 메이커 UI 골격 완료 (VoteEndingEditor 4탭, EndingEditor section 분리). **메이커 UI 품질 미달로 재작업 필요** — 엔딩 분기 편집 UX, 개인 목표 질문 캐릭터별/공통 분리, 투표 API 고급 모드 실사용 검증, 플레이어 VoteScreen 고급 모드, GM Dashboard 질문별 결과, 퍼널 안정화(fallback/스킵/갇힘 방지) 모두 미완. → `docs/plans/20260411_VOTE_ENDING_RESTRUCTURE_PLAN.md`
 - [x] **서버 기반 공용 타이머** — `SharedState.timerState`로 라운드 타이머 서버 기반 통합. GM/호스트가 시작·일시정지·재개 가능. 플레이어 공통화면 탭에서 카운트다운 표시. 합의 모드 호스트 조작 지원. 비로그인 세션 삭제 권한 수정 ✅ 완료 (2026-04-09)
 - [x] **계정별 동시 세션 수 제한** — 로그인 유저 최대 3개(admin 면제), 비로그인 유저 1개(쿠키 기반 추적). 한도 초과 시 모달로 기존 세션 관리 + `/library/manage/my-sessions` 페이지 추가 ✅ 완료 (2026-04-09)
 - [x] **인물 설정 관계 탭 복구** — 메이커 Step3 관계 탭 정상 확인. 플레이어 인물 정보에서 관계/인상 미입력 시 불필요한 placeholder 텍스트 제거 ✅ 완료 (2026-04-09)

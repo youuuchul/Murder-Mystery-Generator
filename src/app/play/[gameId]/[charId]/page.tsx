@@ -707,19 +707,39 @@ function VoteScreen({
   sessionId: string;
   token: string;
 }) {
+  const isAdvanced = game.advancedVotingEnabled && game.voteQuestions.length > 0;
+  const currentVoteRound = sharedState.currentVoteRound ?? 1;
+  const activeQuestions = isAdvanced
+    ? game.voteQuestions.filter((q) => q.voteRound === currentVoteRound)
+    : [];
+
+  // 기본 투표: 단일 선택
   const [selectedId, setSelectedId] = useState("");
+  // 고급 투표: 질문별 선택 { questionId → targetId }
+  const [questionSelections, setQuestionSelections] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const totalPlayers = sharedState.characterSlots.filter((s) => s.isLocked).length;
+  const totalPlayers = sharedState.characterSlots.filter((s) => s.isLocked && !s.isAiControlled).length;
+
+  function setQuestionSelection(questionId: string, targetId: string) {
+    setQuestionSelections((prev) => ({ ...prev, [questionId]: targetId }));
+  }
+
+  const allQuestionsAnswered = isAdvanced
+    ? activeQuestions.every((q) => questionSelections[q.id])
+    : Boolean(selectedId);
 
   async function submitVote() {
-    if (!selectedId) return;
+    if (!allQuestionsAnswered) return;
     setSubmitting(true);
+    const body = isAdvanced
+      ? { token, questionVotes: questionSelections }
+      : { token, targetPlayerId: selectedId };
     const res = await fetch(`/api/sessions/${sessionId}/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, targetPlayerId: selectedId }),
+      body: JSON.stringify(body),
     });
     if (res.ok) setSubmitted(true);
     else {
@@ -734,9 +754,6 @@ function VoteScreen({
       <div className="space-y-4">
         <div className="text-center py-8 border border-mystery-800 rounded-xl bg-mystery-950/10">
           <p className="text-mystery-300 font-semibold">투표 완료</p>
-          <p className="text-dark-500 text-sm mt-1">
-            {game.players.find((p) => p.id === selectedId)?.name}에게 투표했습니다
-          </p>
         </div>
         <div className="text-center">
           <p className="text-sm text-dark-500">
@@ -754,7 +771,81 @@ function VoteScreen({
     );
   }
 
-  // 현재는 자기 자신을 포함해 모든 참가 캐릭터에게 투표할 수 있다.
+  // 고급 투표 모드: 질문별 UI
+  if (isAdvanced) {
+    return (
+      <div className="space-y-4">
+        {game.scripts.vote.narration && (
+          <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+            <p className="text-xs text-yellow-500 mb-2">투표 안내</p>
+            <p className="text-sm text-dark-200 leading-relaxed whitespace-pre-line">
+              {game.scripts.vote.narration}
+            </p>
+          </div>
+        )}
+
+        <div className="text-center py-2">
+          <p className="text-dark-500 text-xs">
+            {sharedState.voteCount} / {totalPlayers}명 투표 완료
+          </p>
+        </div>
+
+        {activeQuestions.map((q) => {
+          const targets = q.targetMode === "custom-choices"
+            ? q.choices.map((c) => ({ id: c.id, name: c.label, image: undefined as string | undefined }))
+            : q.targetMode === "players-and-npcs"
+            ? [
+                ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
+                ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
+              ]
+            : game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage }));
+
+          return (
+            <div key={q.id} className="space-y-2">
+              <div className="py-2">
+                <p className="text-dark-200 font-semibold">{q.label || "투표 질문"}</p>
+                {q.description && <p className="text-dark-500 text-xs mt-0.5">{q.description}</p>}
+              </div>
+              <div className="space-y-2">
+                {targets.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setQuestionSelection(q.id, t.id)}
+                    className={[
+                      "w-full rounded-xl border px-4 py-3.5 text-left transition-all",
+                      questionSelections[q.id] === t.id
+                        ? "border-mystery-600 bg-mystery-950/30 ring-1 ring-mystery-600"
+                        : "border-dark-700 bg-dark-900 hover:border-dark-500",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center gap-3">
+                      {t.image ? (
+                        <div className="w-14 shrink-0">
+                          <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
+                        </div>
+                      ) : null}
+                      <p className="font-semibold text-dark-100">{t.name}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        <button
+          onClick={submitVote}
+          disabled={!allQuestionsAnswered || submitting}
+          className="w-full py-3.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-40"
+        >
+          {submitting ? "제출 중…" : "투표 제출"}
+        </button>
+      </div>
+    );
+  }
+
+  // 기본 투표 모드
   const votablePlayers = game.players;
 
   return (

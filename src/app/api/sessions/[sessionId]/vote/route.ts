@@ -12,7 +12,8 @@ import { markPhaseStarted } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
-import type { VoteTally, VoteReveal } from "@/types/session";
+import type { VoteTally, VoteReveal, QuestionTally } from "@/types/session";
+import type { GamePackage, VoteTargetMode } from "@/types/game";
 
 type Params = { params: { sessionId: string } };
 type LoadedGame = NonNullable<Awaited<ReturnType<typeof getGame>>>;
@@ -63,6 +64,56 @@ function resolveEndingBranchId(
     ?? game.ending.branches.find((branch) => branch.triggerType === "wrong-arrest-fallback")?.id;
 }
 
+/** 고급 투표: 주 질문의 최다 득표 선택지 기반으로 엔딩 분기를 찾는다. */
+function resolveAdvancedEndingBranchId(
+  game: LoadedGame,
+  questionTallies: QuestionTally[]
+): string | undefined {
+  const primaryQuestion = game.voteQuestions.find((q) => q.isPrimary);
+  if (!primaryQuestion) return undefined;
+
+  const primaryTally = questionTallies.find((qt) => qt.questionId === primaryQuestion.id);
+  if (!primaryTally || primaryTally.tally.length === 0) return undefined;
+
+  const topChoiceId = primaryTally.tally[0].playerId; // playerId 필드에 targetId가 저장됨
+
+  // custom-choice-selected 분기 매칭
+  const customBranch = game.ending.branches.find((b) =>
+    b.triggerType === "custom-choice-selected"
+    && b.targetQuestionId === primaryQuestion.id
+    && b.targetChoiceId === topChoiceId
+  );
+  if (customBranch) return customBranch.id;
+
+  // players-only/players-and-npcs 모드: 기존 로직으로 fallback
+  if (primaryQuestion.targetMode !== "custom-choices") {
+    const culpritPlayerId = game.story.culpritPlayerId;
+    if (topChoiceId === culpritPlayerId) {
+      return game.ending.branches.find((b) => b.triggerType === "culprit-captured")?.id;
+    }
+    return game.ending.branches.find((b) =>
+      b.triggerType === "specific-player-arrested" && b.targetPlayerId === topChoiceId
+    )?.id ?? game.ending.branches.find((b) => b.triggerType === "wrong-arrest-fallback")?.id;
+  }
+
+  return undefined;
+}
+
+/** 고급 투표: targetId가 유효한 대상인지 검증 */
+function validateVoteTarget(game: GamePackage, targetMode: VoteTargetMode, targetId: string): boolean {
+  switch (targetMode) {
+    case "players-only":
+      return game.players.some((p) => p.id === targetId);
+    case "players-and-npcs":
+      return game.players.some((p) => p.id === targetId)
+        || game.story.npcs.some((n) => n.id === targetId);
+    case "custom-choices":
+      return game.voteQuestions.some((q) =>
+        q.choices.some((c) => c.id === targetId)
+      );
+  }
+}
+
 /** 현재 세션의 비공개 표 데이터를 정렬된 득표 집계로 변환한다. */
 function buildVoteTally(session: LoadedSession): VoteTally[] {
   session.votes = session.votes ?? {};
@@ -80,6 +131,34 @@ function buildVoteTally(session: LoadedSession): VoteTally[] {
     count: data.count,
     voterNames: data.voterNames,
   })).sort((a, b) => b.count - a.count);
+}
+
+/** 고급 투표: 질문별 득표 집계 */
+function buildAdvancedVoteTallies(session: LoadedSession): QuestionTally[] {
+  const advVotes = session.advancedVotes ?? {};
+  const allQuestionIds = new Set<string>();
+  for (const qv of Object.values(advVotes)) {
+    for (const qId of Object.keys(qv)) allQuestionIds.add(qId);
+  }
+
+  return [...allQuestionIds].map((questionId) => {
+    const tallyMap = new Map<string, { count: number; voterNames: string[] }>();
+    for (const [token, qvMap] of Object.entries(advVotes)) {
+      const targetId = qvMap[questionId];
+      if (!targetId) continue;
+      const voter = session.playerStates.find((p) => p.token === token);
+      if (!tallyMap.has(targetId)) tallyMap.set(targetId, { count: 0, voterNames: [] });
+      const entry = tallyMap.get(targetId)!;
+      entry.count++;
+      if (voter) entry.voterNames.push(voter.playerName);
+    }
+    return {
+      questionId,
+      tally: [...tallyMap.entries()]
+        .map(([playerId, data]) => ({ playerId, count: data.count, voterNames: data.voterNames }))
+        .sort((a, b) => b.count - a.count),
+    };
+  });
 }
 
 /** 최다 득표 동률 후보를 playerId 목록으로 추린다. */
@@ -130,6 +209,49 @@ async function revealVotes(
       const now = new Date().toISOString();
       const game = await getGame(latestSession.gameId);
       const culpritPlayerId = game?.story.culpritPlayerId ?? "";
+      const isAdvanced = game?.advancedVotingEnabled && Object.keys(latestSession.advancedVotes ?? {}).length > 0;
+
+      // 고급 투표: 질문별 집계 후 primary 기반으로 엔딩 분기 결정
+      if (isAdvanced && game) {
+        const questionTallies = buildAdvancedVoteTallies(latestSession as LoadedSession);
+        const resolvedBranchId = resolveAdvancedEndingBranchId(game, questionTallies);
+
+        // primary question의 최다 득표로 arrestedPlayerId 결정 (players 모드일 때)
+        const primaryQ = game.voteQuestions.find((q) => q.isPrimary);
+        const primaryTally = questionTallies.find((qt) => qt.questionId === primaryQ?.id);
+        const topTargetId = primaryTally?.tally[0]?.playerId;
+
+        const resultType = topTargetId === culpritPlayerId ? "culprit-captured" : "wrong-arrest";
+        const reveal: VoteReveal = {
+          tally: primaryTally?.tally ?? [],
+          culpritPlayerId,
+          arrestedPlayerId: topTargetId,
+          resultType: primaryQ?.targetMode === "custom-choices" ? undefined : resultType,
+          resolvedBranchId,
+          voteRound: 1,
+          questionTallies,
+        };
+        latestSession.pendingArrestOptions = undefined;
+        latestSession.sharedState.voteReveal = reveal;
+        latestSession.sharedState.phase = "ending";
+        latestSession.sharedState.endingStage = "branch";
+        markPhaseStarted(latestSession.sharedState, now);
+        if (latestSession.playerAgentState) {
+          latestSession.playerAgentState = syncPlayerAgentRuntimeStatusForSharedPhase(
+            latestSession.playerAgentState, latestSession.sharedState
+          );
+          latestSession.sharedState.characterSlots = applyPlayerAgentOccupancyToCharacterSlots(
+            latestSession.sharedState.characterSlots, latestSession.playerAgentState
+          );
+        }
+        latestSession.sharedState.eventLog.push({
+          id: crypto.randomUUID(), timestamp: now,
+          message: "투표 결과가 공개됐습니다.", type: "vote_revealed",
+        });
+        return { requiresTieBreak: false, pendingArrestOptions: [] as string[] };
+      }
+
+      // 기본 투표 로직
       const tally = buildVoteTally(latestSession as LoadedSession);
       const tiedCandidates = resolveTiedCandidates(tally);
       const resolvedForcedArrestedPlayerId = forcedArrestedPlayerId
@@ -225,13 +347,16 @@ async function revealVotes(
 /** POST /api/sessions/[sessionId]/vote — 투표 제출 */
 export async function POST(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
-  const { token, targetPlayerId } = await req.json().catch(() => ({})) as {
+  const body = await req.json().catch(() => ({})) as {
     token?: string;
     targetPlayerId?: string;
+    /** 고급 투표: 질문별 투표 */
+    questionVotes?: Record<string, string>;
   };
+  const { token, targetPlayerId, questionVotes } = body;
 
-  if (!token || !targetPlayerId) {
-    return NextResponse.json({ error: "token, targetPlayerId 필수" }, { status: 400 });
+  if (!token || (!targetPlayerId && !questionVotes)) {
+    return NextResponse.json({ error: "token 및 투표 대상 필수" }, { status: 400 });
   }
 
   try {
@@ -261,33 +386,54 @@ export async function POST(req: NextRequest, { params }: Params) {
           throw new Error("Invalid token");
         }
 
-        latestSession.votes = latestSession.votes ?? {};
-        latestSession.sharedState.voteCount = latestSession.sharedState.voteCount ?? 0;
-
-        const alreadyVoted = token in latestSession.votes;
-        latestSession.votes[token] = targetPlayerId;
-
-        if (!alreadyVoted) {
-          latestSession.sharedState.voteCount++;
-          latestSession.sharedState.eventLog.push({
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            message: `${voter.playerName}님이 투표했습니다.`,
-            type: "vote_submitted",
-          });
-        }
-
         const game = await getGame(latestSession.gameId);
         if (!game) {
           throw new Error("Game not found");
+        }
+
+        const isAdvanced = game.advancedVotingEnabled && questionVotes && Object.keys(questionVotes).length > 0;
+
+        if (isAdvanced) {
+          // 고급 투표: 질문별 저장
+          latestSession.advancedVotes = latestSession.advancedVotes ?? {};
+          const alreadyVoted = token in (latestSession.advancedVotes ?? {});
+          latestSession.advancedVotes[token] = questionVotes;
+
+          if (!alreadyVoted) {
+            latestSession.sharedState.voteCount = (latestSession.sharedState.voteCount ?? 0) + 1;
+            latestSession.sharedState.eventLog.push({
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              message: `${voter.playerName}님이 투표했습니다.`,
+              type: "vote_submitted",
+            });
+          }
+        } else {
+          // 기본 투표
+          latestSession.votes = latestSession.votes ?? {};
+          latestSession.sharedState.voteCount = latestSession.sharedState.voteCount ?? 0;
+
+          const alreadyVoted = token in latestSession.votes;
+          latestSession.votes[token] = targetPlayerId!;
+
+          if (!alreadyVoted) {
+            latestSession.sharedState.voteCount++;
+            latestSession.sharedState.eventLog.push({
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              message: `${voter.playerName}님이 투표했습니다.`,
+              type: "vote_submitted",
+            });
+          }
         }
 
         const totalPlayers = latestSession.sharedState.characterSlots.filter(
           (slot) => slot.isLocked && !slot.isAiControlled
         ).length;
         return {
-          allVoted: latestSession.sharedState.voteCount >= totalPlayers,
+          allVoted: (latestSession.sharedState.voteCount ?? 0) >= totalPlayers,
           forcedArrestedPlayerId: undefined,
+          isAdvanced,
         };
       }
     );

@@ -6,11 +6,14 @@ import type {
   EndingConfig,
   Player,
   PersonalEnding,
+  VoteQuestion,
 } from "@/types/game";
 
 interface EndingEditorProps {
   ending: EndingConfig;
   players: Player[];
+  voteQuestions: VoteQuestion[];
+  advancedVotingEnabled: boolean;
   onChange: (ending: EndingConfig) => void;
 }
 
@@ -59,6 +62,8 @@ function normalizeBranchPersonalEndings(
 export default function EndingEditor({
   ending,
   players,
+  voteQuestions,
+  advancedVotingEnabled,
   onChange,
 }: EndingEditorProps) {
   function updateBranch(index: number, partial: Partial<EndingBranch>) {
@@ -174,17 +179,23 @@ export default function EndingEditor({
                     <label className="mb-1 block text-xs font-medium text-dark-400">트리거</label>
                     <select
                       value={branch.triggerType}
-                      onChange={(e) => updateBranch(index, {
-                        triggerType: e.target.value as EndingBranch["triggerType"],
-                        targetPlayerId: e.target.value === "specific-player-arrested"
-                          ? branch.targetPlayerId
-                          : undefined,
-                      })}
+                      onChange={(e) => {
+                        const tt = e.target.value as EndingBranch["triggerType"];
+                        updateBranch(index, {
+                          triggerType: tt,
+                          targetPlayerId: tt === "specific-player-arrested" ? branch.targetPlayerId : undefined,
+                          targetQuestionId: tt === "custom-choice-selected" ? branch.targetQuestionId : undefined,
+                          targetChoiceId: tt === "custom-choice-selected" ? branch.targetChoiceId : undefined,
+                        });
+                      }}
                       className={inp}
                     >
                       <option value="culprit-captured">범인 검거</option>
                       <option value="specific-player-arrested">특정 캐릭터 검거</option>
                       <option value="wrong-arrest-fallback">오검거 기본 분기</option>
+                      {advancedVotingEnabled && (
+                        <option value="custom-choice-selected">커스텀 선택지 결과</option>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -204,6 +215,44 @@ export default function EndingEditor({
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {branch.triggerType === "custom-choice-selected" && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-dark-400">투표 질문</label>
+                      <select
+                        value={branch.targetQuestionId ?? ""}
+                        onChange={(e) => updateBranch(index, {
+                          targetQuestionId: e.target.value || undefined,
+                          targetChoiceId: undefined,
+                        })}
+                        className={inp}
+                      >
+                        <option value="">— 질문 선택 —</option>
+                        {voteQuestions.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {q.label || `질문 (${q.voteRound}차)`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-dark-400">선택지 결과</label>
+                      <select
+                        value={branch.targetChoiceId ?? ""}
+                        onChange={(e) => updateBranch(index, { targetChoiceId: e.target.value || undefined })}
+                        className={inp}
+                      >
+                        <option value="">— 선택지 선택 —</option>
+                        {(voteQuestions.find((q) => q.id === branch.targetQuestionId)?.choices ?? []).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label || "(선택지 없음)"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
 

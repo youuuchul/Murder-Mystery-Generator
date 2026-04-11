@@ -2,13 +2,29 @@
 
 import { useEffect, useState } from "react";
 import ImageAssetField from "./ImageAssetField";
-import type { Location, RoundScript, ScriptSegment, Scripts } from "@/types/game";
+import type {
+  Location,
+  Player,
+  RoundScript,
+  ScriptSegment,
+  Scripts,
+  StoryNpc,
+  VoteQuestion,
+  VoteQuestionChoice,
+  VoteTargetMode,
+} from "@/types/game";
 
 interface ScriptEditorProps {
   gameId: string;
   scripts: Scripts;
   rounds: number;
   locations: Location[];
+  players: Player[];
+  npcs: StoryNpc[];
+  advancedVotingEnabled: boolean;
+  voteQuestions: VoteQuestion[];
+  onChangeAdvancedVoting: (enabled: boolean) => void;
+  onChangeVoteQuestions: (questions: VoteQuestion[]) => void;
   onChange: (scripts: Scripts) => void;
   focusTarget?: string | null;
   focusToken?: number;
@@ -512,11 +528,333 @@ function getRoundsTabStatus(rounds: RoundScript[]): EditorStatus {
   return "partial";
 }
 
+const TARGET_MODE_LABELS: Record<VoteTargetMode, string> = {
+  "players-only": "플레이어만",
+  "players-and-npcs": "플레이어 + NPC",
+  "custom-choices": "커스텀 선택지",
+};
+
+function createVoteQuestion(voteRound: number): VoteQuestion {
+  return {
+    id: crypto.randomUUID(),
+    voteRound,
+    label: "",
+    targetMode: "players-only",
+    isPrimary: false,
+    sortOrder: 0,
+    choices: [],
+  };
+}
+
+function createVoteChoice(): VoteQuestionChoice {
+  return { id: crypto.randomUUID(), label: "" };
+}
+
+function VoteSettingsPanel({
+  enabled,
+  questions,
+  players,
+  npcs,
+  onToggle,
+  onChangeQuestions,
+}: {
+  enabled: boolean;
+  questions: VoteQuestion[];
+  players: Player[];
+  npcs: StoryNpc[];
+  onToggle: (v: boolean) => void;
+  onChangeQuestions: (q: VoteQuestion[]) => void;
+}) {
+  const round1Questions = questions.filter((q) => q.voteRound === 1);
+  const round2Questions = questions.filter((q) => q.voteRound === 2);
+
+  function addQuestion(voteRound: number) {
+    onChangeQuestions([...questions, createVoteQuestion(voteRound)]);
+  }
+
+  function updateQuestion(id: string, patch: Partial<VoteQuestion>) {
+    onChangeQuestions(questions.map((q) => q.id === id ? { ...q, ...patch } : q));
+  }
+
+  function deleteQuestion(id: string) {
+    onChangeQuestions(questions.filter((q) => q.id !== id));
+  }
+
+  function updateChoices(questionId: string, choices: VoteQuestionChoice[]) {
+    updateQuestion(questionId, { choices });
+  }
+
+  return (
+    <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-dark-100">고급 투표 설정</p>
+          <p className="mt-1 text-xs text-dark-500">
+            다중 질문, NPC 투표 대상, 커스텀 선택지, 2차 투표 등 확장 투표 기능을 설정합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onToggle(!enabled)}
+          className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
+            enabled ? "bg-mystery-600" : "bg-dark-700"
+          }`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-4" : ""
+          }`} />
+        </button>
+      </div>
+
+      {enabled && (
+        <div className="space-y-5 pt-2">
+          {/* 1차 투표 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">1차 투표 질문</p>
+              <button
+                type="button"
+                onClick={() => addQuestion(1)}
+                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+              >
+                + 질문 추가
+              </button>
+            </div>
+            {round1Questions.length === 0 && (
+              <p className="text-xs text-dark-600 text-center py-3 border border-dashed border-dark-700 rounded-xl">
+                질문을 추가하면 기본 범인 투표 대신 사용됩니다.
+              </p>
+            )}
+            {round1Questions.map((q) => (
+              <VoteQuestionForm
+                key={q.id}
+                question={q}
+                players={players}
+                npcs={npcs}
+                onChange={(patch) => updateQuestion(q.id, patch)}
+                onDelete={() => deleteQuestion(q.id)}
+                onChangeChoices={(c) => updateChoices(q.id, c)}
+              />
+            ))}
+          </div>
+
+          {/* 2차 투표 */}
+          <div className="space-y-3 border-t border-dark-700 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-mystery-300/80">2차 투표 (선택)</p>
+                <p className="text-xs text-dark-600 mt-0.5">1차 투표 결과 조건에 따라 추가 투표를 진행합니다.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => addQuestion(2)}
+                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+              >
+                + 질문 추가
+              </button>
+            </div>
+            {round2Questions.map((q) => (
+              <VoteQuestionForm
+                key={q.id}
+                question={q}
+                players={players}
+                npcs={npcs}
+                isSecondRound
+                firstRoundQuestions={round1Questions}
+                onChange={(patch) => updateQuestion(q.id, patch)}
+                onDelete={() => deleteQuestion(q.id)}
+                onChangeChoices={(c) => updateChoices(q.id, c)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function VoteQuestionForm({
+  question,
+  players,
+  npcs,
+  isSecondRound,
+  firstRoundQuestions,
+  onChange,
+  onDelete,
+  onChangeChoices,
+}: {
+  question: VoteQuestion;
+  players: Player[];
+  npcs: StoryNpc[];
+  isSecondRound?: boolean;
+  firstRoundQuestions?: VoteQuestion[];
+  onChange: (patch: Partial<VoteQuestion>) => void;
+  onDelete: () => void;
+  onChangeChoices: (c: VoteQuestionChoice[]) => void;
+}) {
+  const [expanded, setExpanded] = useState(!question.label);
+
+  return (
+    <div className="rounded-xl border border-dark-700/70 bg-dark-950/45 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-3 py-3 text-left transition-colors hover:bg-dark-900/50"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {question.isPrimary && (
+                <span className="rounded-full border border-mystery-800 bg-mystery-950/30 px-2 py-0.5 text-[11px] text-mystery-400">
+                  주 질문
+                </span>
+              )}
+              <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400">
+                {TARGET_MODE_LABELS[question.targetMode]}
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm font-medium text-dark-100">
+              {question.label || <span className="text-dark-500 italic">질문 텍스트 없음</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="rounded-lg border border-dark-700 px-2.5 py-1.5 text-xs text-dark-500 hover:border-red-900/50 hover:text-red-400 transition-colors"
+            >
+              삭제
+            </button>
+            <span className="text-xs text-dark-500">{expanded ? "접기" : "열기"}</span>
+          </div>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 border-t border-dark-800/80 bg-black/10 px-3 pb-3 pt-3">
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">질문 텍스트</label>
+            <input
+              type="text"
+              value={question.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              placeholder="예: 범인은 누구인가?, 살해 도구는?"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">보충 설명 (선택)</label>
+            <input
+              type="text"
+              value={question.description ?? ""}
+              onChange={(e) => onChange({ description: e.target.value || undefined })}
+              placeholder="질문에 대한 추가 안내"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">투표 대상</label>
+              <select
+                value={question.targetMode}
+                onChange={(e) => {
+                  const mode = e.target.value as VoteTargetMode;
+                  onChange({
+                    targetMode: mode,
+                    choices: mode === "custom-choices" ? question.choices : [],
+                  });
+                }}
+                className={inputClass}
+              >
+                {(Object.keys(TARGET_MODE_LABELS) as VoteTargetMode[]).map((m) => (
+                  <option key={m} value={m}>{TARGET_MODE_LABELS[m]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer py-2">
+                <input
+                  type="checkbox"
+                  checked={question.isPrimary}
+                  onChange={(e) => onChange({ isPrimary: e.target.checked })}
+                  className="accent-mystery-500 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-dark-400">엔딩 분기 결정용 (주 질문)</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 커스텀 선택지 */}
+          {question.targetMode === "custom-choices" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs text-dark-500">선택지</label>
+                <button
+                  type="button"
+                  onClick={() => onChangeChoices([...question.choices, createVoteChoice()])}
+                  className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                >
+                  + 추가
+                </button>
+              </div>
+              {question.choices.map((c, ci) => (
+                <div key={c.id} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={c.label}
+                    onChange={(e) => {
+                      const next = question.choices.map((ch, i) =>
+                        i === ci ? { ...ch, label: e.target.value } : ch
+                      );
+                      onChangeChoices(next);
+                    }}
+                    placeholder={`선택지 ${ci + 1}`}
+                    className={inputClass + " flex-1"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onChangeChoices(question.choices.filter((_, i) => i !== ci))}
+                    className="text-xs text-dark-600 hover:text-red-400 px-2 transition-colors"
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 2차 투표 트리거 조건 */}
+          {isSecondRound && firstRoundQuestions && firstRoundQuestions.length > 0 && (
+            <div className="space-y-2 border-t border-dark-700 pt-3">
+              <label className="block text-xs text-dark-500">2차 투표 전 스토리 텍스트</label>
+              <textarea
+                rows={3}
+                value={question.preStoryText ?? ""}
+                onChange={(e) => onChange({ preStoryText: e.target.value || undefined })}
+                placeholder="1차 투표 결과 공개 후, 2차 투표 전에 보여줄 스토리"
+                className={inputClass + " resize-none"}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ScriptEditor({
   gameId,
   scripts,
   rounds,
   locations,
+  players,
+  npcs,
+  advancedVotingEnabled,
+  voteQuestions,
+  onChangeAdvancedVoting,
+  onChangeVoteQuestions,
   onChange,
   focusTarget,
   focusToken,
@@ -668,7 +1006,7 @@ export default function ScriptEditor({
       )}
 
       {activeTab === "vote" && (
-        <div data-maker-anchor="step-5-vote">
+        <div data-maker-anchor="step-5-vote" className="space-y-6">
           <SegmentEditor
             label="투표"
             phaseLabel="투표"
@@ -677,6 +1015,16 @@ export default function ScriptEditor({
             onChange={(vote) => onChange({ ...scripts, vote })}
             textLabel="투표 안내 텍스트"
             textBadgeLabel="안내 텍스트"
+          />
+
+          {/* 고급 투표 설정 */}
+          <VoteSettingsPanel
+            enabled={advancedVotingEnabled}
+            questions={voteQuestions}
+            players={players}
+            npcs={npcs}
+            onToggle={onChangeAdvancedVoting}
+            onChangeQuestions={onChangeVoteQuestions}
           />
         </div>
       )}

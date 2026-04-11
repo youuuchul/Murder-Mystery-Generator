@@ -463,6 +463,12 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               scripts={game.scripts}
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}
+              players={game.players ?? []}
+              npcs={game.story?.npcs ?? []}
+              advancedVotingEnabled={game.advancedVotingEnabled ?? false}
+              voteQuestions={game.voteQuestions ?? []}
+              onChangeAdvancedVoting={(enabled) => updateGame({ advancedVotingEnabled: enabled })}
+              onChangeVoteQuestions={(voteQuestions) => updateGame({ voteQuestions })}
               onChange={(scripts) => updateGame({ scripts })}
               focusTarget={focusRequest.target}
               focusToken={focusRequest.token}
@@ -472,6 +478,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             <EndingEditor
               ending={game.ending}
               players={game.players ?? []}
+              voteQuestions={game.voteQuestions ?? []}
+              advancedVotingEnabled={game.advancedVotingEnabled ?? false}
               onChange={(ending) => updateGame({ ending })}
             />
           )}

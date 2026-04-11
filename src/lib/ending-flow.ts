@@ -37,9 +37,20 @@ export function hasAuthorNotesStage(game: GamePackage): boolean {
     && game.ending.authorNotes.some((note) => hasText(note.title) || hasText(note.content));
 }
 
+/** 고급 투표에서 2차 투표 질문이 존재하는지 판단한다. */
+function hasSecondVoteRound(game: GamePackage): boolean {
+  return game.advancedVotingEnabled
+    && game.voteQuestions.some((q) => q.voteRound === 2);
+}
+
 /** 현재 게임 설정에서 가능한 엔딩 단계 순서를 계산한다. */
 export function getEndingStageOrder(game: GamePackage, reveal?: VoteReveal): EndingStage[] {
   const stages: EndingStage[] = ["branch"];
+
+  if (hasSecondVoteRound(game)) {
+    stages.push("vote-round-2");
+    stages.push("branch-2");
+  }
 
   if (hasPersonalEndingStage(game, reveal)) {
     stages.push("personal");

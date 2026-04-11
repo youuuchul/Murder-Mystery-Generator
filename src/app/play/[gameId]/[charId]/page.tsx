@@ -457,7 +457,7 @@ function CardDetailModal({
     setTransferring(false);
   }
 
-  const typeLabel: Record<string, string> = { physical: "물적 증거", testimony: "증언", scene: "현장 단서" };
+  const locationName = clue ? game.locations.find((l) => l.id === clue.locationId)?.name : undefined;
 
   return (
     <div
@@ -472,7 +472,7 @@ function CardDetailModal({
         <div>
           <p className="font-bold text-dark-50 text-lg leading-tight">{clue?.title ?? "(제목 없음)"}</p>
           <p className="text-xs text-dark-500 mt-1">
-            {typeLabel[clue?.type ?? ""] ?? clue?.type}
+            {locationName ?? "위치 미지정"}
             {item.fromPlayerId && " · 이전받음"}
           </p>
         </div>
@@ -2250,7 +2250,7 @@ export default function PlayerView() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-dark-100 truncate">{clue.title}</p>
                         <p className="text-xs text-dark-500 mt-0.5">
-                          {TYPE_LABEL[clue.type] ?? clue.type}{item.fromPlayerId && " · 이전받음"}
+                          {game.locations.find((l) => l.id === clue.locationId)?.name ?? "위치 미지정"}{item.fromPlayerId && " · 이전받음"}
                         </p>
                       </div>
                       <span className="text-dark-600 text-xs shrink-0">자세히 →</span>
@@ -2449,8 +2449,6 @@ export default function PlayerView() {
                                       ? "border-red-900/40 bg-dark-900/40"
                                       : clue.condition
                                       ? "border-yellow-900/50 bg-dark-800/40"
-                                      : loc.previewCluesEnabled && clue.previewTitle
-                                      ? "border-amber-900/30 bg-amber-950/10"
                                       : "border-dark-700/60 bg-dark-800/30"
                                   }`}
                                 >
@@ -2464,7 +2462,7 @@ export default function PlayerView() {
                                       </>
                                     ) : alreadyHas ? (
                                       <p className="text-sm font-medium break-words text-mystery-300">
-                                        {clue.title || "(카드)"}
+                                        {`${loc.name || "장소"} #${idx + 1}`}
                                       </p>
                                     ) : takenByOther ? (
                                       <>
@@ -2482,11 +2480,7 @@ export default function PlayerView() {
                                       </>
                                     ) : (
                                       <>
-                                        <p className={`text-sm font-medium break-words ${
-                                          loc.previewCluesEnabled && clue.previewTitle
-                                            ? "text-amber-400/80"
-                                            : "text-dark-400"
-                                        }`}>
+                                        <p className="text-sm font-medium break-words text-dark-400">
                                           {loc.previewCluesEnabled && clue.previewTitle
                                             ? clue.previewTitle
                                             : `${loc.name || "장소"} #${idx + 1}`}

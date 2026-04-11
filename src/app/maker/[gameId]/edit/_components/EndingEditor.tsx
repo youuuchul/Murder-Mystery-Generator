@@ -15,6 +15,8 @@ interface EndingEditorProps {
   voteQuestions: VoteQuestion[];
   advancedVotingEnabled: boolean;
   onChange: (ending: EndingConfig) => void;
+  /** 렌더링할 섹션. 생략하면 전체 표시. */
+  section?: "branches" | "personal" | "author";
 }
 
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
@@ -65,6 +67,7 @@ export default function EndingEditor({
   voteQuestions,
   advancedVotingEnabled,
   onChange,
+  section,
 }: EndingEditorProps) {
   function updateBranch(index: number, partial: Partial<EndingBranch>) {
     onChange({
@@ -109,15 +112,22 @@ export default function EndingEditor({
     });
   }
 
+  const showBranches = !section || section === "branches";
+  const showPersonal = !section || section === "personal";
+  const showAuthor = !section || section === "author";
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-bold text-dark-50">엔딩</h2>
-        <p className="mt-1 text-sm text-dark-500">
-          검거된 캐릭터 기준 분기 엔딩과 분기별 개인 엔딩, 작가 추가 설명을 설정합니다.
-        </p>
-      </div>
+      {!section && (
+        <div>
+          <h2 className="text-xl font-bold text-dark-50">엔딩</h2>
+          <p className="mt-1 text-sm text-dark-500">
+            검거된 캐릭터 기준 분기 엔딩과 분기별 개인 엔딩, 작가 추가 설명을 설정합니다.
+          </p>
+        </div>
+      )}
 
+      {showBranches && (
       <div data-maker-anchor="step-6-branches" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -383,7 +393,9 @@ export default function EndingEditor({
           </div>
         )}
       </div>
+      )}
 
+      {showAuthor && (
       <div data-maker-anchor="step-6-author-notes" className="rounded-xl border border-dark-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -469,6 +481,7 @@ export default function EndingEditor({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

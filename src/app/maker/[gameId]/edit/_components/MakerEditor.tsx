@@ -8,7 +8,7 @@ import StoryEditor from "./StoryEditor";
 import PlayerEditor from "./PlayerEditor";
 import LocationEditor from "./LocationEditor";
 import ScriptEditor from "./ScriptEditor";
-import EndingEditor from "./EndingEditor";
+import VoteEndingEditor from "./VoteEndingEditor";
 import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
 import type { GamePackage, Player, Story } from "@/types/game";
@@ -463,24 +463,15 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               scripts={game.scripts}
               rounds={game.rules?.roundCount ?? 4}
               locations={game.locations ?? []}
-              players={game.players ?? []}
-              npcs={game.story?.npcs ?? []}
-              advancedVotingEnabled={game.advancedVotingEnabled ?? false}
-              voteQuestions={game.voteQuestions ?? []}
-              onChangeAdvancedVoting={(enabled) => updateGame({ advancedVotingEnabled: enabled })}
-              onChangeVoteQuestions={(voteQuestions) => updateGame({ voteQuestions })}
               onChange={(scripts) => updateGame({ scripts })}
               focusTarget={focusRequest.target}
               focusToken={focusRequest.token}
             />
           )}
           {currentStep === 6 && (
-            <EndingEditor
-              ending={game.ending}
-              players={game.players ?? []}
-              voteQuestions={game.voteQuestions ?? []}
-              advancedVotingEnabled={game.advancedVotingEnabled ?? false}
-              onChange={(ending) => updateGame({ ending })}
+            <VoteEndingEditor
+              game={game}
+              onUpdate={updateGame}
             />
           )}
         </div>

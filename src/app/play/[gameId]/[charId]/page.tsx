@@ -14,6 +14,7 @@ import {
   resolveBranchPersonalEndings,
 } from "@/lib/ending-flow";
 import type { PlayerSharedBoardContent } from "@/lib/player-shared-board";
+import { evaluatePlayerScore } from "@/lib/score-evaluator";
 import {
   getAdvanceConfirmKind,
   getPlayerAdvanceRequestLabel,
@@ -115,6 +116,7 @@ interface PlayerSessionStateResponse {
   sharedBoard?: PlayerSharedBoardContent | null;
   isSessionHost?: boolean;
   endedAt?: string;
+  myVotes?: Record<string, string>;
 }
 
 type VideoSource =
@@ -669,10 +671,14 @@ function PersonalEndingPanel({
   game,
   reveal,
   myPlayerId,
+  inventory,
+  myVotes,
 }: {
   game: GamePackage;
   reveal: VoteReveal;
   myPlayerId: string;
+  inventory: InventoryCard[];
+  myVotes: Record<string, string>;
 }) {
   const branch = resolveActiveEndingBranch(game, reveal);
   const branchPersonalEndings = resolveBranchPersonalEndings(branch);
@@ -680,6 +686,7 @@ function PersonalEndingPanel({
     ?? branchPersonalEndings[0];
   const myPlayer = game.players.find((p) => p.id === myPlayerId);
   const hasScore = (myPlayer?.scoreConditions?.length ?? 0) > 0;
+  const scoreEval = myPlayer ? evaluatePlayerScore({ player: myPlayer, reveal, inventory, myVotes }) : null;
 
   return (
     <div className="space-y-5">
@@ -693,13 +700,34 @@ function PersonalEndingPanel({
         </div>
       )}
 
-      {hasScore && (
-        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-          <p className="text-xs text-dark-500">내 승점 조건</p>
-          {myPlayer?.scoreConditions.map((sc, i) => (
-            <div key={i} className="flex items-center justify-between text-sm">
-              <span className="text-dark-300">{sc.description}</span>
-              <span className="text-mystery-400 font-bold">+{sc.points}점</span>
+      {hasScore && scoreEval && (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-dark-500">내 승점 결과</p>
+            {scoreEval.hasAnyAutoJudged && (
+              <p className="text-sm text-mystery-300 font-bold">
+                총 {scoreEval.totalPoints}점
+              </p>
+            )}
+          </div>
+          {scoreEval.results.map((r, i) => (
+            <div key={i} className="flex items-center justify-between text-sm gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {r.achieved === true && (
+                  <span className="text-xs text-emerald-400 shrink-0">달성</span>
+                )}
+                {r.achieved === false && (
+                  <span className="text-xs text-dark-600 shrink-0">미달성</span>
+                )}
+                <span className={r.achieved === false ? "text-dark-500 line-through" : "text-dark-300"}>
+                  {r.condition.description}
+                </span>
+              </div>
+              <span className={`font-bold shrink-0 ${
+                r.achieved === false ? "text-dark-600" : "text-mystery-400"
+              }`}>
+                +{r.condition.points}점
+              </span>
             </div>
           ))}
         </div>
@@ -1739,6 +1767,7 @@ export default function PlayerView() {
   const [sharedBoard, setSharedBoard] = useState<PlayerSharedBoardContent | null>(null);
   const [endedAt, setEndedAt] = useState<string | undefined>();
   const [inventory, setInventory] = useState<InventoryCard[]>([]);
+  const [myVotes, setMyVotes] = useState<Record<string, string>>({});
   const [roundAcquired, setRoundAcquired] = useState<Record<string, number>>({});
   const [roundVisited, setRoundVisited] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
@@ -1794,6 +1823,7 @@ export default function PlayerView() {
         sharedBoard: nextSharedBoard,
         isSessionHost: nextIsHost,
         endedAt: nextEndedAt,
+        myVotes: nextMyVotes,
       } = await sessionRes.json() as PlayerSessionStateResponse;
       setSharedState(ss);
       setSessionCode(nextSessionCode ?? "");
@@ -1805,6 +1835,7 @@ export default function PlayerView() {
       setInventory(playerState.inventory ?? []);
       setRoundAcquired(playerState.roundAcquired ?? {});
       setRoundVisited(playerState.roundVisitedLocations ?? {});
+      setMyVotes(nextMyVotes ?? {});
       setGame(g);
       setLoading(false);
     }
@@ -1855,6 +1886,7 @@ export default function PlayerView() {
           sharedBoard: nextSharedBoard,
           isSessionHost: nextIsHost,
           endedAt: nextEndedAt,
+          myVotes: nextMyVotes,
         } = await res.json() as PlayerSessionStateResponse;
         setSharedState(ss);
         setSessionCode(nextSessionCode ?? "");
@@ -1866,6 +1898,7 @@ export default function PlayerView() {
         setInventory(playerState.inventory ?? []);
         setRoundAcquired(playerState.roundAcquired ?? {});
         setRoundVisited(playerState.roundVisitedLocations ?? {});
+        setMyVotes(nextMyVotes ?? {});
       } catch {}
     }, 1200);
     return () => clearInterval(id);
@@ -2111,7 +2144,13 @@ export default function PlayerView() {
             </div>
           )}
           {endingStage === "personal" && (
-            <PersonalEndingPanel game={game} reveal={sharedState.voteReveal} myPlayerId={charId} />
+            <PersonalEndingPanel
+              game={game}
+              reveal={sharedState.voteReveal}
+              myPlayerId={charId}
+              inventory={inventory}
+              myVotes={myVotes}
+            />
           )}
           {endingStage === "author-notes" && (
             <AuthorNotesPanel game={game} />

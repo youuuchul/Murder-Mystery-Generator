@@ -423,6 +423,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               locations={game.locations ?? []}
               story={game.story}
               timeline={game.story.timeline}
+              voteQuestions={game.voteQuestions ?? []}
               onChange={(players) => updateGame({
                 players,
                 story: players.some((player) => player.id === game.story.culpritPlayerId)

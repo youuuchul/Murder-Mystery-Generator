@@ -284,6 +284,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
       isSessionHost: hostByUserId || hostByCookie,
       endedAt: session.endedAt,
+      /** 본인의 개인 투표 답변 (personal 질문 승점 판정용) */
+      myVotes: session.advancedVotes?.[token] ?? {},
     });
   }
 

@@ -291,10 +291,32 @@ function normalizePlayer(player: Player | undefined, timelineSlots: TimelineSlot
     victoryCondition: normalizeVictoryCondition(player?.victoryCondition),
     personalGoal: asOptionalString(player?.personalGoal),
     scoreConditions: Array.isArray(player?.scoreConditions)
-      ? player.scoreConditions.map((condition) => ({
-          description: asTrimmedString(condition?.description),
-          points: Number.isFinite(condition?.points) ? Number(condition.points) : 0,
-        }))
+      ? player.scoreConditions.map((condition) => {
+          const rawType = condition?.type;
+          const type: "manual" | "culprit-outcome" | "clue-ownership" | "vote-answer" =
+            rawType === "culprit-outcome" || rawType === "clue-ownership" || rawType === "vote-answer"
+              ? rawType
+              : "manual";
+          const config = condition?.config && typeof condition.config === "object"
+            ? {
+                expectedOutcome: condition.config.expectedOutcome === "arrested" || condition.config.expectedOutcome === "escaped"
+                  ? condition.config.expectedOutcome
+                  : undefined,
+                clueId: asOptionalString(condition.config.clueId),
+                expectedOwnership: condition.config.expectedOwnership === "has" || condition.config.expectedOwnership === "not-has"
+                  ? condition.config.expectedOwnership
+                  : undefined,
+                questionId: asOptionalString(condition.config.questionId),
+                expectedAnswerId: asOptionalString(condition.config.expectedAnswerId),
+              }
+            : undefined;
+          return {
+            description: asTrimmedString(condition?.description),
+            points: Number.isFinite(condition?.points) ? Number(condition.points) : 0,
+            type,
+            config,
+          };
+        })
       : [],
     background: asTrimmedString(player?.background),
     story: asTrimmedString(player?.story) || legacyAlibi || "",

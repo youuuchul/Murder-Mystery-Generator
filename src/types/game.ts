@@ -144,10 +144,34 @@ export const VICTORY_CONDITION_LABELS: Record<VictoryCondition, string> = {
   "personal-goal": "개인 목표",
 };
 
+/** 승점 조건 자동 판정 타입 */
+export type ScoreConditionType =
+  | "manual"            // 수동 판정 (기본, 설명만 표시)
+  | "culprit-outcome"   // 범인 검거 결과 (arrested/escaped)
+  | "clue-ownership"    // 특정 단서 보유 여부 (has/not-has)
+  | "vote-answer";      // 추가 투표 답변 일치 여부
+
+/** 자동 판정 조건의 세부 설정 */
+export interface ScoreConditionConfig {
+  /** culprit-outcome: "arrested"=범인이 검거됨, "escaped"=범인이 도주함 */
+  expectedOutcome?: "arrested" | "escaped";
+  /** clue-ownership: 대상 단서 ID */
+  clueId?: string;
+  /** clue-ownership: "has"=보유해야 달성, "not-has"=미보유해야 달성 */
+  expectedOwnership?: "has" | "not-has";
+  /** vote-answer: 대상 투표 질문 ID (purpose="personal" 질문) */
+  questionId?: string;
+  /** vote-answer: 기대 답변 ID (선택지 ID 또는 플레이어 ID) */
+  expectedAnswerId?: string;
+}
+
 /** 승점 조건 1개 */
 export interface ScoreCondition {
   description: string; // 예: "범인 검거 성공", "목표 아이템 획득"
   points: number;
+  /** 자동 판정 타입. 없거나 "manual"이면 수동 판정(달성 여부 표시 안 함) */
+  type?: ScoreConditionType;
+  config?: ScoreConditionConfig;
 }
 
 /** 연관 단서 정보 — 플레이어 카드에 표기. 자기 관련 단서가 어떤 것인지 알려줌 */

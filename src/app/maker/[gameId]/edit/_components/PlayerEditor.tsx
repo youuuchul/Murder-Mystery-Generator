@@ -10,10 +10,12 @@ import type {
   Story,
   VictoryCondition,
   ScoreCondition,
+  ScoreConditionType,
   RelatedClueRef,
   Relationship,
   StoryTimeline,
   TimelineSlot,
+  VoteQuestion,
 } from "@/types/game";
 
 interface PlayerEditorProps {
@@ -23,6 +25,7 @@ interface PlayerEditorProps {
   locations: Location[];
   story: Story;
   timeline: StoryTimeline;
+  voteQuestions: VoteQuestion[];
   onChange: (players: Player[]) => void;
   onChangeTimeline: (timeline: StoryTimeline) => void;
   onChangeCulprit: (playerId: string) => void;
@@ -398,6 +401,9 @@ function PlayerForm({
   clues,
   locations,
   relationTargets,
+  voteQuestions,
+  players,
+  npcs,
   isCulprit,
   onChange,
   onDelete,
@@ -407,6 +413,9 @@ function PlayerForm({
   clues: Clue[];
   locations: Location[];
   relationTargets: RelationTargetOption[];
+  voteQuestions: VoteQuestion[];
+  players: Player[];
+  npcs: Story["npcs"];
   isCulprit: boolean;
   onChange: (p: Player) => void;
   onDelete: () => void;
@@ -642,41 +651,16 @@ function PlayerForm({
           )}
 
           {tab === "score" && (
-            <div className="space-y-2">
-              <p className="text-xs text-dark-500">이 캐릭터의 승점 조건을 설정하세요.</p>
-              {player.scoreConditions.map((sc, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={sc.description}
-                    onChange={(e) => updateScore(idx, { description: e.target.value })}
-                    placeholder="예: 범인 검거 성공"
-                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
-                  />
-                  <input
-                    type="number"
-                    value={sc.points}
-                    onChange={(e) => updateScore(idx, { points: Number(e.target.value) })}
-                    className="w-14 bg-dark-800 border border-dark-600 rounded-lg px-2 py-2 text-dark-100 text-xs text-center focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
-                  />
-                  <span className="text-xs text-dark-500 shrink-0">점</span>
-                  <button
-                    type="button"
-                    onClick={() => update("scoreConditions", player.scoreConditions.filter((_, i) => i !== idx))}
-                    className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors"
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => update("scoreConditions", [...player.scoreConditions, { description: "", points: 1 }])}
-                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
-              >
-                + 승점 조건 추가
-              </button>
-            </div>
+            <ScoreConditionsEditor
+              scoreConditions={player.scoreConditions}
+              clues={clues}
+              voteQuestions={voteQuestions}
+              players={players}
+              npcs={npcs}
+              onUpdate={(idx, patch) => updateScore(idx, patch)}
+              onAdd={() => update("scoreConditions", [...player.scoreConditions, { description: "", points: 1, type: "manual" }])}
+              onDelete={(idx) => update("scoreConditions", player.scoreConditions.filter((_, i) => i !== idx))}
+            />
           )}
 
           {tab === "clues" && (
@@ -803,6 +787,7 @@ export default function PlayerEditor({
   locations,
   story,
   timeline,
+  voteQuestions,
   onChange,
   onChangeTimeline,
   onChangeCulprit,
@@ -955,6 +940,9 @@ export default function PlayerEditor({
               clues={clues}
               locations={locations}
               relationTargets={relationTargets}
+              voteQuestions={voteQuestions}
+              players={syncedPlayers}
+              npcs={story.npcs}
               isCulprit={player.id === story.culpritPlayerId}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}
               onDelete={() => onChange(players.filter((_, i) => i !== idx))}
@@ -962,6 +950,207 @@ export default function PlayerEditor({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── 승점 조건 편집 ─────────────────────────────────────────
+
+const SCORE_TYPE_LABELS: Record<ScoreConditionType, string> = {
+  manual: "수동 판정",
+  "culprit-outcome": "범인 검거 결과",
+  "clue-ownership": "단서 보유 여부",
+  "vote-answer": "개인 투표 답변",
+};
+
+function ScoreConditionsEditor({
+  scoreConditions,
+  clues,
+  voteQuestions,
+  players,
+  npcs,
+  onUpdate,
+  onAdd,
+  onDelete,
+}: {
+  scoreConditions: ScoreCondition[];
+  clues: Clue[];
+  voteQuestions: VoteQuestion[];
+  players: Player[];
+  npcs: Story["npcs"];
+  onUpdate: (idx: number, patch: Partial<ScoreCondition>) => void;
+  onAdd: () => void;
+  onDelete: (idx: number) => void;
+}) {
+  const personalQuestions = voteQuestions.filter((q) => q.purpose === "personal");
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-dark-500">
+        승점 조건을 설정하세요. 자동 판정 타입을 지정하면 엔딩 시 달성 여부가 자동으로 표시됩니다.
+      </p>
+
+      {scoreConditions.map((sc, idx) => {
+        const type = sc.type ?? "manual";
+        return (
+          <div key={idx} className="rounded-lg border border-dark-700 bg-dark-900/40 p-3 space-y-2">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={sc.description}
+                onChange={(e) => onUpdate(idx, { description: e.target.value })}
+                placeholder="예: 범인 검거 성공"
+                className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+              />
+              <input
+                type="number"
+                value={sc.points}
+                onChange={(e) => onUpdate(idx, { points: Number(e.target.value) })}
+                className="w-14 bg-dark-800 border border-dark-600 rounded-lg px-2 py-2 text-dark-100 text-xs text-center focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+              />
+              <span className="text-xs text-dark-500 shrink-0">점</span>
+              <button
+                type="button"
+                onClick={() => onDelete(idx)}
+                className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-dark-500 shrink-0">판정</label>
+              <select
+                value={type}
+                onChange={(e) => {
+                  const nextType = e.target.value as ScoreConditionType;
+                  onUpdate(idx, { type: nextType, config: {} });
+                }}
+                className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+              >
+                {(Object.keys(SCORE_TYPE_LABELS) as ScoreConditionType[]).map((t) => (
+                  <option key={t} value={t}>{SCORE_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 타입별 config */}
+            {type === "culprit-outcome" && (
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-dark-500 shrink-0">조건</label>
+                <select
+                  value={sc.config?.expectedOutcome ?? "arrested"}
+                  onChange={(e) => onUpdate(idx, {
+                    config: { ...sc.config, expectedOutcome: e.target.value as "arrested" | "escaped" },
+                  })}
+                  className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                >
+                  <option value="arrested">범인이 검거됐을 때</option>
+                  <option value="escaped">범인이 도주했을 때</option>
+                </select>
+              </div>
+            )}
+
+            {type === "clue-ownership" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-dark-500 shrink-0">대상 단서</label>
+                  <select
+                    value={sc.config?.clueId ?? ""}
+                    onChange={(e) => onUpdate(idx, {
+                      config: { ...sc.config, clueId: e.target.value || undefined },
+                    })}
+                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                  >
+                    <option value="">— 단서 선택 —</option>
+                    {clues.map((c) => (
+                      <option key={c.id} value={c.id}>{c.title || "(이름 없음)"}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-dark-500 shrink-0">조건</label>
+                  <select
+                    value={sc.config?.expectedOwnership ?? "has"}
+                    onChange={(e) => onUpdate(idx, {
+                      config: { ...sc.config, expectedOwnership: e.target.value as "has" | "not-has" },
+                    })}
+                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                  >
+                    <option value="has">보유해야 달성</option>
+                    <option value="not-has">미보유해야 달성</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {type === "vote-answer" && (
+              <div className="space-y-2">
+                {personalQuestions.length === 0 ? (
+                  <p className="text-[11px] text-yellow-400/70 border border-yellow-900/30 bg-yellow-950/10 rounded-lg px-2 py-1.5">
+                    투표 탭에서 추가 투표(개인 목표) 질문을 먼저 추가하세요.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] text-dark-500 shrink-0">질문</label>
+                      <select
+                        value={sc.config?.questionId ?? ""}
+                        onChange={(e) => onUpdate(idx, {
+                          config: { ...sc.config, questionId: e.target.value || undefined, expectedAnswerId: undefined },
+                        })}
+                        className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                      >
+                        <option value="">— 질문 선택 —</option>
+                        {personalQuestions.map((q) => (
+                          <option key={q.id} value={q.id}>{q.label || "(질문 없음)"}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {sc.config?.questionId && (() => {
+                      const q = personalQuestions.find((pq) => pq.id === sc.config?.questionId);
+                      if (!q) return null;
+                      const answers: { id: string; label: string }[] = q.targetMode === "custom-choices"
+                        ? q.choices.map((c) => ({ id: c.id, label: c.label || "(선택지)" }))
+                        : q.targetMode === "players-and-npcs"
+                          ? [
+                              ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
+                              ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
+                            ]
+                          : players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
+                      return (
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] text-dark-500 shrink-0">정답</label>
+                          <select
+                            value={sc.config?.expectedAnswerId ?? ""}
+                            onChange={(e) => onUpdate(idx, {
+                              config: { ...sc.config, expectedAnswerId: e.target.value || undefined },
+                            })}
+                            className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                          >
+                            <option value="">— 정답 선택 —</option>
+                            {answers.map((a) => (
+                              <option key={a.id} value={a.id}>{a.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={onAdd}
+        className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+      >
+        + 승점 조건 추가
+      </button>
     </div>
   );
 }

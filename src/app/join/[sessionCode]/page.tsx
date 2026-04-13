@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
+import {
+  clearPlayerSessionToken,
+  persistPlayerSessionToken,
+} from "@/lib/player-session-cookie";
 import type { JoinSessionPreview } from "@/lib/session-sanitizer";
 import type { GamePackage } from "@/types/game";
 
@@ -68,7 +72,7 @@ export default function JoinPage() {
         const resumeRes = await fetch(`/api/sessions/${data.session.id}?token=${savedToken}`);
 
         if (!resumeRes.ok) {
-          localStorage.removeItem(`mm_${data.session.id}`);
+          clearPlayerSessionToken(data.session.id);
           setResumeMessage("");
           setLoading(false);
           return;
@@ -102,8 +106,8 @@ export default function JoinPage() {
       return;
     }
     const { token, sessionId, gameId, playerId } = await res.json() as JoinActionResponse;
-    // token 저장
-    localStorage.setItem(`mm_${sessionId}`, token);
+    // token을 localStorage와 쿠키 모두에 저장 (쿠키는 서버 컴포넌트 SSR용)
+    persistPlayerSessionToken(sessionId, token);
     router.push(`/play/${gameId}/${playerId}?s=${sessionId}`);
   }
 

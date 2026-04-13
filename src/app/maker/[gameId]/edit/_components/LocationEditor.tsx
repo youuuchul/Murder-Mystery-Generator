@@ -19,13 +19,13 @@ interface LocationEditorProps {
 const CLUE_TYPES: { value: Clue["type"]; label: string; hint: string }[] = [
   {
     value: "owned",
-    label: "개인 단서",
-    hint: "획득자가 소유 · 카드 건네주기 가능",
+    label: "획득",
+    hint: "획득자 인벤토리로 이동 · 카드 건네주기 가능",
   },
   {
     value: "shared",
-    label: "공용 단서",
-    hint: "첫 발견자만 조사회수 1회 · 이후 모두에게 공개 · 재조사 무료",
+    label: "공개",
+    hint: "첫 발견자만 조사회수 1회 · 발견 이후 모두에게 공개 · 재조사 무료",
   },
 ];
 
@@ -665,6 +665,9 @@ function ClueForm({
                   </option>
                 ))}
               </select>
+              {typeInfo?.hint && (
+                <p className="mt-1 text-[11px] text-dark-500 leading-snug">{typeInfo.hint}</p>
+              )}
             </div>
           </div>
 
@@ -681,8 +684,9 @@ function ClueForm({
 
           {isSharedClue && (
             <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-3 text-xs text-sky-300 space-y-1">
-              <p>공용 단서는 첫 발견자가 조사회수 1회를 소모하면 모든 플레이어에게 공개됩니다.</p>
-              <p className="opacity-80">이후 본인·타인 재조사는 조사회수를 소모하지 않으며 인벤토리에는 들어가지 않습니다.</p>
+              <p>발견 전에는 다른 단서와 동일하게 비공개 상태로 표시됩니다.</p>
+              <p className="opacity-80">첫 발견자가 조사회수 1회를 소모하면 모든 플레이어에게 제목·내용이 공개됩니다.</p>
+              <p className="opacity-80">이후 본인·타인의 재조사는 조사회수를 소모하지 않고, 인벤토리에는 들어가지 않습니다.</p>
             </div>
           )}
 

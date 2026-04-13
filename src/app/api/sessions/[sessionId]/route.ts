@@ -10,6 +10,7 @@ import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { buildPlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { getGame } from "@/lib/game-repository";
+import { getGameCached } from "@/lib/game-repository-cache";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import {
@@ -36,7 +37,7 @@ import type { EndingStage, GamePhase, GameSession, TimerState, VoteTally, VoteRe
 type Params = { params: { sessionId: string } };
 
 async function canManageSession(request: NextRequest, session: GameSession): Promise<boolean> {
-  const game = await getGame(session.gameId);
+  const game = await getGameCached(session.gameId);
   if (!game) {
     return false;
   }
@@ -268,7 +269,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (token) {
     const pState = session.playerStates.find((p) => p.token === token);
     if (!pState) return NextResponse.json({ error: "Invalid token" }, { status: 403 });
-    const game = await getGame(session.gameId);
+    const game = await getGameCached(session.gameId);
     if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
     const currentUser = await getRequestMakerUser(req);
     const hostByUserId = isSessionHost(session, currentUser?.id);

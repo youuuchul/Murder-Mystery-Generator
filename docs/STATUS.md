@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-13 (엔딩 퍼널 스포일러 제거, 승점 표시 개선, 새 캐릭터 기본 승점 타입 지정, 퍼포먼스 최적화)
+> 마지막 업데이트: 2026-04-13 (서버 부하 완화: GM 폴링 종료 가드, getGame 30s 캐시, SSE maxDuration 60s, Library listUsers 제거)
 
 ---
 
@@ -88,7 +88,8 @@
 |------|---------|
 | AI 단서 반응 획득 | 조건식 문제, 타이밍/체감 속도 튜닝 |
 | 투표 완료 후 UI 체감 | 퍼널 분리 완료. 완료 후 폴링/SSE 중단 + 초기 fetch 20s 타임아웃 적용 (2026-04-13) |
-| **Vercel Cold Start 지연** | Library 페이지 Cold Start 5~15s, Warm 1.8s. DB는 정상(세션 26개, 최대 5KB). 대응책: (1) library 페이지 revalidate 적용, (2) Vercel Pro 플랜 keep-warm, (3) Edge Runtime 전환 검토 |
+| **Vercel Cold Start 지연** | Library 페이지 Cold Start 5~15s, Warm 1.8s. DB는 정상(세션 20개, 최대 11KB). 1차 대응: listUsers 전체 스캔 제거 + owner id 병렬 조회로 전환 (2026-04-13). 추가 대응 필요 시: revalidate/ISR 또는 Vercel Pro keep-warm 검토 |
+| **엔딩 후 서버 무응답** | 원인: GM 탭 폴링 종료 가드 없음 + 세션 GET이 매번 정규화 15테이블 조인 실행 + SSE 무한 유지. 수정: GM shouldStopPolling 가드, getGame 30s in-memory 캐시, SSE maxDuration=60s로 슬롯 회수 (2026-04-13) |
 | 동점 재투표 시스템 | 혼자 테스트 불가 — 2명 이상 참여 세션에서 실동작 검증 필요 |
 | 이미지 서버 파생본 | 썸네일 전략 검토 |
 | 비밀번호 찾기 | 운영 도메인 기준 메일 발송 최종 검증 |

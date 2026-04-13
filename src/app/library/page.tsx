@@ -14,7 +14,7 @@ import {
   getMakerAccountNoticeMessage,
 } from "./_components/maker-account-feedback";
 
-export const dynamic = "force-dynamic"; // 항상 서버에서 최신 목록 렌더링
+export const dynamic = "force-dynamic"; // 로그인 상태·Navigation을 반영하려면 요청마다 렌더링 필요
 
 const makerAuthGateway = getMakerAuthGateway();
 
@@ -35,8 +35,17 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     listPublicGames(),
     countNonPublicGames(),
   ]);
-  const makerUsers = await makerAuthGateway.listUsers();
-  const ownerNameMap = new Map(makerUsers.map((user) => [user.id, user.displayName]));
+  // 공개 게임 소유자 id만 유니크하게 모아서 개별 조회한다.
+  // 전체 profiles 스캔(listUsers)은 공개 시나리오가 늘어나도 비용이 선형 증가하지 않도록 피한다.
+  const uniqueOwnerIds = Array.from(new Set(games.map((game) => game.access.ownerId).filter(Boolean)));
+  const ownerRecords = await Promise.all(
+    uniqueOwnerIds.map((id) => makerAuthGateway.getUserById(id).catch(() => null))
+  );
+  const ownerNameMap = new Map(
+    ownerRecords
+      .filter((user): user is NonNullable<typeof user> => Boolean(user))
+      .map((user) => [user.id, user.displayName])
+  );
   const publicGameItems = games.map((game) => ({
     game,
     ownerDisplayName: ownerNameMap.get(game.access.ownerId),

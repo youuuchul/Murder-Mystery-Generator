@@ -1,13 +1,16 @@
 import { NextRequest } from "next/server";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
-import { getGame } from "@/lib/game-repository";
+import { getGameCached } from "@/lib/game-repository-cache";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { subscribe, unsubscribe } from "@/lib/sse/broadcaster";
 import { getSession } from "@/lib/session-repository";
 
 export const dynamic = "force-dynamic";
+// 서버리스 함수 슬롯을 오래 점유하지 않도록 60초에서 강제 종료.
+// 클라이언트는 EventSource 기본 동작으로 자동 재연결한다.
+export const maxDuration = 60;
 
 const encoder = new TextEncoder();
 
@@ -27,7 +30,7 @@ export async function GET(
       return new Response("Invalid token", { status: 403 });
     }
   } else {
-    const game = await getGame(session.gameId);
+    const game = await getGameCached(session.gameId);
     const currentUser = await getRequestMakerUser(req);
 
     if (!game || !canAccessGmPlay(game, currentUser)) {

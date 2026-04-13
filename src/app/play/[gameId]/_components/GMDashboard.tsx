@@ -1391,8 +1391,11 @@ export default function GMDashboard({
   }
 
   // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 세션 상태 동기화
+  // 게임 종료(endedAt) 또는 complete 단계에서는 폴링 중단 (서버 부하 감소)
+  const gmShouldStopPolling = Boolean(session?.endedAt) || session?.sharedState?.endingStage === "complete";
   useEffect(() => {
     if (!session) return;
+    if (gmShouldStopPolling) return;
     const id = setInterval(async () => {
       try {
         const res = await fetch(`/api/sessions/${session.id}`);
@@ -1403,11 +1406,11 @@ export default function GMDashboard({
       } catch {}
     }, 3000);
     return () => clearInterval(id);
-  }, [session?.id]);
+  }, [session?.id, gmShouldStopPolling]);
 
   // SSE 구독
   useSSE(
-    session ? `/api/sessions/${session.id}/events` : null,
+    session && !gmShouldStopPolling ? `/api/sessions/${session.id}/events` : null,
     {
       session_update: useCallback(
         (data: unknown) => {

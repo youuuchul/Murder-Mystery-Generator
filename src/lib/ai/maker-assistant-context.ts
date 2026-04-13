@@ -163,6 +163,12 @@ export function buildMakerAssistantContext(
       title: clue.title,
       description: clue.description,
       type: clue.type,
+      // AI가 게임플레이 동작을 이해하도록 동작 기반 라벨을 함께 전달.
+      // owned: 획득 시 인벤토리 진입, 카드 건네주기 가능
+      // shared: 첫 발견자만 조사회수 1회 차감, 이후 모두에게 공개 (인벤토리 미진입)
+      typeLabel: clue.type === "shared"
+        ? "공용 단서 — 첫 발견자만 조사회수 1회 차감, 발견 후 전원 공개. 인벤토리 미진입."
+        : "획득 단서 — 획득자 인벤토리에 들어감, 카드 건네주기 가능.",
       locationId: clue.locationId,
       locationName:
         normalizedGame.locations.find((location) => location.id === clue.locationId)?.name ?? "",

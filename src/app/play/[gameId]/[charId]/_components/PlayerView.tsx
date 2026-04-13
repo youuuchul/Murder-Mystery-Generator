@@ -2844,13 +2844,9 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                     <button
                                       onClick={() => acquireClue(loc.id, clue.id)}
                                       disabled={acquiring === clue.id}
-                                      className={`text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 ${
-                                        isSharedClue
-                                          ? "bg-sky-900/60 hover:bg-sky-800 text-sky-200 border border-sky-800"
-                                          : "bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700"
-                                      }`}
+                                      className="text-xs px-3 py-1.5 rounded-lg bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700 shrink-0 transition-colors disabled:opacity-50"
                                     >
-                                      {acquiring === clue.id ? "…" : isSharedClue ? "조사" : "획득"}
+                                      {acquiring === clue.id ? "…" : "획득"}
                                     </button>
                                   )}
                                 </div>

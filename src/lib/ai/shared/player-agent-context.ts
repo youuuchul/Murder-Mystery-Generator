@@ -80,7 +80,7 @@ export function buildPlayerAgentVisibleContext(input: {
       cardId: item.cardId,
       title: clue?.title ?? "(제목 없음)",
       description: clue?.description ?? "",
-      type: clue?.type ?? "physical",
+      type: clue?.type ?? "owned",
       acquiredAt: item.acquiredAt,
       fromPlayerId: item.fromPlayerId,
     };

@@ -502,7 +502,9 @@ function listSelectableCluesForAi(input: {
   }
 
   const strictCandidates = input.game.clues.filter((clue) => {
-    if (clue.type === "scene") {
+    // Phase 2에서 shared 단서도 AI 첫 발견이 가능하도록 변경 예정.
+    // 현재는 Phase 1 호환을 위해 기존 scene과 동일하게 AI 획득 제외.
+    if (clue.type === "shared") {
       return false;
     }
 
@@ -570,7 +572,9 @@ function listSelectableCluesForAi(input: {
   // 조건이 너무 빡빡해서 AI가 계속 아무 행동도 못 하는 상황을 막기 위해,
   // 기본 잠금/중복 제약만 남긴 완화 후보를 fallback으로 한 번 더 시도한다.
   return input.game.clues.filter((clue) => {
-    if (clue.type === "scene") {
+    // Phase 2에서 shared 단서도 AI 첫 발견이 가능하도록 변경 예정.
+    // 현재는 Phase 1 호환을 위해 기존 scene과 동일하게 AI 획득 제외.
+    if (clue.type === "shared") {
       return false;
     }
 

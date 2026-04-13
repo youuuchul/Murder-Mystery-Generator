@@ -406,7 +406,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
           clueId: c.clue_id,
           title: c.clue_title ?? "",
           description: c.clue_description ?? "",
-          type: c.clue_type ?? "physical",
+          type: c.clue_type ?? "owned",
           imageUrl: c.clue_image_url ?? undefined,
         })),
       eventCards: cardRows

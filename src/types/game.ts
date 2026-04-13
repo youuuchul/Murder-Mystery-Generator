@@ -248,7 +248,13 @@ export interface Clue {
   id: string;
   title: string;
   description: string;
-  type: "physical" | "testimony" | "scene";
+  /**
+   * owned: 획득자 인벤토리에 들어가고 건네주기/소유 이전 가능.
+   * shared: 첫 발견자만 조사회수 1회 차감, 이후 본인/타인 재조사 무료. 인벤토리 미진입.
+   *
+   * legacy 값(physical/testimony/scene)은 normalizer에서 자동 변환된다.
+   */
+  type: "owned" | "shared";
   imageUrl?: string;          // 플레이어 인벤토리/상세에 노출할 단서 이미지
   locationId: string;
   /** legacy field — 기존 데이터 호환용 */

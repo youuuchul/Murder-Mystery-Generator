@@ -253,11 +253,14 @@ function normalizeEndingBranch(
   };
 }
 
-/** legacy 문서형 단서를 현재 3종 단서 체계로 안전하게 매핑한다. */
+/**
+ * Clue 유형을 현재 2종 체계(owned/shared)로 매핑한다.
+ * legacy 값(physical/testimony → owned, scene → shared)을 투명하게 흡수한다.
+ */
 function normalizeClueType(value: unknown): Clue["type"] {
-  return value === "testimony" || value === "scene"
-    ? value
-    : "physical";
+  if (value === "shared" || value === "scene") return "shared";
+  if (value === "owned" || value === "physical" || value === "testimony") return "owned";
+  return "owned";
 }
 
 /** 플레이어 개인 엔딩 1개를 정리한다. */
@@ -370,9 +373,8 @@ function normalizeClue(clue: Clue | undefined): Clue {
     locationId: asTrimmedString(clue?.locationId),
     pointsTo: asOptionalString(clue?.pointsTo),
     isSecret: clue?.isSecret === true,
-    condition: normalizeClueType(clue?.type) === "scene"
-      ? undefined
-      : normalizeClueCondition(clue?.condition),
+    // owned/shared 모두 조건부 발견 허용 (기존 scene 전용 undefined 처리는 제거)
+    condition: normalizeClueCondition(clue?.condition),
     previewTitle: asOptionalString(clue?.previewTitle),
     previewDescription: asOptionalString(clue?.previewDescription),
   };

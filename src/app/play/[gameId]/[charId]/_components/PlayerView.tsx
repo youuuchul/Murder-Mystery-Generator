@@ -2743,19 +2743,19 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                             <p className="text-xs text-dark-700 text-center py-2">단서 없음</p>
                           ) : (
                             locClues.map((clue, idx) => {
-                              const isSceneClue = clue.type === "scene";
+                              const isSharedClue = clue.type === "shared";
                               const alreadyHas = inventoryIds.has(clue.id);
-                              const takenByOther = !isSceneClue && !alreadyHas && globalAcquired.includes(clue.id);
+                              const takenByOther = !isSharedClue && !alreadyHas && globalAcquired.includes(clue.id);
 
                               // 단서 획득 조건 체크
                               const clueCondMet = checkConditionLocally(clue.condition);
-                              const clueLocked = !isSceneClue && clueCondMet === false; // has_items 조건이 명확히 미충족
+                              const clueLocked = !isSharedClue && clueCondMet === false; // has_items 조건이 명확히 미충족
 
                               return (
                                 <div
                                   key={clue.id}
                                   className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${
-                                    isSceneClue
+                                    isSharedClue
                                       ? "border-sky-900/50 bg-sky-950/10"
                                       : alreadyHas
                                       ? "border-mystery-800 bg-mystery-950/20 opacity-70"
@@ -2769,7 +2769,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                   }`}
                                 >
                                   <div className="min-w-0 flex-1">
-                                    {isSceneClue ? (
+                                    {isSharedClue ? (
                                       <>
                                         <p className="text-sm font-medium break-words text-sky-300">
                                           {clue.title || `현장 단서 ${idx + 1}`}
@@ -2807,7 +2807,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                       </>
                                     )}
                                   </div>
-                                  {isSceneClue ? (
+                                  {isSharedClue ? (
                                     <button
                                       onClick={() => setSelectedSceneClue(clue)}
                                       disabled={locationLocked}

@@ -153,9 +153,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "조사 페이즈가 아닙니다" }, { status: 400 });
     }
 
-    // 현장 단서는 공개형이므로 장소 화면에서 바로 확인한다.
-    if (clue.type === "scene") {
-      return NextResponse.json({ error: "현장 단서는 획득하지 않고 장소에서 바로 확인합니다." }, { status: 400 });
+    // TODO(Phase 2): 공용 단서는 첫 발견자만 비용을 내고 이후엔 자유 열람하도록 재설계.
+    // 현재는 Phase 1 호환을 위해 획득 경로를 거부한다 (기존 scene 동작과 동일).
+    if (clue.type === "shared") {
+      return NextResponse.json({ error: "공용 단서는 장소에서 직접 확인합니다." }, { status: 400 });
     }
 
     // 단서 획득 조건 체크

@@ -16,10 +16,17 @@ interface LocationEditorProps {
   onChangeRules: (rules: GameRules) => void;
 }
 
-const CLUE_TYPES: { value: Clue["type"]; label: string }[] = [
-  { value: "physical", label: "물적 증거" },
-  { value: "testimony", label: "증언" },
-  { value: "scene", label: "현장 단서" },
+const CLUE_TYPES: { value: Clue["type"]; label: string; hint: string }[] = [
+  {
+    value: "owned",
+    label: "개인 단서",
+    hint: "획득자가 소유 · 카드 건네주기 가능",
+  },
+  {
+    value: "shared",
+    label: "공용 단서",
+    hint: "첫 발견자만 조사회수 1회 · 이후 모두에게 공개 · 재조사 무료",
+  },
 ];
 
 const inputClass =
@@ -50,7 +57,7 @@ function createClue(locationId: string): Clue {
     id: crypto.randomUUID(),
     title: "",
     description: "",
-    type: "physical",
+    type: "owned",
     imageUrl: undefined,
     locationId,
   };
@@ -541,7 +548,7 @@ function ClueForm({
   const [expanded, setExpanded] = useState(!clue.title && !clue.description && !clue.imageUrl);
   const [uploadingImage, setUploadingImage] = useState(false);
   const typeInfo = CLUE_TYPES.find((t) => t.value === clue.type);
-  const isSceneClue = clue.type === "scene";
+  const isSharedClue = clue.type === "shared";
 
   function update<K extends keyof Clue>(key: K, value: Clue[K]) {
     onChange({ ...clue, [key]: value });
@@ -596,7 +603,7 @@ function ClueForm({
                   이미지
                 </span>
               )}
-              {clue.condition && !isSceneClue && (
+              {clue.condition && (
                 <span className="rounded-full border border-mystery-800 bg-mystery-950/30 px-2 py-0.5 text-[11px] text-mystery-400">
                   잠금 조건
                 </span>
@@ -648,11 +655,7 @@ function ClueForm({
                 value={clue.type}
                 onChange={(e) => {
                   const nextType = e.target.value as Clue["type"];
-                  onChange({
-                    ...clue,
-                    type: nextType,
-                    condition: nextType === "scene" ? undefined : clue.condition,
-                  });
+                  onChange({ ...clue, type: nextType });
                 }}
                 className={inputClass}
               >
@@ -671,14 +674,15 @@ function ClueForm({
               rows={3}
               value={clue.description}
               onChange={(e) => update("description", e.target.value)}
-              placeholder={isSceneClue ? "장소에서 바로 확인할 공개 현장 정보" : "플레이어가 카드를 획득했을 때 보게 되는 내용"}
+              placeholder={isSharedClue ? "첫 발견 이후 모두에게 공개될 공용 단서 내용" : "플레이어가 카드를 획득했을 때 보게 되는 내용"}
               className={inputClass + " resize-none"}
             />
           </div>
 
-          {isSceneClue && (
-            <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-3 text-xs text-sky-300">
-              현장 단서는 인벤토리에 들어가지 않습니다. 장소가 열리면 플레이어가 해당 장소에서 바로 내용을 확인합니다.
+          {isSharedClue && (
+            <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-3 text-xs text-sky-300 space-y-1">
+              <p>공용 단서는 첫 발견자가 조사회수 1회를 소모하면 모든 플레이어에게 공개됩니다.</p>
+              <p className="opacity-80">이후 본인·타인 재조사는 조사회수를 소모하지 않으며 인벤토리에는 들어가지 않습니다.</p>
             </div>
           )}
 
@@ -721,24 +725,24 @@ function ClueForm({
             </div>
           )}
 
-          {/* 단서 획득 조건 */}
-          {!isSceneClue && (
-            <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
-              <label className="block text-xs text-dark-500 mb-2">
-                단서 획득 조건
-                <span className="text-dark-600 font-normal ml-1">— 조건 충족 시에만 획득 가능</span>
-              </label>
-              <ConditionForm
-                label="획득 조건"
-                condition={clue.condition}
-                onChange={(c) => update("condition", c)}
-                allClues={allClues}
-                allLocations={allLocations}
-                allCharacters={allCharacters}
-                excludeClueId={clue.id}
-              />
-            </div>
-          )}
+          {/* 단서 획득 조건 — owned/shared 모두 적용 (shared는 첫 발견 시점에만 체크) */}
+          <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
+            <label className="block text-xs text-dark-500 mb-2">
+              단서 획득 조건
+              <span className="text-dark-600 font-normal ml-1">
+                — {isSharedClue ? "첫 발견 시에만 조건 체크" : "조건 충족 시에만 획득 가능"}
+              </span>
+            </label>
+            <ConditionForm
+              label="획득 조건"
+              condition={clue.condition}
+              onChange={(c) => update("condition", c)}
+              allClues={allClues}
+              allLocations={allLocations}
+              allCharacters={allCharacters}
+              excludeClueId={clue.id}
+            />
+          </div>
         </div>
       )}
     </div>

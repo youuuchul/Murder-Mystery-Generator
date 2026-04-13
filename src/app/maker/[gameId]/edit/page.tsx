@@ -1,46 +1,21 @@
-import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
-import { resolveEditableGameForUser } from "@/lib/game-access";
-import { getGame, saveGame } from "@/lib/game-repository";
-import { requireCurrentMakerUser } from "@/lib/maker-user.server";
-import MakerEditor from "./_components/MakerEditor";
+import MakerEditorLoader, {
+  MakerEditorLoaderSkeleton,
+} from "./_components/MakerEditorLoader";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ gameId: string }> };
 
+/**
+ * 제작 편집 페이지.
+ * 헤더 쉘(back link 등)을 즉시 렌더하고, getGame + 권한 확인이 필요한
+ * 에디터 본체는 Suspense로 스트리밍한다.
+ * 초기 경로 진입 시 loading.tsx가 먼저 표시되다가 이 쉘로 교체된다.
+ */
 export default async function EditGamePage({ params }: Props) {
   const { gameId } = await params;
-  const currentUser = await requireCurrentMakerUser(`/maker/${gameId}/edit`);
-  const game = await getGame(gameId);
-
-  if (!game) notFound();
-
-  const editableGame = resolveEditableGameForUser(game, currentUser);
-  if (!editableGame) {
-    return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))] px-4 py-12 text-dark-50">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-dark-800 bg-dark-900/90 p-8 shadow-2xl">
-          <p className="text-xs uppercase tracking-[0.24em] text-amber-300/80">Access</p>
-          <h1 className="mt-3 text-2xl font-semibold">편집 권한이 없는 게임입니다</h1>
-          <p className="mt-3 text-sm leading-6 text-dark-400">
-            현재 작업자 세션은 이 게임의 소유자가 아닙니다. 라이브러리로 돌아가
-            다른 게임을 선택하거나, 소유자 계정으로 다시 로그인하세요.
-          </p>
-          <Link
-            href="/library/manage"
-            className="mt-6 inline-flex rounded-xl border border-dark-700 px-4 py-2.5 text-sm text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-50"
-          >
-            내 게임 관리로 돌아가기
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (editableGame.claimed) {
-    await saveGame(editableGame.game);
-  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))]">
@@ -51,18 +26,15 @@ export default async function EditGamePage({ params }: Props) {
               ← 내 게임 관리
             </Link>
             <span className="text-dark-700">|</span>
-            <span className="text-dark-200 font-medium text-sm truncate max-w-xs">
-              {editableGame.game.title}
-            </span>
+            <span className="text-dark-300 text-sm">편집 화면</span>
           </div>
-          <span className="text-xs text-dark-500">
-            마지막 수정: {new Date(editableGame.game.updatedAt).toLocaleDateString("ko-KR")}
-          </span>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <MakerEditor initialGame={editableGame.game} />
+        <Suspense fallback={<MakerEditorLoaderSkeleton />}>
+          <MakerEditorLoader gameId={gameId} />
+        </Suspense>
       </main>
     </div>
   );

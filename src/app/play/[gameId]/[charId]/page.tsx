@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import AiChatPanel from "./_components/AiChatPanel";
+import PlayLoadingSkeleton from "./_components/PlayLoadingSkeleton";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import {
   ENDING_STAGE_LABELS,
@@ -2026,11 +2027,7 @@ export default function PlayerView() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
-        <p className="text-dark-400 animate-pulse">로딩 중…</p>
-      </div>
-    );
+    return <PlayLoadingSkeleton />;
   }
 
   if (error || !game || !sharedState) {

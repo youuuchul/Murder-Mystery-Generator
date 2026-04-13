@@ -141,11 +141,17 @@ export function applyPlayerAgentAutoAcquireReaction(
     };
   }
 
-  aiPlayerState.inventory.push({
-    cardId: selectedClue.id,
-    cardType: "clue",
-    acquiredAt: now,
-  });
+  const isSharedClue = selectedClue.type === "shared";
+
+  // 공용 단서는 인벤토리에 넣지 않는다 (소유 개념 부재).
+  // 인간 플레이어와 동일하게 acquiredClueIds에만 등록하여 "발견" 상태를 남긴다.
+  if (!isSharedClue) {
+    aiPlayerState.inventory.push({
+      cardId: selectedClue.id,
+      cardType: "clue",
+      acquiredAt: now,
+    });
+  }
 
   session.sharedState.acquiredClueIds = session.sharedState.acquiredClueIds ?? [];
   if (!session.sharedState.acquiredClueIds.includes(selectedClue.id)) {
@@ -174,8 +180,10 @@ export function applyPlayerAgentAutoAcquireReaction(
   session.sharedState.eventLog.push({
     id: crypto.randomUUID(),
     timestamp: now,
-    message: `${actorName}(AI)이 단서를 확보했습니다.`,
-    type: "card_received",
+    message: isSharedClue
+      ? `${actorName}(AI)이 공용 단서 "${selectedClue.title}"을(를) 발견했습니다.`
+      : `${actorName}(AI)이 단서를 확보했습니다.`,
+    type: isSharedClue ? "system" : "card_received",
   });
 
   return {
@@ -502,12 +510,7 @@ function listSelectableCluesForAi(input: {
   }
 
   const strictCandidates = input.game.clues.filter((clue) => {
-    // Phase 2에서 shared 단서도 AI 첫 발견이 가능하도록 변경 예정.
-    // 현재는 Phase 1 호환을 위해 기존 scene과 동일하게 AI 획득 제외.
-    if (clue.type === "shared") {
-      return false;
-    }
-
+    // 이미 발견/획득된 단서는 후보에서 제외 (shared도 동일 — 재발견 의미 없음).
     if (input.session.sharedState.acquiredClueIds.includes(clue.id)) {
       return false;
     }
@@ -572,12 +575,7 @@ function listSelectableCluesForAi(input: {
   // 조건이 너무 빡빡해서 AI가 계속 아무 행동도 못 하는 상황을 막기 위해,
   // 기본 잠금/중복 제약만 남긴 완화 후보를 fallback으로 한 번 더 시도한다.
   return input.game.clues.filter((clue) => {
-    // Phase 2에서 shared 단서도 AI 첫 발견이 가능하도록 변경 예정.
-    // 현재는 Phase 1 호환을 위해 기존 scene과 동일하게 AI 획득 제외.
-    if (clue.type === "shared") {
-      return false;
-    }
-
+    // 이미 발견/획득된 단서는 후보에서 제외 (shared도 동일 — 재발견 의미 없음).
     if (input.session.sharedState.acquiredClueIds.includes(clue.id)) {
       return false;
     }

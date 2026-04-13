@@ -559,7 +559,7 @@ function SceneClueModal({
       >
         <div>
           <p className="font-bold text-dark-50 text-lg leading-tight">{clue.title || "(제목 없음)"}</p>
-          <p className="text-xs text-dark-500 mt-1">현장 단서</p>
+          <p className="text-xs text-sky-500 mt-1">공용 단서 · 전체 공개</p>
         </div>
 
         <div className="bg-dark-800 rounded-xl p-4 space-y-4">
@@ -1991,9 +1991,20 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       const err = await res.json();
       alert(err.error ?? "획득 실패");
     } else {
-      const data = await res.json().catch(() => ({})) as { card?: InventoryCard };
+      const data = await res.json().catch(() => ({})) as {
+        card?: InventoryCard;
+        action?: "shared_discovered" | "shared_view";
+        clue?: { id: string; title: string; description: string; imageUrl?: string };
+      };
       if (data.card) {
+        // owned 단서: 인벤토리에 들어간 카드를 상세 모달로 오픈
         setSelectedCard(data.card);
+      } else if (data.action === "shared_discovered" || data.action === "shared_view") {
+        // 공용 단서: 읽기 전용 모달을 연다. game.clues에서 전체 데이터를 찾아 전달.
+        const fullClue = game?.clues.find((c) => c.id === clueId);
+        if (fullClue) {
+          setSelectedSceneClue(fullClue);
+        }
       }
     }
     // 인벤토리 업데이트는 SSE inventory_${token} 이벤트에서만 처리
@@ -2745,17 +2756,20 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                             locClues.map((clue, idx) => {
                               const isSharedClue = clue.type === "shared";
                               const alreadyHas = inventoryIds.has(clue.id);
+                              const sharedDiscovered = isSharedClue && globalAcquired.includes(clue.id);
+                              // 미발견 shared는 다른 단서와 동일하게 비공개(placeholder) 처리.
+                              // 발견된 shared는 "공개" 상태로 모두에게 title 노출.
                               const takenByOther = !isSharedClue && !alreadyHas && globalAcquired.includes(clue.id);
 
                               // 단서 획득 조건 체크
                               const clueCondMet = checkConditionLocally(clue.condition);
-                              const clueLocked = !isSharedClue && clueCondMet === false; // has_items 조건이 명확히 미충족
+                              const clueLocked = clueCondMet === false; // has_items 조건이 명확히 미충족
 
                               return (
                                 <div
                                   key={clue.id}
                                   className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${
-                                    isSharedClue
+                                    sharedDiscovered
                                       ? "border-sky-900/50 bg-sky-950/10"
                                       : alreadyHas
                                       ? "border-mystery-800 bg-mystery-950/20 opacity-70"
@@ -2769,12 +2783,12 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                   }`}
                                 >
                                   <div className="min-w-0 flex-1">
-                                    {isSharedClue ? (
+                                    {sharedDiscovered ? (
                                       <>
                                         <p className="text-sm font-medium break-words text-sky-300">
-                                          {clue.title || `현장 단서 ${idx + 1}`}
+                                          {clue.title || "(제목 없음)"}
                                         </p>
-                                        <p className="text-xs text-dark-500 mt-0.5">공개 정보 · 획득되지 않음</p>
+                                        <p className="text-xs text-sky-600/80 mt-0.5">공개 · 발견됨</p>
                                       </>
                                     ) : alreadyHas ? (
                                       <p className="text-sm font-medium break-words text-mystery-300">
@@ -2807,13 +2821,12 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                       </>
                                     )}
                                   </div>
-                                  {isSharedClue ? (
+                                  {sharedDiscovered ? (
                                     <button
                                       onClick={() => setSelectedSceneClue(clue)}
-                                      disabled={locationLocked}
-                                      className="text-xs px-3 py-1.5 rounded-lg bg-sky-900/50 hover:bg-sky-900/70 text-sky-200 border border-sky-800 shrink-0 transition-colors disabled:opacity-40"
+                                      className="text-xs px-3 py-1.5 rounded-lg bg-sky-900/50 hover:bg-sky-900/70 text-sky-200 border border-sky-800 shrink-0 transition-colors"
                                     >
-                                      내용 확인
+                                      내용 열람
                                     </button>
                                   ) : alreadyHas ? (
                                     <span className="text-xs text-mystery-500 shrink-0">보유 중</span>
@@ -2831,9 +2844,13 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                     <button
                                       onClick={() => acquireClue(loc.id, clue.id)}
                                       disabled={acquiring === clue.id}
-                                      className="text-xs px-3 py-1.5 rounded-lg bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700 shrink-0 transition-colors disabled:opacity-50"
+                                      className={`text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 ${
+                                        isSharedClue
+                                          ? "bg-sky-900/60 hover:bg-sky-800 text-sky-200 border border-sky-800"
+                                          : "bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700"
+                                      }`}
                                     >
-                                      {acquiring === clue.id ? "…" : "획득"}
+                                      {acquiring === clue.id ? "…" : isSharedClue ? "조사" : "획득"}
                                     </button>
                                   )}
                                 </div>

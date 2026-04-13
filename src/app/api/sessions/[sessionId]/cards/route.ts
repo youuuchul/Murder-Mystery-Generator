@@ -153,10 +153,144 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "조사 페이즈가 아닙니다" }, { status: 400 });
     }
 
-    // TODO(Phase 2): 공용 단서는 첫 발견자만 비용을 내고 이후엔 자유 열람하도록 재설계.
-    // 현재는 Phase 1 호환을 위해 획득 경로를 거부한다 (기존 scene 동작과 동일).
+    // 공용 단서(shared) 분기: 첫 발견자만 비용을 내고 이후엔 무료 열람.
+    // 인벤토리에 넣지 않고 sharedState.acquiredClueIds에만 등록한다.
     if (clue.type === "shared") {
-      return NextResponse.json({ error: "공용 단서는 장소에서 직접 확인합니다." }, { status: 400 });
+      session.sharedState.acquiredClueIds = session.sharedState.acquiredClueIds ?? [];
+      const alreadyDiscovered = session.sharedState.acquiredClueIds.includes(clueId);
+
+      if (alreadyDiscovered) {
+        // 이미 발견된 shared — 비용/조건 체크 없이 내용만 반환.
+        return NextResponse.json({
+          action: "shared_view",
+          clue: {
+            id: clue.id,
+            title: clue.title,
+            description: clue.description,
+            imageUrl: clue.imageUrl,
+          },
+        });
+      }
+
+      // 첫 발견 — owned와 동일한 게이트를 거치되 인벤토리에는 넣지 않는다.
+      if (clue.condition) {
+        const condResult = evaluateCondition(clue.condition, pState, session.playerStates);
+        if (!condResult.ok) {
+          return NextResponse.json({ error: condResult.reason }, { status: 403 });
+        }
+      }
+
+      const sharedRoundKey = String(session.sharedState.currentRound);
+      const sharedCluesPerRound = game.rules?.cluesPerRound ?? 0;
+      if (sharedCluesPerRound > 0) {
+        pState.roundAcquired = pState.roundAcquired ?? {};
+        const acquiredThisRound = pState.roundAcquired[sharedRoundKey] ?? 0;
+        if (acquiredThisRound >= sharedCluesPerRound) {
+          return NextResponse.json(
+            { error: `이번 라운드 획득 한도(${sharedCluesPerRound}개)에 도달했습니다.` },
+            { status: 403 }
+          );
+        }
+      }
+
+      const sharedAllowRevisit = game.rules?.allowLocationRevisit ?? true;
+      if (!sharedAllowRevisit) {
+        pState.roundVisitedLocations = pState.roundVisitedLocations ?? {};
+        const visited = pState.roundVisitedLocations[sharedRoundKey] ?? [];
+        if (visited.includes(locationId)) {
+          return NextResponse.json(
+            { error: "이번 라운드에 이미 방문한 장소입니다." },
+            { status: 403 }
+          );
+        }
+      }
+
+      try {
+        const { session: persistedSession } = await mutateSessionWithRetry(
+          sessionId,
+          (latestSession) => {
+            const latestPlayerState = latestSession.playerStates.find((p) => p.playerId === pState.playerId);
+            if (!latestPlayerState) {
+              throw new Error("참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.");
+            }
+
+            latestSession.sharedState.acquiredClueIds = latestSession.sharedState.acquiredClueIds ?? [];
+            if (latestSession.sharedState.acquiredClueIds.includes(clueId)) {
+              // 경쟁 상태: 동시에 다른 플레이어가 먼저 발견. 비용 없이 관찰자로 취급.
+              return { raced: true as const };
+            }
+
+            // 라운드 한도/재방문 체크 (최신 상태로 재확인)
+            const latestRoundKey = String(latestSession.sharedState.currentRound);
+            const latestCluesPerRound = game.rules?.cluesPerRound ?? 0;
+            if (latestCluesPerRound > 0) {
+              latestPlayerState.roundAcquired = latestPlayerState.roundAcquired ?? {};
+              const acquiredThisRound = latestPlayerState.roundAcquired[latestRoundKey] ?? 0;
+              if (acquiredThisRound >= latestCluesPerRound) {
+                throw new Error(`이번 라운드 획득 한도(${latestCluesPerRound}개)에 도달했습니다.`);
+              }
+            }
+
+            const latestAllowRevisit = game.rules?.allowLocationRevisit ?? true;
+            if (!latestAllowRevisit) {
+              latestPlayerState.roundVisitedLocations = latestPlayerState.roundVisitedLocations ?? {};
+              const visited = latestPlayerState.roundVisitedLocations[latestRoundKey] ?? [];
+              if (visited.includes(locationId)) {
+                throw new Error("이번 라운드에 이미 방문한 장소입니다.");
+              }
+            }
+
+            // 발견 처리: acquiredClueIds에 추가, 인벤토리에는 넣지 않음.
+            latestSession.sharedState.acquiredClueIds.push(clueId);
+            latestPlayerState.roundAcquired = latestPlayerState.roundAcquired ?? {};
+            latestPlayerState.roundAcquired[latestRoundKey] = (latestPlayerState.roundAcquired[latestRoundKey] ?? 0) + 1;
+
+            if (!latestAllowRevisit) {
+              latestPlayerState.roundVisitedLocations = latestPlayerState.roundVisitedLocations ?? {};
+              const visited = latestPlayerState.roundVisitedLocations[latestRoundKey] ?? [];
+              if (!visited.includes(locationId)) {
+                latestPlayerState.roundVisitedLocations[latestRoundKey] = [...visited, locationId];
+              }
+            }
+
+            latestSession.sharedState.eventLog.push({
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              message: `${latestPlayerState.playerName}님이 공용 단서 "${clue.title}"을(를) 발견했습니다.`,
+              type: "system",
+            });
+
+            return { raced: false as const };
+          }
+        );
+
+        broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+        broadcast(sessionId, "shared_clue_discovered", {
+          clueId,
+          discovererPlayerId: pState.playerId,
+          discovererName: pState.playerName,
+          locationId,
+        });
+
+        return NextResponse.json({
+          action: "shared_discovered",
+          clue: {
+            id: clue.id,
+            title: clue.title,
+            description: clue.description,
+            imageUrl: clue.imageUrl,
+          },
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === "참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.") {
+          return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        if (isSessionConflictError(error)) {
+          return createSessionConflictResponse();
+        }
+        const message = error instanceof Error ? error.message : "공용 단서 발견 실패";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
     }
 
     // 단서 획득 조건 체크

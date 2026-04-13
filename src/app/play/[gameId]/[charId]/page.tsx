@@ -1818,7 +1818,20 @@ export default function PlayerView() {
   useEffect(() => {
     if (!token || !sessionId) return;
     async function fetchState() {
-      const sessionRes = await fetch(`/api/sessions/${sessionId}?token=${token}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      let sessionRes: Response;
+      try {
+        sessionRes = await fetch(`/api/sessions/${sessionId}?token=${token}`, {
+          signal: controller.signal,
+        });
+      } catch {
+        setError("세션 로드 시간이 초과됐습니다. 잠시 후 다시 시도해주세요.");
+        setLoading(false);
+        return;
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (!sessionRes.ok) {
         setError("세션에 접근할 수 없습니다.");
         setLoading(false);

@@ -180,8 +180,23 @@ function withSessionDefaults<T extends GameSession>(
   };
 }
 
+/** eventLog 최대 크기 — JSONB 저장 부하 억제 */
+const MAX_EVENT_LOG_SIZE = 200;
+
+function capEventLog(session: GameSession): GameSession {
+  const log = session.sharedState.eventLog ?? [];
+  if (log.length <= MAX_EVENT_LOG_SIZE) return session;
+  return {
+    ...session,
+    sharedState: {
+      ...session.sharedState,
+      eventLog: log.slice(-MAX_EVENT_LOG_SIZE),
+    },
+  };
+}
+
 function buildSupabaseSessionRow(session: GameSession): SupabaseSessionRow {
-  const normalizedSession = withSessionDefaults(session);
+  const normalizedSession = capEventLog(withSessionDefaults(session));
   return {
     id: normalizedSession.id,
     game_id: normalizedSession.gameId,

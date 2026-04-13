@@ -577,7 +577,7 @@ function SceneClueModal({
 
 // ── 퍼널별 엔딩 패널 ──────────────────────────────────────────────
 
-/** 투표 결과 패널: 득표 현황 + 진범 공개 */
+/** 투표 결과 패널: 득표 현황만 (진범/검거 결과는 분기 엔딩 이후에 공개) */
 function VoteResultPanel({
   reveal,
   game,
@@ -585,48 +585,27 @@ function VoteResultPanel({
   reveal: VoteReveal;
   game: GamePackage;
 }) {
-  const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
-  const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
   const totalVotes = reveal.tally.reduce((s, t) => s + t.count, 0);
 
   return (
     <div className="space-y-5">
-      {/* 진범 공개 */}
-      <div className="bg-dark-900 border border-mystery-800 rounded-xl p-4">
-        <p className="text-xs text-mystery-500 mb-2">진범</p>
-        <p className="text-xl font-bold text-mystery-300">
-          {culprit?.name ?? "알 수 없음"}
-        </p>
-      </div>
-
-      {arrested && (
-        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-          <p className="text-xs text-dark-500 mb-2">검거된 인물</p>
-          <p className="text-lg font-semibold text-dark-100">{arrested.name}</p>
-        </div>
-      )}
-
       {/* 득표 현황 */}
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
         <p className="text-xs text-dark-500">득표 현황 ({totalVotes}표)</p>
         {reveal.tally.map((t) => {
           const player = game.players.find((p) => p.id === t.playerId);
-          const isCulprit = t.playerId === reveal.culpritPlayerId;
           const pct = totalVotes > 0 ? Math.round((t.count / totalVotes) * 100) : 0;
           return (
             <div key={t.playerId}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-dark-200 flex items-center gap-1.5">
-                  {isCulprit && <span className="text-xs text-mystery-400">진범</span>}
+                <span className="text-sm text-dark-200">
                   {player?.name ?? "(알 수 없음)"}
                 </span>
                 <span className="text-xs text-dark-400">{t.count}표 ({pct}%)</span>
               </div>
               <div className="h-2 bg-dark-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${
-                    isCulprit ? "bg-mystery-600" : "bg-dark-600"
-                  }`}
+                  className="h-full rounded-full transition-all bg-dark-600"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -641,7 +620,7 @@ function VoteResultPanel({
   );
 }
 
-/** 분기 엔딩 스토리 패널 */
+/** 분기 엔딩 스토리 패널 — 스토리 + 진범/검거 결과 공개 */
 function BranchEndingPanel({
   game,
   reveal,
@@ -650,18 +629,38 @@ function BranchEndingPanel({
   reveal: VoteReveal;
 }) {
   const branch = resolveActiveEndingBranch(game, reveal);
-  if (!branch?.storyText) {
-    return (
-      <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 text-center">
-        <p className="text-sm text-dark-500">엔딩 스토리가 설정되지 않았습니다.</p>
-      </div>
-    );
-  }
+  const culprit = game.players.find((p) => p.id === reveal.culpritPlayerId);
+  const arrested = game.players.find((p) => p.id === reveal.arrestedPlayerId);
+
   return (
-    <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-4">
-      <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">엔딩</p>
-      {branch.label && <p className="text-sm font-medium text-mystery-300">{branch.label}</p>}
-      <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branch.storyText}</p>
+    <div className="space-y-5">
+      {/* 엔딩 스토리 */}
+      {branch?.storyText ? (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 space-y-4">
+          <p className="text-xs text-dark-500 font-medium tracking-wide uppercase">엔딩</p>
+          {branch.label && <p className="text-sm font-medium text-mystery-300">{branch.label}</p>}
+          <p className="text-sm text-dark-100 leading-relaxed whitespace-pre-line">{branch.storyText}</p>
+        </div>
+      ) : (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-5 text-center">
+          <p className="text-sm text-dark-500">엔딩 스토리가 설정되지 않았습니다.</p>
+        </div>
+      )}
+
+      {/* 진범 공개 (스토리 이후) */}
+      {culprit && (
+        <div className="bg-dark-900 border border-mystery-800 rounded-xl p-4">
+          <p className="text-xs text-mystery-500 mb-2">진범</p>
+          <p className="text-xl font-bold text-mystery-300">{culprit.name}</p>
+        </div>
+      )}
+
+      {arrested && (
+        <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
+          <p className="text-xs text-dark-500 mb-2">검거된 인물</p>
+          <p className="text-lg font-semibold text-dark-100">{arrested.name}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -702,34 +701,46 @@ function PersonalEndingPanel({
 
       {hasScore && scoreEval && (
         <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-dark-500">내 승점 결과</p>
-            {scoreEval.hasAnyAutoJudged && (
-              <p className="text-sm text-mystery-300 font-bold">
-                총 {scoreEval.totalPoints}점
-              </p>
-            )}
-          </div>
-          {scoreEval.results.map((r, i) => (
-            <div key={i} className="flex items-center justify-between text-sm gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                {r.achieved === true && (
-                  <span className="text-xs text-emerald-400 shrink-0">달성</span>
-                )}
-                {r.achieved === false && (
-                  <span className="text-xs text-dark-600 shrink-0">미달성</span>
-                )}
-                <span className={r.achieved === false ? "text-dark-500 line-through" : "text-dark-300"}>
-                  {r.condition.description}
+          <p className="text-xs text-dark-500">내 승점 조건</p>
+          {scoreEval.results.map((r, i) => {
+            const isManual = r.achieved === null;
+            const achieved = r.achieved === true;
+            const failed = r.achieved === false;
+            return (
+              <div key={i} className="flex items-center justify-between text-sm gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {achieved && (
+                    <span className="text-xs text-emerald-400 shrink-0">달성</span>
+                  )}
+                  {failed && (
+                    <span className="text-xs text-dark-600 shrink-0">미달성</span>
+                  )}
+                  {isManual && (
+                    <span className="text-xs text-yellow-500/70 shrink-0">수동 확인</span>
+                  )}
+                  <span className={failed ? "text-dark-500 line-through" : "text-dark-300"}>
+                    {r.condition.description || "(설명 없음)"}
+                  </span>
+                </div>
+                <span className={`font-bold shrink-0 ${
+                  failed ? "text-dark-600" : isManual ? "text-yellow-500/70" : "text-mystery-400"
+                }`}>
+                  +{r.condition.points}점
                 </span>
               </div>
-              <span className={`font-bold shrink-0 ${
-                r.achieved === false ? "text-dark-600" : "text-mystery-400"
-              }`}>
-                +{r.condition.points}점
-              </span>
+            );
+          })}
+          {scoreEval.hasAnyAutoJudged && (
+            <div className="border-t border-dark-700 pt-3 flex items-center justify-between">
+              <p className="text-xs text-dark-500">자동 판정 합계</p>
+              <p className="text-sm text-mystery-300 font-bold">{scoreEval.totalPoints}점</p>
             </div>
-          ))}
+          )}
+          {scoreEval.results.some((r) => r.achieved === null) && (
+            <p className="text-xs text-dark-600 leading-relaxed">
+              수동 확인 조건은 GM 또는 직접 확인 후 합산하세요.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -1870,9 +1881,12 @@ export default function PlayerView() {
     previousPhaseRef.current = nextPhase;
   }, [sharedState?.phase]);
 
-  // 폴링 fallback — SSE가 프록시에 버퍼링될 때 3초마다 상태 동기화
+  // 폴링 fallback — SSE가 프록시에 버퍼링될 때 상태 동기화
+  // 게임 종료(endedAt) 또는 complete 단계에서는 폴링 중단 (DB 부하 감소)
+  const shouldStopPolling = Boolean(endedAt) || sharedState?.endingStage === "complete";
   useEffect(() => {
     if (!token || !sessionId) return;
+    if (shouldStopPolling) return;
     const id = setInterval(async () => {
       try {
         const res = await fetch(`/api/sessions/${sessionId}?token=${token}`);
@@ -1902,10 +1916,10 @@ export default function PlayerView() {
       } catch {}
     }, 1200);
     return () => clearInterval(id);
-  }, [token, sessionId]);
+  }, [token, sessionId, shouldStopPolling]);
 
   useSSE(
-    sessionId && token ? `/api/sessions/${sessionId}/events?token=${encodeURIComponent(token)}` : null,
+    sessionId && token && !shouldStopPolling ? `/api/sessions/${sessionId}/events?token=${encodeURIComponent(token)}` : null,
     {
       session_update: (data: unknown) => {
         const d = data as { sharedState: SharedState; endedAt?: string };

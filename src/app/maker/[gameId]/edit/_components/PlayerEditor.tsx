@@ -56,7 +56,12 @@ function createPlayer(): Player {
     name: "",
     victoryCondition: "arrest-culprit",
     personalGoal: "",
-    scoreConditions: [{ description: "범인 검거 성공", points: 3 }],
+    scoreConditions: [{
+      description: "범인 검거 성공",
+      points: 3,
+      type: "culprit-outcome",
+      config: { expectedOutcome: "arrested" },
+    }],
     background: "",
     story: "",
     secret: "",

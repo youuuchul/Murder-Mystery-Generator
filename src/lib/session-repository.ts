@@ -20,6 +20,12 @@ export interface SessionRepository {
   listAllActiveSessions(): Promise<GameSession[]>;
   countActiveSessionsByHost(hostUserId: string): Promise<number>;
   listActiveSessionsByHost(hostUserId: string): Promise<GameSession[]>;
+  /**
+   * 자동 정리 대상 세션을 찾는다.
+   * - 엔딩 완료(ended_at 있음) 이후 `olderThanHours` 초과
+   * - 또는 엔딩 없이 `olderThanHours` 동안 업데이트 없음(미활동)
+   */
+  listExpiredSessions(olderThanHours: number): Promise<GameSession[]>;
 }
 
 /**
@@ -306,6 +312,29 @@ async function countSupabaseActiveSessionsByHost(hostUserId: string): Promise<nu
   return count ?? 0;
 }
 
+async function loadSupabaseExpiredSessions(olderThanHours: number): Promise<GameSession[]> {
+  const safeHours = Math.max(1, Math.floor(olderThanHours));
+  const thresholdIso = new Date(Date.now() - safeHours * 60 * 60 * 1000).toISOString();
+
+  const supabase = createSupabasePersistenceClient();
+  // 엔딩 완료된 세션 중 ended_at가 기준 이전
+  // + 엔딩 없이 updated_at가 기준 이전인 세션(장기 미활동)
+  // Supabase OR 필터로 한 번에 조회.
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(SUPABASE_SESSION_COLUMNS)
+    .or(
+      `and(ended_at.not.is.null,ended_at.lt.${thresholdIso}),`
+      + `and(ended_at.is.null,updated_at.lt.${thresholdIso})`
+    );
+
+  if (error) {
+    throw new Error(`Failed to list expired Supabase sessions: ${error.message}`);
+  }
+
+  return ((data ?? []) as unknown as SupabaseSessionRow[]).map((row) => hydrateSupabaseSession(row));
+}
+
 async function loadSupabaseActiveSessionsByHost(hostUserId: string): Promise<GameSession[]> {
   const normalizedUserId = hostUserId.trim();
   if (!normalizedUserId) {
@@ -466,6 +495,9 @@ const supabaseSessionRepository: SessionRepository = {
   async listActiveSessionsByHost(hostUserId) {
     return loadSupabaseActiveSessionsByHost(hostUserId);
   },
+  async listExpiredSessions(olderThanHours) {
+    return loadSupabaseExpiredSessions(olderThanHours);
+  },
 };
 
 export function getSessionRepository(): SessionRepository {
@@ -524,6 +556,10 @@ export function countActiveSessionsByHost(hostUserId: string): Promise<number> {
 
 export function listActiveSessionsByHost(hostUserId: string): Promise<GameSession[]> {
   return getSessionRepository().listActiveSessionsByHost(hostUserId);
+}
+
+export function listExpiredSessions(olderThanHours: number): Promise<GameSession[]> {
+  return getSessionRepository().listExpiredSessions(olderThanHours);
 }
 
 /**

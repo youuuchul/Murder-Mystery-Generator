@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   applyPlayerAgentOccupancyToCharacterSlots,
   enablePlayerAgentSlotsForMissingPlayers,
@@ -6,6 +6,8 @@ import {
 } from "@/lib/ai/player-agent/core/player-agent-state";
 import { ENDING_STAGE_LABELS, getNextEndingStage, normalizeEndingStage } from "@/lib/ending-flow";
 import { getGame } from "@/lib/game-repository";
+import { hasStoredGmSessionAccess, isSessionHost } from "@/lib/gm-session-access";
+import { getRequestMakerUser } from "@/lib/maker-user.server";
 import {
   applySessionAdvanceStep,
   clearPhaseAdvanceRequests,
@@ -27,12 +29,12 @@ interface PhaseRequestBody {
  * 플레이어가 다음 단계 진행 요청을 누르거나 취소한다.
  * 현재 참가 중인 인원이 모두 요청하면 GM 없이도 다음 스텝으로 진행된다.
  */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const { sessionId } = params;
   const {
     token,
     action = "request",
-    fillMissingWithAi = false,
+    fillMissingWithAi: rawFillMissingWithAi = false,
   } = await req.json().catch(() => ({})) as PhaseRequestBody;
 
   if (!token) {
@@ -48,6 +50,12 @@ export async function POST(req: Request, { params }: Params) {
   if (!game) {
     return NextResponse.json({ error: "Game not found" }, { status: 404 });
   }
+
+  // AI 채우기는 방 호스트(세션 생성자)만 설정 가능. 비호스트 요청은 조용히 false 처리.
+  const currentUser = await getRequestMakerUser(req);
+  const isHost = isSessionHost(existingSession, currentUser?.id)
+    || hasStoredGmSessionAccess(existingSession, req.cookies);
+  const fillMissingWithAi = rawFillMissingWithAi && isHost;
 
   try {
     const { session: persistedSession, result } = await mutateSessionWithRetry(

@@ -1089,6 +1089,7 @@ function PlayerAdvanceConfirmModal({
   onConfirm,
   onCancel,
   confirming,
+  canControlAiFill,
 }: {
   kind: SessionAdvanceConfirmKind;
   joinedPlayerCount: number;
@@ -1096,6 +1097,7 @@ function PlayerAdvanceConfirmModal({
   onConfirm: (options: { fillMissingWithAi: boolean }) => void;
   onCancel: () => void;
   confirming: boolean;
+  canControlAiFill: boolean;
 }) {
   const isOpening = kind === "opening";
   const isFull = joinedPlayerCount >= totalPlayerCount;
@@ -1135,17 +1137,23 @@ function PlayerAdvanceConfirmModal({
             </div>
 
             {!isFull ? (
-              <label className="flex items-start gap-3 rounded-xl border border-dark-800 bg-dark-950/60 p-4 text-sm text-dark-200">
-                <input
-                  type="checkbox"
-                  checked={fillMissingWithAi}
-                  onChange={(event) => setFillMissingWithAi(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500 focus:ring-mystery-500"
-                />
-                <span className="leading-6">
-                  부족한 인원 {missingPlayerCount}명을 AI 플레이어로 채우기
-                </span>
-              </label>
+              canControlAiFill ? (
+                <label className="flex items-start gap-3 rounded-xl border border-dark-800 bg-dark-950/60 p-4 text-sm text-dark-200">
+                  <input
+                    type="checkbox"
+                    checked={fillMissingWithAi}
+                    onChange={(event) => setFillMissingWithAi(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-dark-600 bg-dark-950 text-mystery-500 focus:ring-mystery-500"
+                  />
+                  <span className="leading-6">
+                    부족한 인원 {missingPlayerCount}명을 AI 플레이어로 채우기
+                  </span>
+                </label>
+              ) : (
+                <p className="rounded-xl border border-dark-800 bg-dark-950/60 p-4 text-xs leading-6 text-dark-500">
+                  부족 인원 AI 채우기는 방을 만든 호스트만 설정할 수 있습니다.
+                </p>
+              )
             ) : null}
           </div>
         ) : (
@@ -2348,7 +2356,14 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
             ← {leaveLabel}
           </button>
           <p className="mt-1 text-xs text-dark-500 truncate max-w-[180px]">{game.title}</p>
-          <p className="text-sm font-semibold text-dark-100">{character.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-dark-100">{character.name}</p>
+            {isHost && sessionMode === "player-consensus" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-700/60 bg-amber-950/30 text-amber-300 font-medium">
+                호스트
+              </span>
+            )}
+          </div>
         </div>
         <span
           className={`text-xs px-3 py-1 rounded-full border font-medium ${
@@ -2992,6 +3007,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
           onCancel={() => setPhaseAdvanceConfirmKind(null)}
           onConfirm={(options) => { void confirmPhaseAdvanceRequest(options); }}
           confirming={phaseRequestSubmitting}
+          canControlAiFill={isHost}
         />
       )}
 

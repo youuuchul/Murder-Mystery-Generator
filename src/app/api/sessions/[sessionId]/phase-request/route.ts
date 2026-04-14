@@ -105,6 +105,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
         latestSession.sharedState.phaseAdvanceRequestPlayerIds = [...requestedPlayerIds];
 
+        // 호스트가 체크박스를 설정했다면 sharedState에 의도를 박아둔다.
+        // 합의 마지막 요청자가 비호스트여도 호스트 결정이 유지된다.
+        if (action === "request" && fillMissingWithAi && latestSession.sharedState.phase === "lobby") {
+          latestSession.sharedState.pendingFillMissingWithAi = true;
+        }
+
         const joinedPlayerIds = latestSession.sharedState.characterSlots
           .filter((item) => item.isLocked && !item.isAiControlled)
           .map((item) => item.playerId);
@@ -152,7 +158,13 @@ export async function POST(req: NextRequest, { params }: Params) {
               type: "phase_changed",
             });
           } else {
-            if (fillMissingWithAi && latestSession.sharedState.phase === "lobby" && latestSession.playerAgentState) {
+            // 호스트가 어느 시점이든 설정해둔 pending 플래그 + 이번 요청 플래그 중 하나라도 true면 AI fill 적용.
+            const shouldFillWithAi =
+              latestSession.sharedState.phase === "lobby"
+              && Boolean(latestSession.playerAgentState)
+              && (fillMissingWithAi || latestSession.sharedState.pendingFillMissingWithAi === true);
+
+            if (shouldFillWithAi && latestSession.playerAgentState) {
               latestSession.playerAgentState = enablePlayerAgentSlotsForMissingPlayers(
                 latestSession.playerAgentState,
                 {
@@ -163,6 +175,8 @@ export async function POST(req: NextRequest, { params }: Params) {
                 }
               );
             }
+            // lobby를 벗어나면 intent 플래그는 쓸모 없어지니 해제.
+            latestSession.sharedState.pendingFillMissingWithAi = undefined;
 
             applySessionAdvanceStep(latestSession, game);
             if (latestSession.playerAgentState) {

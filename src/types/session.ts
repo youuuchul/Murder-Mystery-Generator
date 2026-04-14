@@ -135,6 +135,12 @@ export interface SharedState {
   characterSlots: CharacterSlot[];
   /** 다음 단계 진행 요청을 누른 플레이어 ID 목록 */
   phaseAdvanceRequestPlayerIds: string[];
+  /**
+   * player-consensus에서 호스트가 오프닝 진입 모달의 "AI로 채우기"를 체크해두었는지.
+   * 합의가 마지막 비호스트 요청으로 성사되는 경우에도 호스트 의도를 유지하기 위한 플래그.
+   * advance 실행 후 서버가 명시적으로 해제한다.
+   */
+  pendingFillMissingWithAi?: boolean;
   voteCount: number;
   /** 현재 투표 라운드 (고급 투표 모드). 기본값 1. */
   currentVoteRound?: number;

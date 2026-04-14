@@ -11,6 +11,7 @@ import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
 import { broadcast } from "@/lib/sse/broadcaster";
+import { publishSessionRealtime } from "@/lib/sse/realtime-publisher";
 import type { InventoryCard, PlayerState } from "@/types/session";
 import type { ClueCondition } from "@/types/game";
 
@@ -266,13 +267,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
         broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
         const discovererCharacter = game.players.find((p) => p.id === pState.playerId);
-        broadcast(sessionId, "shared_clue_discovered", {
+        const sharedDiscoveryPayload = {
           clueId,
           discovererPlayerId: pState.playerId,
           discovererName: pState.playerName,
           discovererCharacterName: discovererCharacter?.name ?? null,
           locationId,
-        });
+        };
+        broadcast(sessionId, "shared_clue_discovered", sharedDiscoveryPayload);
+        void publishSessionRealtime(sessionId, "shared_clue_discovered", sharedDiscoveryPayload);
 
         return NextResponse.json({
           action: "shared_discovered",
@@ -482,13 +485,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       // 다른 플레이어에게 owned 단서 획득 알림 (스포일러 방지 위해 title 미포함)
       const acquirerCharacter = game.players.find((p) => p.id === pState.playerId);
-      broadcast(sessionId, "clue_acquired", {
+      const acquirePayload = {
         clueId,
         locationId,
         acquirerPlayerId: pState.playerId,
         acquirerName: pState.playerName,
         acquirerCharacterName: acquirerCharacter?.name ?? null,
-      });
+      };
+      broadcast(sessionId, "clue_acquired", acquirePayload);
+      void publishSessionRealtime(sessionId, "clue_acquired", acquirePayload);
 
       // AI 플레이어가 이어서 획득한 단서들도 동일한 알림 이벤트로 브로드캐스트
       for (const outcome of result.autoAcquireOutcomes ?? []) {
@@ -513,6 +518,7 @@ export async function POST(req: NextRequest, { params }: Params) {
               acquirerCharacterName: outcome.actorCharacterName ?? null,
             };
         broadcast(sessionId, eventName, payload);
+        void publishSessionRealtime(sessionId, eventName, payload);
       }
 
       return NextResponse.json({

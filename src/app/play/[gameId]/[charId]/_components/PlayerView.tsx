@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
+import { getRealtimeClient } from "@/lib/supabase/realtime-client";
 import AiChatPanel from "./AiChatPanel";
 import PlayLoadingSkeleton from "./PlayLoadingSkeleton";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
@@ -1977,32 +1978,50 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
         if (d.roundAcquired) setRoundAcquired(d.roundAcquired);
         if (d.roundVisitedLocations) setRoundVisited(d.roundVisitedLocations);
       },
-      shared_clue_discovered: (data: unknown) => {
-        lastSseAtRef.current = Date.now();
-        const d = data as { clueId: string; discovererPlayerId: string; discovererName: string; discovererCharacterName?: string | null; locationId: string };
-        if (d.discovererPlayerId === charId) return;
-        const clue = game?.clues.find((c) => c.id === d.clueId);
-        const title = clue?.title ?? "공용 단서";
-        const who = formatActorName(d.discovererName, d.discovererCharacterName);
-        setDiscoveryNotice({
-          id: `${d.clueId}-${Date.now()}`,
-          message: `${who}이(가) 「${title}」을(를) 발견했어요`,
-        });
-      },
-      clue_acquired: (data: unknown) => {
-        lastSseAtRef.current = Date.now();
-        const d = data as { clueId: string; locationId: string; acquirerPlayerId: string; acquirerName: string; acquirerCharacterName?: string | null };
-        if (d.acquirerPlayerId === charId) return;
-        const loc = game?.locations?.find((l) => l.id === d.locationId);
-        const where = loc?.name ?? "어떤 장소";
-        const who = formatActorName(d.acquirerName, d.acquirerCharacterName);
-        setDiscoveryNotice({
-          id: `${d.clueId}-${Date.now()}`,
-          message: `${who}이(가) ${where}에서 단서를 확보했어요`,
-        });
-      },
     }
   );
+
+  // Supabase Realtime Broadcast — cross-instance 실시간 알림 (Vercel 서버리스 대응).
+  // SSE broadcaster는 in-memory여서 서버 인스턴스가 나뉘면 다른 클라에 도달 못 함.
+  // 단일 인스턴스 환경(로컬 dev)에서는 서버가 SSE도 함께 쏘지만 클라는 Realtime만 구독해 중복 방지.
+  useEffect(() => {
+    if (!sessionId || !game || shouldStopPolling) return;
+    const client = getRealtimeClient();
+    if (!client) return;
+
+    const channel = client.channel(`session:${sessionId}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel.on("broadcast", { event: "shared_clue_discovered" }, ({ payload }) => {
+      const d = payload as { clueId: string; discovererPlayerId: string; discovererName: string; discovererCharacterName?: string | null; locationId: string };
+      if (d.discovererPlayerId === charId) return;
+      const clue = game.clues.find((c) => c.id === d.clueId);
+      const title = clue?.title ?? "공용 단서";
+      const who = formatActorName(d.discovererName, d.discovererCharacterName);
+      setDiscoveryNotice({
+        id: `${d.clueId}-${Date.now()}`,
+        message: `${who}이(가) 「${title}」을(를) 발견했어요`,
+      });
+    });
+
+    channel.on("broadcast", { event: "clue_acquired" }, ({ payload }) => {
+      const d = payload as { clueId: string; locationId: string; acquirerPlayerId: string; acquirerName: string; acquirerCharacterName?: string | null };
+      if (d.acquirerPlayerId === charId) return;
+      const loc = game.locations?.find((l) => l.id === d.locationId);
+      const where = loc?.name ?? "어떤 장소";
+      const who = formatActorName(d.acquirerName, d.acquirerCharacterName);
+      setDiscoveryNotice({
+        id: `${d.clueId}-${Date.now()}`,
+        message: `${who}이(가) ${where}에서 단서를 확보했어요`,
+      });
+    });
+
+    channel.subscribe();
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [sessionId, game, charId, shouldStopPolling]);
 
   // 알림 자동 dismiss (3s)
   useEffect(() => {

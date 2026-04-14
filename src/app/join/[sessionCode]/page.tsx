@@ -47,6 +47,12 @@ export default function JoinPage() {
   const selectedSlot = session?.sharedState.characterSlots.find((slot) => slot.playerId === selectedPlayerId) ?? null;
   const isAiSlot = Boolean(selectedSlot?.isAiControlled);
   const isRejoinFlow = Boolean(selectedSlot?.isLocked && !selectedSlot?.isAiControlled);
+  const selectedHasPriorProgress = Boolean(
+    selectedSlot
+    && !selectedSlot.isLocked
+    && !selectedSlot.isAiControlled
+    && session?.slotsWithPriorProgress?.includes(selectedSlot.playerId)
+  );
 
   useEffect(() => {
     async function fetchSession() {
@@ -156,6 +162,8 @@ export default function JoinPage() {
               const taken = slot.isLocked;
               const aiTaken = slot.isAiControlled === true;
               const selected = selectedPlayerId === slot.playerId;
+              const hasPriorProgress = session?.slotsWithPriorProgress?.includes(slot.playerId) ?? false;
+              const canInherit = !taken && !aiTaken && hasPriorProgress;
 
               return (
                 <button
@@ -205,6 +213,8 @@ export default function JoinPage() {
                       </span>
                     ) : taken ? (
                       <span className="text-xs text-amber-400 shrink-0">복귀 가능</span>
+                    ) : canInherit ? (
+                      <span className="text-xs text-emerald-400 shrink-0">이어받기 가능</span>
                     ) : selected ? (
                       <span className="text-xs text-mystery-400 shrink-0">선택됨</span>
                     ) : null}
@@ -224,7 +234,9 @@ export default function JoinPage() {
             <p className="text-xs text-dark-500">
               {isRejoinFlow
                 ? "처음 참가할 때 입력한 실제 이름을 그대로 입력해야 복귀할 수 있습니다."
-                : "플레이어를 식별할 실제 이름을 입력하세요. 나중에 재접속할 때도 이 이름으로 확인합니다."}
+                : selectedHasPriorProgress
+                  ? "이전 점유자가 남긴 인벤토리/진행 상태를 이어받습니다. 실제 이름을 입력하세요."
+                  : "플레이어를 식별할 실제 이름을 입력하세요. 나중에 재접속할 때도 이 이름으로 확인합니다."}
             </p>
             <input
               type="text"

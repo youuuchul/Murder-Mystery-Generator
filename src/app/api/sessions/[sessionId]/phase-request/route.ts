@@ -51,11 +51,18 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Game not found" }, { status: 404 });
   }
 
-  // AI 채우기는 방 호스트(세션 생성자)만 설정 가능. 비호스트 요청은 조용히 false 처리.
+  // AI 채우기는 방 호스트만 설정 가능. 비호스트 요청은 조용히 false 처리.
+  // 호스트 판정 3단계: (1) Supabase user id 매칭, (2) GM 세션 쿠키 매칭,
+  // (3) player-consensus 호스트 토큰 — 비로그인/시크릿탭 대응.
   const currentUser = await getRequestMakerUser(req);
   const hostByUserId = isSessionHost(existingSession, currentUser?.id);
   const hostByCookie = hasStoredGmSessionAccess(existingSession, req.cookies);
-  const isHost = hostByUserId || hostByCookie;
+  const requesterPlayerState = existingSession.playerStates.find((p) => p.token === token);
+  const hostByPlayerToken =
+    existingSession.mode === "player-consensus"
+    && Boolean(existingSession.hostPlayerId)
+    && requesterPlayerState?.playerId === existingSession.hostPlayerId;
+  const isHost = hostByUserId || hostByCookie || hostByPlayerToken;
   const fillMissingWithAi = rawFillMissingWithAi && isHost;
 
   if (rawFillMissingWithAi) {
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       appliedFlag: fillMissingWithAi,
       hostByUserId,
       hostByCookie,
+      hostByPlayerToken,
       hasUser: Boolean(currentUser?.id),
     });
   }

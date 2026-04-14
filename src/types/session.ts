@@ -185,6 +185,12 @@ export interface GameSession {
   mode: SessionMode;
   /** 이 세션을 만든 GM 작업자 ID. 공개 게임의 익명 GM 세션은 비어 있을 수 있다. */
   hostUserId?: string;
+  /**
+   * player-consensus 모드에서 방을 만든 참가자(가장 먼저 join한)의 캐릭터 playerId.
+   * 비로그인/시크릿탭에서 쿠키를 유실해도 토큰 기반으로 호스트를 식별할 수 있게 한다.
+   * GM 모드는 hostUserId 로 충분해 이 필드를 사용하지 않는다.
+   */
+  hostPlayerId?: string;
   createdAt: string;
   updatedAt: string;
   startedAt?: string;

@@ -101,7 +101,7 @@
 ## 미착수 — 우선순위순
 
 ### 🚨 긴급
-- [ ] **AI 채우기가 비호스트/쿠키 유실 상태에서 무음 실패** — 다른 플레이어가 이미 참여해 있을 때 호스트가 "부족 인원 AI 채우기" 체크하고 오프닝 진입해도 AI 슬롯이 안 채워진다는 보고(2026-04-14). 원인 의심: `phase-request/route.ts`의 `isHost` 판정이 `isSessionHost(userId)` OR `hasStoredGmSessionAccess(cookie)`인데, 비로그인 호스트가 쿠키 유실 상태면 비호스트로 분류돼 `fillMissingWithAi`가 강제 false 처리. Vercel 로그에 `[phase-request] fillMissingWithAi 판정` 진단 로그 추가 완료 — 실제 경로 확인 후 수정. GM 모드 PATCH 경로는 별개라 영향 없을 것으로 예상. **후속**: 로그 확인 → 원인 확정 → 호스트 판정 강화 또는 실패 시 사용자 알림(조용한 실패 대신).
+- [x] **AI 채우기가 비호스트/쿠키 유실 상태에서 무음 실패** — 원인: 기존 호스트 판정이 `isSessionHost(userId)` OR `hasStoredGmSessionAccess(cookie)`라 비로그인 시크릿탭 호스트는 쿠키 매칭 실패 시 비호스트로 분류돼 `fillMissingWithAi`가 강제 false. **수정**: `GameSession.hostPlayerId` 필드 도입(player-consensus 모드에서 가장 먼저 join한 참가자의 캐릭터 playerId). join API가 첫 join 시 고정 세팅. `phase-request`/세션 GET/`page.tsx` SSR 3곳 모두 `hostByPlayerToken` 조건을 OR에 추가 — 토큰 기반이라 쿠키 유실 무관. GM 모드는 기존 hostUserId 경로 유지. ✅ 완료 (2026-04-14)
 - [ ] **조인 시 "이미 참가한 슬롯" 더블 알럿** — 캐릭터 선택 후 "참가하기" 첫 클릭에 알럿 떴다가 확인 누르면 정상 진입(2026-04-14 보고). 원인: `handleJoin`에 재진입 가드 없음 → 모바일 더블탭 또는 React state flush 지연으로 같은 요청 두 번 발사. 두 번째 요청이 이미 잠긴 슬롯 만나 409. `useRef`로 동기 가드 추가 완료(2026-04-14). 배포 후 재현 검증 필요.
 
 ### 높음

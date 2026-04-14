@@ -58,6 +58,12 @@ export async function POST(req: Request, { params }: Params) {
         slot.isLocked = true;
         slot.isAiControlled = false;
 
+        // player-consensus 모드에서 방 호스트 식별자: 가장 먼저 참가한 사람을 고정.
+        // 쿠키 유실 상황에서도 토큰/playerId로 호스트 판정 가능하게 한다.
+        if (session.mode === "player-consensus" && !session.hostPlayerId) {
+          session.hostPlayerId = playerId;
+        }
+
         if (existingPlayerState) {
           existingPlayerState.token = token;
           existingPlayerState.playerName = normalizedPlayerName;

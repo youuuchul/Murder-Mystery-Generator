@@ -274,6 +274,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     const currentUser = await getRequestMakerUser(req);
     const hostByUserId = isSessionHost(session, currentUser?.id);
     const hostByCookie = !hostByUserId && hasStoredGmSessionAccess(session, req.cookies);
+    const hostByPlayerToken =
+      session.mode === "player-consensus"
+      && Boolean(session.hostPlayerId)
+      && pState.playerId === session.hostPlayerId;
     return NextResponse.json({
       sharedState: session.sharedState,
       playerState: pState,
@@ -283,7 +287,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       sessionName: session.sessionName,
       sessionMode: session.mode,
       sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
-      isSessionHost: hostByUserId || hostByCookie,
+      isSessionHost: hostByUserId || hostByCookie || hostByPlayerToken,
       endedAt: session.endedAt,
       /** 본인의 개인 투표 답변 (personal 질문 승점 판정용) */
       myVotes: session.advancedVotes?.[token] ?? {},

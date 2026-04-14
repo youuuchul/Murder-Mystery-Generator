@@ -57,10 +57,16 @@ async function PlayerServerLoader({ sessionId }: { sessionId: string }) {
 
   // 호스트 여부를 SSR에서 확정해 내려 보낸다. 쿠키+auth가 모두 서버에서 접근 가능하므로
   // 첫 페인트부터 체크박스/배지 상태가 정확하게 노출된다.
+  // player-consensus에선 hostPlayerId로도 판정(쿠키 유실 케이스 대응).
   const currentUser = await getCurrentMakerUser();
+  const hostByPlayerToken =
+    session.mode === "player-consensus"
+    && Boolean(session.hostPlayerId)
+    && pState.playerId === session.hostPlayerId;
   const isSessionHostForInitial =
     isSessionHost(session, currentUser?.id)
-    || hasStoredGmSessionAccess(session, cookieStore);
+    || hasStoredGmSessionAccess(session, cookieStore)
+    || hostByPlayerToken;
 
   const initialState: PlayerSessionStateResponse = {
     sharedState: session.sharedState,

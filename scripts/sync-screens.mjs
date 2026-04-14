@@ -8,7 +8,7 @@
  *
  * 실행: npm run sync:screens
  */
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
@@ -49,8 +49,39 @@ const auth = new google.auth.GoogleAuth({
 });
 const sheets = google.sheets({ version: "v4", auth });
 
+/**
+ * 특정 화면 ID에 해당하는 스크린샷 파일을 찾는다.
+ * 규칙: `P-XXX.png` 기본 + `P-XXX_*.png` 변형.
+ * Phase 2에서 Drive 업로드로 대체될 자리.
+ */
+function summarizeScreenshots(screenId, files) {
+  if (!screenId) return "";
+  const prefix = screenId;
+  const matches = files.filter(
+    (name) => name === `${prefix}.png` || name.startsWith(`${prefix}_`) || name.startsWith(`${prefix}.`)
+  );
+  // 정확히 매칭되는 것만 카운트 (P-017이 P-017.1을 흡수하지 않도록)
+  const exact = matches.filter((name) => {
+    const base = name.replace(/\.(png|jpg|jpeg|webp|gif)$/i, "");
+    return base === prefix || base.startsWith(`${prefix}_`);
+  });
+  if (exact.length === 0) return "미캡처";
+  if (exact.length === 1) return `있음 (${exact[0]})`;
+  return `있음 ×${exact.length}`;
+}
+
+async function listScreenshotFiles(projectRoot) {
+  const dir = path.join(projectRoot, "docs", "screenshots");
+  try {
+    const entries = await readdir(dir);
+    return entries.filter((name) => /\.(png|jpg|jpeg|webp|gif)$/i.test(name));
+  } catch {
+    return [];
+  }
+}
+
 /** 시트 단위 쓰기 작업 한 묶음을 기술한다. */
-function buildSheetUpdates(screens) {
+function buildSheetUpdates(screens, screenshotFiles) {
   const header = [
     "ID",
     "구분",
@@ -62,6 +93,7 @@ function buildSheetUpdates(screens) {
     "권한/가드",
     "관련 백로그",
     "마지막 검토일",
+    "스크린샷",
     "비고",
   ];
   const rows = screens.map((s) => [
@@ -75,6 +107,7 @@ function buildSheetUpdates(screens) {
     s.auth ?? "",
     (s.backlog ?? []).join(", "),
     s.reviewedAt ?? "",
+    summarizeScreenshots(s.id, screenshotFiles),
     s.notes ?? "",
   ]);
   return [header, ...rows];
@@ -113,10 +146,11 @@ async function main() {
   const sheetTitle = data.sheetName || "화면 설계서";
   const screens = Array.isArray(data.screens) ? data.screens : [];
 
-  console.log(`[sync-screens] 화면 수: ${screens.length} → 시트: ${sheetTitle}`);
+  const screenshotFiles = await listScreenshotFiles(projectRoot);
+  console.log(`[sync-screens] 화면 ${screens.length}개 / 스크린샷 파일 ${screenshotFiles.length}개 → 시트: ${sheetTitle}`);
 
   await ensureSheetExists(sheetTitle);
-  const values = buildSheetUpdates(screens);
+  const values = buildSheetUpdates(screens, screenshotFiles);
   await overwriteSheet(sheetTitle, values);
 
   console.log("[sync-screens] 완료");

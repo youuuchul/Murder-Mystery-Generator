@@ -1,0 +1,10 @@
+# 이 폴더의 이미지는 깃에 추적하지 않는다. 공유는 Google Drive + Sheet 이미지 셀 경유.
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# README/.gitignore 자체는 추적
+!README.md
+!.gitignore

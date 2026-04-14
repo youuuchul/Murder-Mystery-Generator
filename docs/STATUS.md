@@ -132,12 +132,10 @@
 
 ### 기획·설계 인프라
 - [x] **화면 설계서 인벤토리(docs/screens.json)** — 34개 화면(페이지 17 + 서브탭/모드 17)에 `P-XXX` ID 부여. 각 `page.tsx` 상단 `@screen P-###` 주석으로 코드/시트 일관성 유지. `npm run sync:screens`로 Google Sheets 덮어쓰기 동기화. ✅ 완료 (2026-04-14)
-- [ ] **화면 설계 → 디자인 자산 동기화 전략** — PM/디자인 관점에서 현재 구현 화면을 Figma 또는 대체 포맷으로 연결할 방법을 설계한다. 후보 비교 필요:
-  1. **Figma MCP / Plugin** — Figma API로 페이지 프레임 자동 생성. 장점: 협업 표준. 단점: 레이아웃은 수동, 컴포넌트 일치 어려움. MCP 항상 로드는 토큰 손해 → 필요시 로컬 노드 스크립트(`scripts/sync-figma.mjs`)로 토큰 부담 0.
-  2. **HTML/Storybook 스냅샷** — 각 page를 정적 HTML로 내보내기(`next export` 또는 Puppeteer 캡처). 장점: 실제 UI 그대로. 단점: Figma에선 편집 불가.
-  3. **스토리북(Storybook) 도입** — 컴포넌트/화면 카탈로그 자동. 장점: 개발자/PM 공통 언어. 단점: 스토리 작성 비용.
-  4. **Framer/Penpot 등 대체** — 저비용 대안.
-  의사결정 선행 후 MVP 스크립트 작성. 현재 우선순위: 중간(유저 인입 전 PM 협업 강화용).
+- [ ] **화면 설계 → 디자인 자산 동기화 전략** — 의사결정 결과: **Puppeteer 자동 캡처는 취소**(인증/상태 의존 화면이 많아 비용 대비 이득 작음), **직접 캡처 + 네이밍 규칙 + Drive/Sheet 자동 연동** 방향으로 전환.
+  - **Phase 1 완료 (2026-04-14)**: `docs/screenshots/` 폴더 + README(파일명 규칙 `P-XXX.png` 시트 ID 일치) + `.gitignore` (이미지 비추적). `sync-screens.mjs`에 "스크린샷" 컬럼 추가 — 파일 존재 여부(`있음`/`미캡처`) 표시.
+  - **Phase 2 미착수**: `scripts/sync-screenshots.mjs` — Drive API로 `docs/screenshots/*.png` 업로드, 공유 링크 획득, Sheet에 `=IMAGE(url)` 수식 자동 삽입. 필요 env: `GOOGLE_DRIVE_FOLDER_ID`. 공개 설정: 서비스계정이 만든 파일은 해당 계정 소유라 공유 링크 발급 + `permissions.create({type:"anyone", role:"reader"})` 필요.
+  - **Figma 직접 연동은 추가 백로그로 보류**: 일단 Sheet 임베드로 충분. 디자이너 손이 필요할 때 Figma로 확장.
 - [ ] **Git 브랜치 전략 전환** — 유저 인입 시점에 main/dev 분리 도입. 현재는 main 직접 push + Vercel 즉시 배포. 병렬 에이전트 작업 시 feature 브랜치 + worktree 활용. dev 도입 시 Vercel Preview 기반 staging 검증 추가. CLAUDE.md/AGENTS.md 지침도 함께 갱신 필요
 - [x] **다자 밀담 컨텍스트 체이닝** — 다자 밀담에서 각 AI가 이전 AI 응답을 컨텍스트로 받아 답변. turnContext 파라미터로 이전 발언 누적 전달. 캐릭터 관계/타임라인/승점 조건을 프롬프트에 포함. 메타 정보(점수, 승리 조건) 노출 방지 — 원본 데이터를 LLM이 캐릭터 심리로 해석. ✅ 완료 (2026-04-10)
 - [x] AI 채팅 탭 및 대화 파이프라인 — 장소 탐색 탭에 밀담 하위 탭 추가. POST /api/sessions/[sessionId]/chat API. LangChain ChatOpenAI + Langfuse OTel 트레이싱. 캐릭터별 프롬프트(배경/스토리/비밀/관계/타임라인/내면 동기). 다자 밀담 turnContext 체이닝. 메타 정보 노출 방지. ✅ 완료 (2026-04-10)

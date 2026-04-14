@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { getGameCached } from "@/lib/game-repository-cache";
+import { hasStoredGmSessionAccess, isSessionHost } from "@/lib/gm-session-access";
+import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { buildPlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { getPlayerSessionCookieName } from "@/lib/player-session-cookie";
 import { getSession } from "@/lib/session-repository";
@@ -52,6 +54,13 @@ async function PlayerServerLoader({ sessionId }: { sessionId: string }) {
     return <PlayerView initialToken={token} />;
   }
 
+  // 호스트 여부를 SSR에서 확정해 내려 보낸다. 쿠키+auth가 모두 서버에서 접근 가능하므로
+  // 첫 페인트부터 체크박스/배지 상태가 정확하게 노출된다.
+  const currentUser = await getCurrentMakerUser();
+  const isSessionHostForInitial =
+    isSessionHost(session, currentUser?.id)
+    || hasStoredGmSessionAccess(session, cookieStore);
+
   const initialState: PlayerSessionStateResponse = {
     sharedState: session.sharedState,
     playerState: {
@@ -65,9 +74,7 @@ async function PlayerServerLoader({ sessionId }: { sessionId: string }) {
     sessionName: session.sessionName,
     sessionMode: session.mode,
     sharedBoard: buildPlayerSharedBoardContent(game, session.sharedState),
-    // isSessionHost는 쿠키+auth 조합이 필요해 SSR에선 보수적으로 false로 두고,
-    // 클라이언트 첫 폴링에서 정확한 값으로 교정된다.
-    isSessionHost: false,
+    isSessionHost: isSessionHostForInitial,
     endedAt: session.endedAt,
     myVotes: session.advancedVotes?.[token] ?? {},
   };

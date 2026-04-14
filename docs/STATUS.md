@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-14 (단서 획득 응답 지연 개선 + 실시간 알림 완료)
+> 마지막 업데이트: 2026-04-14 (호스트 AI 채우기 안정화, 조인 더블알럿 가드, 토스트 반투명/스택/모달 위 표시, 24h 세션 정리 cron, 화면 설계서 + 스크린샷 워크플로우)
 
 ---
 
@@ -101,8 +101,16 @@
 ## 미착수 — 우선순위순
 
 ### 🚨 긴급
+- [ ] **모바일 첫 진입 뷰포트 확대 이슈** — 모바일에서 사이트 최초 접속 시 화면이 살짝 확대된 상태로 뜨고, 손가락으로 축소해야 딱 맞는 스케일이 됨(2026-04-14 보고). 원인 후보:
+  - `src/app/layout.tsx` 또는 `<head>`의 `viewport` meta(`width=device-width, initial-scale=1, maximum-scale=1`) 설정 미흡/누락
+  - 특정 요소의 고정 너비(min-width px, overflow-x)가 기기 폭보다 커서 브라우저가 축소 렌더
+  - Safari iOS 특유의 `input[type=text]` 자동 줌 (16px 미만 폰트 시 포커스 시 확대)
+  - Tailwind 기본 reset과 충돌
+  조사 필요: (1) 현재 layout viewport 설정 확인, (2) 실제 모바일 기기에서 어떤 요소가 overflow 원인인지 DevTools Remote 검사, (3) initial-scale=1 + viewport-fit=cover 적용 후 재검증. 수정 단순할 수 있지만 라우트별로 레이아웃이 달라서 공통 head 설정 점검이 먼저.
+
+
 - [x] **AI 채우기가 합의 마지막 요청자가 비호스트일 때 드롭되는 문제** — (A) 우선 호스트 판정: `GameSession.hostPlayerId` 필드 도입(player-consensus에서 첫 join한 playerId 고정). `phase-request`/세션 GET/`page.tsx` SSR에 `hostByPlayerToken` 조건 OR 추가 — 쿠키 유실 무관. (B) 플래그 드롭 수정: player-consensus에서 advance는 마지막 요청자가 트리거하는데, 비호스트 요청 body에는 `fillMissingWithAi=false`라 호스트 의도가 덮어써졌음. `SharedState.pendingFillMissingWithAi` 필드 도입해 호스트가 체크 시 세션 상태에 박아두고 advance 시 함께 평가, 성공 시 해제. GM 모드는 직접 PATCH라 영향 없음. ✅ 완료 (2026-04-14)
-- [ ] **조인 시 "이미 참가한 슬롯" 더블 알럿** — 캐릭터 선택 후 "참가하기" 첫 클릭에 알럿 떴다가 확인 누르면 정상 진입(2026-04-14 보고). 원인: `handleJoin`에 재진입 가드 없음 → 모바일 더블탭 또는 React state flush 지연으로 같은 요청 두 번 발사. 두 번째 요청이 이미 잠긴 슬롯 만나 409. `useRef`로 동기 가드 추가 완료(2026-04-14). 배포 후 재현 검증 필요.
+- [x] **조인 시 "이미 참가한 슬롯" 더블 알럿** — 원인: `handleJoin`에 재진입 가드 없음 → 모바일 더블탭/React state flush 지연으로 같은 요청 두 번 발사, 두 번째가 이미 잠긴 슬롯 만나 409. `useRef` 동기 가드 추가 + try/finally로 상태 해제 보장. ✅ 완료 (2026-04-14)
 
 ### 높음
 - [x] **획득 전 단서 표시 설정** — 장소별 "획득 전 미리보기" 토글 + 단서별 preview_title/preview_description 입력. 기본 OFF 시 `{장소명} #N` 표시. ON 시 조사 포인트 힌트·NPC 대화 선택지 용도 활용. DB 컬럼 추가. 메이커 LocationEditor, 플레이어 UI, AI 플레이어 연동. 카드 상세에서 유형 라벨을 획득 장소로 교체. ✅ 완료 (2026-04-11)

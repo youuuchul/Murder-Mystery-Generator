@@ -516,6 +516,14 @@ function LocationBlock({
                     onDelete={() => onDeleteClue(clue.id)}
                   />
                 ))}
+                {/* 연속 추가 시 위로 스크롤할 필요가 없도록 목록 하단에도 추가 버튼 노출 */}
+                <button
+                  type="button"
+                  onClick={onAddClue}
+                  className="w-full rounded-xl border border-dashed border-mystery-900/50 bg-mystery-950/15 py-2 text-xs text-mystery-300/80 transition-colors hover:border-mystery-700 hover:bg-mystery-950/30 hover:text-mystery-200"
+                >
+                  + 단서 추가
+                </button>
               </div>
             )}
           </section>

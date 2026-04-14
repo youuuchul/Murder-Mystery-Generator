@@ -19,7 +19,8 @@
     "migrate:local-data": "node scripts/migrate-local-data-to-supabase.mjs --apply",
     "migrate:local-assets:dry-run": "node scripts/migrate-local-assets-to-supabase.mjs --dry-run",
     "migrate:local-assets": "node scripts/migrate-local-assets-to-supabase.mjs --apply",
-    "restore:game:to-supabase": "node scripts/restore-game-content-from-local-to-supabase.mjs"
+    "restore:game:to-supabase": "node scripts/restore-game-content-from-local-to-supabase.mjs",
+    "sync:screens": "node scripts/sync-screens.mjs"
   },
   "dependencies": {
     "@langchain/core": "^1.1.39",
@@ -44,6 +45,8 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.0",
+    "dotenv": "^17.4.2",
+    "googleapis": "^171.4.0",
     "pg": "^8.20.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",

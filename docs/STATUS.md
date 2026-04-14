@@ -148,6 +148,7 @@
 | 문서 | 목적 |
 |------|------|
 | `docs/SPEC.md` | 전체 설계 명세 |
+| `docs/screens.json` | 화면 설계서 원본. `npm run sync:screens`로 Google Sheet 동기화 (PM 협업용) |
 | `docs/backlog/20260406_POST_DEPLOY_PRODUCT_BACKLOG.md` | 배포 후 백로그 세부 스펙 |
 | `docs/archive/plans/` | 완료된 플랜 문서 보존 |
 | `docs/operations/` | admin 운영 가이드 |

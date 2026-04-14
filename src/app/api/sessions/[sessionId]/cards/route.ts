@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   applyPlayerAgentAutoAcquireReaction,
-  tracePlayerAgentAutoAcquireOutcome,
   type PlayerAgentAutoAcquireOutcome,
 } from "@/lib/ai/player-agent/actions/auto-actions";
 import { canAccessGmPlay } from "@/lib/game-access";
@@ -169,6 +168,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             description: clue.description,
             imageUrl: clue.imageUrl,
           },
+          sharedState: session.sharedState,
         });
       }
 
@@ -265,10 +265,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         );
 
         broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+        const discovererCharacter = game.players.find((p) => p.id === pState.playerId);
         broadcast(sessionId, "shared_clue_discovered", {
           clueId,
           discovererPlayerId: pState.playerId,
           discovererName: pState.playerName,
+          discovererCharacterName: discovererCharacter?.name ?? null,
           locationId,
         });
 
@@ -280,6 +282,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             description: clue.description,
             imageUrl: clue.imageUrl,
           },
+          sharedState: persistedSession.sharedState,
         });
       } catch (error) {
         if (error instanceof Error && error.message === "참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.") {
@@ -477,20 +480,48 @@ export async function POST(req: NextRequest, { params }: Params) {
         roundAcquired: persistedPlayerState.roundAcquired,
         roundVisitedLocations: persistedPlayerState.roundVisitedLocations,
       });
+      // 다른 플레이어에게 owned 단서 획득 알림 (스포일러 방지 위해 title 미포함)
+      const acquirerCharacter = game.players.find((p) => p.id === pState.playerId);
+      broadcast(sessionId, "clue_acquired", {
+        clueId,
+        locationId,
+        acquirerPlayerId: pState.playerId,
+        acquirerName: pState.playerName,
+        acquirerCharacterName: acquirerCharacter?.name ?? null,
+      });
 
-      for (const outcome of result.autoAcquireOutcomes ?? [result.autoAcquireOutcome]) {
-        await tracePlayerAgentAutoAcquireOutcome({
-          session: {
-            id: persistedSession.id,
-            gameId: persistedSession.gameId,
-            mode: persistedSession.mode,
-            sharedState: persistedSession.sharedState,
-          },
-          outcome,
-        });
+      // AI 플레이어가 이어서 획득한 단서들도 동일한 알림 이벤트로 브로드캐스트
+      for (const outcome of result.autoAcquireOutcomes ?? []) {
+        if (!outcome.acted || !outcome.acquiredClueId || !outcome.actorPlayerId) continue;
+        const aiClue = game.clues.find((c) => c.id === outcome.acquiredClueId);
+        if (!aiClue) continue;
+        const aiState = persistedSession.playerStates.find((p) => p.playerId === outcome.actorPlayerId);
+        const eventName = aiClue.type === "shared" ? "shared_clue_discovered" : "clue_acquired";
+        const payload = aiClue.type === "shared"
+          ? {
+              clueId: aiClue.id,
+              discovererPlayerId: outcome.actorPlayerId,
+              discovererName: aiState?.playerName ?? outcome.actorCharacterName ?? "AI",
+              discovererCharacterName: outcome.actorCharacterName ?? null,
+              locationId: aiClue.locationId,
+            }
+          : {
+              clueId: aiClue.id,
+              locationId: aiClue.locationId,
+              acquirerPlayerId: outcome.actorPlayerId,
+              acquirerName: aiState?.playerName ?? outcome.actorCharacterName ?? "AI",
+              acquirerCharacterName: outcome.actorCharacterName ?? null,
+            };
+        broadcast(sessionId, eventName, payload);
       }
 
-      return NextResponse.json({ card: persistedCard });
+      return NextResponse.json({
+        card: persistedCard,
+        sharedState: persistedSession.sharedState,
+        inventory: persistedPlayerState.inventory,
+        roundAcquired: persistedPlayerState.roundAcquired,
+        roundVisitedLocations: persistedPlayerState.roundVisitedLocations,
+      });
     } catch (error) {
       if (error instanceof Error && error.message === "참가 정보를 다시 불러오지 못했습니다. 다시 입장해주세요.") {
         return NextResponse.json({ error: error.message }, { status: 409 });

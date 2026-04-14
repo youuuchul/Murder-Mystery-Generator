@@ -67,6 +67,13 @@ function isLocalOnlyHost(hostname: string): boolean {
     || /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(normalizedHost);
 }
 
+function formatActorName(playerName: string | null | undefined, characterName: string | null | undefined): string {
+  const pn = (playerName ?? "").trim();
+  const cn = (characterName ?? "").trim();
+  if (pn && cn && pn !== cn) return `${pn} (${cn})`;
+  return pn || cn || "누군가";
+}
+
 function phaseLabel(p: string, subPhase?: string) {
   if (p.startsWith("round-")) {
     const normalizedSubPhase = subPhase === "discussion" || subPhase === "briefing" ? "discussion" : "investigation";
@@ -1789,6 +1796,8 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const prevEndingStageRef = useRef<string | null>(null);
+  const [discoveryNotice, setDiscoveryNotice] = useState<{ id: string; message: string; tone?: "info" | "error" } | null>(null);
+  const lastSseAtRef = useRef<number>(0);
 
   // 엔딩 단계 변경 시 스크롤 상단으로
   useEffect(() => {
@@ -1912,6 +1921,8 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     if (!token || !sessionId) return;
     if (shouldStopPolling) return;
     const id = setInterval(async () => {
+      // SSE 메시지가 최근 2.5s 이내에 도착했으면 폴링 스킵 (덮어쓰기/부하 방지)
+      if (Date.now() - lastSseAtRef.current < 2500) return;
       try {
         const res = await fetch(`/api/sessions/${sessionId}?token=${token}`);
         if (!res.ok) return;
@@ -1946,18 +1957,51 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     sessionId && token && !shouldStopPolling ? `/api/sessions/${sessionId}/events?token=${encodeURIComponent(token)}` : null,
     {
       session_update: (data: unknown) => {
+        lastSseAtRef.current = Date.now();
         const d = data as { sharedState: SharedState; endedAt?: string };
         setSharedState(d.sharedState);
         if (d.endedAt) setEndedAt(d.endedAt);
       },
       [`inventory_${token}`]: (data: unknown) => {
+        lastSseAtRef.current = Date.now();
         const d = data as { inventory: InventoryCard[]; roundAcquired?: Record<string, number>; roundVisitedLocations?: Record<string, string[]> };
         setInventory(d.inventory);
         if (d.roundAcquired) setRoundAcquired(d.roundAcquired);
         if (d.roundVisitedLocations) setRoundVisited(d.roundVisitedLocations);
       },
+      shared_clue_discovered: (data: unknown) => {
+        lastSseAtRef.current = Date.now();
+        const d = data as { clueId: string; discovererPlayerId: string; discovererName: string; discovererCharacterName?: string | null; locationId: string };
+        if (d.discovererPlayerId === charId) return;
+        const clue = game?.clues.find((c) => c.id === d.clueId);
+        const title = clue?.title ?? "공용 단서";
+        const who = formatActorName(d.discovererName, d.discovererCharacterName);
+        setDiscoveryNotice({
+          id: `${d.clueId}-${Date.now()}`,
+          message: `${who}이(가) 「${title}」을(를) 발견했어요`,
+        });
+      },
+      clue_acquired: (data: unknown) => {
+        lastSseAtRef.current = Date.now();
+        const d = data as { clueId: string; locationId: string; acquirerPlayerId: string; acquirerName: string; acquirerCharacterName?: string | null };
+        if (d.acquirerPlayerId === charId) return;
+        const loc = game?.locations?.find((l) => l.id === d.locationId);
+        const where = loc?.name ?? "어떤 장소";
+        const who = formatActorName(d.acquirerName, d.acquirerCharacterName);
+        setDiscoveryNotice({
+          id: `${d.clueId}-${Date.now()}`,
+          message: `${who}이(가) ${where}에서 단서를 확보했어요`,
+        });
+      },
     }
   );
+
+  // 알림 자동 dismiss (3s)
+  useEffect(() => {
+    if (!discoveryNotice) return;
+    const t = setTimeout(() => setDiscoveryNotice(null), 3000);
+    return () => clearTimeout(t);
+  }, [discoveryNotice]);
 
   useEffect(() => {
     if (sessionMode === "player-consensus" && !initializedConsensusTabRef.current) {
@@ -1982,34 +2026,50 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
   async function acquireClue(locationId: string, clueId: string) {
     setAcquiring(clueId);
-    const res = await fetch(`/api/sessions/${sessionId}/cards`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "acquire", clueId, locationId, token }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error ?? "획득 실패");
-    } else {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acquire", clueId, locationId, token }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = err.error ?? "획득 실패";
+        setDiscoveryNotice({ id: `err-${Date.now()}`, message: msg, tone: "error" });
+        // 409 "이미 다른 플레이어가 보유" → 해당 단서를 즉시 takenByOther 상태로 전환
+        if (res.status === 409 && typeof msg === "string" && msg.includes("이미 다른 플레이어")) {
+          setSharedState((prev) => prev
+            ? { ...prev, acquiredClueIds: Array.from(new Set([...(prev.acquiredClueIds ?? []), clueId])) }
+            : prev);
+        }
+        return;
+      }
       const data = await res.json().catch(() => ({})) as {
         card?: InventoryCard;
         action?: "shared_discovered" | "shared_view";
         clue?: { id: string; title: string; description: string; imageUrl?: string };
+        sharedState?: SharedState;
+        inventory?: InventoryCard[];
+        roundAcquired?: Record<string, number>;
+        roundVisitedLocations?: Record<string, string[]>;
       };
+      // 응답 즉시 상태 반영 — SSE/폴링 대기 없이 UI 동기화
+      if (data.sharedState) setSharedState(data.sharedState);
+      if (data.inventory) setInventory(data.inventory);
+      if (data.roundAcquired) setRoundAcquired(data.roundAcquired);
+      if (data.roundVisitedLocations) setRoundVisited(data.roundVisitedLocations);
+
       if (data.card) {
-        // owned 단서: 인벤토리에 들어간 카드를 상세 모달로 오픈
         setSelectedCard(data.card);
       } else if (data.action === "shared_discovered" || data.action === "shared_view") {
-        // 공용 단서: 읽기 전용 모달을 연다. game.clues에서 전체 데이터를 찾아 전달.
         const fullClue = game?.clues.find((c) => c.id === clueId);
         if (fullClue) {
           setSelectedSceneClue(fullClue);
         }
       }
+    } finally {
+      setAcquiring(null);
     }
-    // 인벤토리 업데이트는 SSE inventory_${token} 이벤트에서만 처리
-    // (로컬 update + SSE 동시 실행 시 이중 추가 버그 방지)
-    setAcquiring(null);
   }
 
   async function submitPhaseAdvanceRequest(
@@ -2264,6 +2324,19 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
+      {/* 발견/오류 알림 */}
+      {discoveryNotice && (
+        <div
+          key={discoveryNotice.id}
+          className={`fixed top-2 left-1/2 -translate-x-1/2 z-50 max-w-[92%] px-3 py-1.5 rounded-full backdrop-blur text-xs border shadow-lg animate-fade-in pointer-events-none ${
+            discoveryNotice.tone === "error"
+              ? "bg-red-900/70 text-red-100 border-red-700/50"
+              : "bg-sky-900/70 text-sky-100 border-sky-700/50"
+          }`}
+        >
+          {discoveryNotice.message}
+        </div>
+      )}
       {/* 상단 상태 바 */}
       <div className="sticky top-0 z-10 bg-dark-950/95 backdrop-blur border-b border-dark-800 px-4 py-2.5 flex items-center justify-between">
         <div className="min-w-0">

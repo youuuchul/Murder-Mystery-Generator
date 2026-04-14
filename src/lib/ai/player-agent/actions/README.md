@@ -19,6 +19,5 @@ AI 플레이어의 자동 행동을 규칙 기반으로 처리한다. LLM을 사
 
 ### Langfuse 트레이싱
 
-- `tracePlayerAgentAutoAcquireOutcome()`: 획득 결과 trace
-- `tracePlayerAgentAutoVoteOutcome()`: 투표 결과 trace
-- trace name: `player-agent.auto-acquire`, `player-agent.auto-vote`
+- `tracePlayerAgentAutoVoteOutcome()`: 투표 결과 trace (`player-agent.auto-vote`)
+- 자동 단서 획득은 결정론 로직이라 트레이스를 남기지 않는다 (응답 지연 회피).

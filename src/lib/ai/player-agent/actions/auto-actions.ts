@@ -307,36 +307,6 @@ export function applyPlayerAgentAutoVotes(
   };
 }
 
-/**
- * AI 자동 단서 획득 결과를 Langfuse trace로 남긴다.
- * 실패해도 게임 진행을 막지 않도록 내부에서 에러를 삼킨다.
- */
-export async function tracePlayerAgentAutoAcquireOutcome(params: {
-  session: Pick<GameSession, "id" | "gameId" | "mode" | "sharedState">;
-  outcome: PlayerAgentAutoAcquireOutcome;
-}): Promise<void> {
-  await tracePlayerAgentObservation({
-    traceName: "player-agent.auto-acquire",
-    sessionId: params.session.id,
-    gameId: params.session.gameId,
-    mode: params.session.mode,
-    phase: params.session.sharedState.phase,
-    input: {
-      trigger: params.outcome.trigger,
-      triggerPlayerId: params.outcome.triggerPlayerId ?? null,
-      currentRound: params.session.sharedState.currentRound,
-      currentSubPhase: params.session.sharedState.currentSubPhase ?? null,
-    },
-    output: {
-      acted: params.outcome.acted,
-      actorPlayerId: params.outcome.actorPlayerId ?? null,
-      actorCharacterName: params.outcome.actorCharacterName ?? null,
-      acquiredClueId: params.outcome.acquiredClueId ?? null,
-      acquiredClueTitle: params.outcome.acquiredClueTitle ?? null,
-      reason: params.outcome.reason ?? null,
-    },
-  });
-}
 
 /**
  * AI 자동 투표 제출 결과를 Langfuse trace로 남긴다.

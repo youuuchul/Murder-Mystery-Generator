@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-13 (단서 유형 리워크 전체 완료 — STATUS 마감 + ai_history 보고서)
+> 마지막 업데이트: 2026-04-14 (단서 획득 응답 지연 개선 + 실시간 알림 완료)
 
 ---
 
@@ -117,7 +117,7 @@
 - [x] **장소 탐색 첫 획득 카드 상세 팝업** — 첫 획득 시 자동 팝업 오픈 ✅ 이미 구현됨 (acquireClue → setSelectedCard)
 - [x] **일부 공개(unlisted) 세션 퇴장/파괴 정책** — GM 퇴장 시 세션 즉시 파괴, 플레이어 퇴장 시 슬롯 해제(마지막이면 세션 파괴), 퇴장 경고 팝업 강화. `POST /api/sessions/[sessionId]/leave` 신규 API. 가시성 전환 시 잔류 세션 경고/일괄 삭제. unlisted join 페이지 게임표지 네비게이션. ✅ 완료 (2026-04-10)
 - [ ] **미사용 세션 자동 정리 정책** — 일정 기간(예: 24시간) 미활동 세션 자동 종료/삭제. 불특정 유저 접속 오픈 대비 세션 누적 방지. 엔딩 완료 세션 자동 정리 포함. Supabase pg_cron 또는 API 기반 정리 검토. 현재는 가시성 전환 시 일괄 삭제 + 세션 수 제한(로그인 3개/비로그인 1개)으로 통제 중. 세부 자동삭제 동작은 유저 인입 후 다듬기
-- [ ] **단서 획득 액션 응답 지연 개선** — 플레이어가 장소에서 단서를 획득할 때 모달/상태 반영이 느림. 원인 후보: (1) `POST /api/sessions/[id]/cards acquire` 응답 시간 — mutateSessionWithRetry + broadcast + SSE 지연. (2) 클라이언트 낙관적 업데이트 부재(서버 응답 기다려 재렌더). (3) 폴링 fallback이 1.2초마다 state 덮어쓰기. 대응: 획득 클릭 즉시 `acquiring` state로 UI 피드백, 응답 도착 전 예상 인벤토리를 낙관적 반영(실패 시 롤백), 획득 직후 단기(0.5~1s) 로컬 우선 렌더로 폴링 덮어쓰기 억제. 클루 상세 모달 오픈과 인벤토리 추가 순서 재점검.
+- [x] **단서 획득 액션 응답 지연 개선** — (1) AI auto-acquire 후 Langfuse 트레이스를 직렬 await하던 코드 제거 — 결정론 로직이라 트레이스 불필요. AI N명 × RTT 가산 제거. (2) acquire 응답에 `sharedState/inventory/roundAcquired/roundVisitedLocations` 동봉 → SSE/폴링 대기 없이 클라가 즉시 setState. (3) `try/finally`로 버튼 잠금 해제 보장. (4) `shared_clue_discovered` + `clue_acquired` SSE 이벤트 구독 + 상단 floating pill 알림(3s) + SSE 수신 시 폴링 backoff(2.5s)로 깜빡임 제거. AI 자동 획득 outcome도 동일 이벤트로 브로드캐스트. "플레이어(캐릭터)" 포맷. (5) `alert()` 제거 → inline 토스트. 409 "이미 다른 플레이어 보유" 시 sharedState 낙관적 push로 버튼 즉시 `takenByOther` 전환. ✅ 완료 (2026-04-14)
 - [ ] **라운드 대표 이미지 업로드** — 현재 URL-only
 - [ ] **대상 작업자 찾기 UX** — 소유권 이관 시 이름/ID 검색
 - [ ] **GM 없는 세션 공통화면 범위 보강**

@@ -57,6 +57,8 @@ const config: Config = {
       animation: {
         "card-flip": "cardFlip 0.6s ease-in-out",
         "fade-in": "fadeIn 0.3s ease-in-out",
+        "toast-in": "toastIn 0.45s ease-out",
+        "toast-out": "toastOut 0.8s ease-in forwards",
       },
       keyframes: {
         cardFlip: {
@@ -67,6 +69,14 @@ const config: Config = {
         fadeIn: {
           "0%": { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        toastIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        toastOut: {
+          "0%": { opacity: "1" },
+          "100%": { opacity: "0" },
         },
       },
     },

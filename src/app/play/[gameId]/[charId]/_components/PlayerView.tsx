@@ -1805,7 +1805,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const prevEndingStageRef = useRef<string | null>(null);
-  const [discoveryNotices, setDiscoveryNotices] = useState<{ id: string; message: string; tone?: "info" | "error" }[]>([]);
+  const [discoveryNotices, setDiscoveryNotices] = useState<{ id: string; message: string; tone?: "info" | "error"; leaving?: boolean }[]>([]);
   const lastSseAtRef = useRef<number>(0);
 
   // 엔딩 단계 변경 시 스크롤 상단으로
@@ -1981,12 +1981,17 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     }
   );
 
-  // 동시 다발 알림을 스택으로 쌓고 각각 2초 뒤 자동 제거.
+  // 동시 다발 알림을 스택으로 쌓고, 2.5초 뒤 부드럽게 페이드아웃(0.8s) → 제거.
   const pushNotice = (notice: { id: string; message: string; tone?: "info" | "error" }) => {
-    setDiscoveryNotices((prev) => [notice, ...prev]);
+    setDiscoveryNotices((prev) => [{ ...notice, leaving: false }, ...prev]);
     setTimeout(() => {
-      setDiscoveryNotices((prev) => prev.filter((n) => n.id !== notice.id));
-    }, 2000);
+      setDiscoveryNotices((prev) =>
+        prev.map((n) => (n.id === notice.id ? { ...n, leaving: true } : n))
+      );
+      setTimeout(() => {
+        setDiscoveryNotices((prev) => prev.filter((n) => n.id !== notice.id));
+      }, 800);
+    }, 2500);
   };
 
   // Supabase Realtime Broadcast — cross-instance 실시간 알림 (Vercel 서버리스 대응).
@@ -2359,10 +2364,12 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
           {discoveryNotices.map((n) => (
             <div
               key={n.id}
-              className={`px-3 py-1.5 rounded-full backdrop-blur text-xs border shadow-lg animate-fade-in ${
+              className={`px-3 py-1.5 rounded-full backdrop-blur-sm text-xs border shadow-md ${
+                n.leaving ? "animate-toast-out" : "animate-toast-in"
+              } ${
                 n.tone === "error"
-                  ? "bg-red-900/70 text-red-100 border-red-700/50"
-                  : "bg-sky-900/70 text-sky-100 border-sky-700/50"
+                  ? "bg-red-900/45 text-red-100 border-red-700/40"
+                  : "bg-sky-900/45 text-sky-100 border-sky-700/40"
               }`}
             >
               {n.message}

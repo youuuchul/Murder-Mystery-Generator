@@ -1,7 +1,7 @@
 /** @screen P-014 — docs/screens.json 참조 */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
@@ -44,6 +44,9 @@ export default function JoinPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [joining, setJoining] = useState(false);
+  // setJoining은 비동기 flush라 연타/모바일 더블탭에서 중복 호출 막지 못함.
+  // ref로 동기 가드를 추가한다.
+  const joiningRef = useRef(false);
 
   const selectedSlot = session?.sharedState.characterSlots.find((slot) => slot.playerId === selectedPlayerId) ?? null;
   const isAiSlot = Boolean(selectedSlot?.isAiControlled);
@@ -98,24 +101,30 @@ export default function JoinPage() {
   }, [router, sessionCode]);
 
   async function handleJoin() {
+    if (joiningRef.current) return;
     if (!selectedPlayerId || !playerName.trim() || !session) return;
+    joiningRef.current = true;
     setJoining(true);
-    const endpoint = isRejoinFlow ? "rejoin" : "join";
-    const res = await fetch(`/api/sessions/${session.id}/${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: selectedPlayerId, playerName: playerName.trim() }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error ?? "참가 실패");
+    try {
+      const endpoint = isRejoinFlow ? "rejoin" : "join";
+      const res = await fetch(`/api/sessions/${session.id}/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: selectedPlayerId, playerName: playerName.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error ?? "참가 실패");
+        return;
+      }
+      const { token, sessionId, gameId, playerId } = await res.json() as JoinActionResponse;
+      // token을 localStorage와 쿠키 모두에 저장 (쿠키는 서버 컴포넌트 SSR용)
+      persistPlayerSessionToken(sessionId, token);
+      router.push(`/play/${gameId}/${playerId}?s=${sessionId}`);
+    } finally {
+      joiningRef.current = false;
       setJoining(false);
-      return;
     }
-    const { token, sessionId, gameId, playerId } = await res.json() as JoinActionResponse;
-    // token을 localStorage와 쿠키 모두에 저장 (쿠키는 서버 컴포넌트 SSR용)
-    persistPlayerSessionToken(sessionId, token);
-    router.push(`/play/${gameId}/${playerId}?s=${sessionId}`);
   }
 
   if (loading) {

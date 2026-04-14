@@ -53,9 +53,22 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // AI 채우기는 방 호스트(세션 생성자)만 설정 가능. 비호스트 요청은 조용히 false 처리.
   const currentUser = await getRequestMakerUser(req);
-  const isHost = isSessionHost(existingSession, currentUser?.id)
-    || hasStoredGmSessionAccess(existingSession, req.cookies);
+  const hostByUserId = isSessionHost(existingSession, currentUser?.id);
+  const hostByCookie = hasStoredGmSessionAccess(existingSession, req.cookies);
+  const isHost = hostByUserId || hostByCookie;
   const fillMissingWithAi = rawFillMissingWithAi && isHost;
+
+  if (rawFillMissingWithAi) {
+    // 호스트 판정 디버깅: AI 채우기 플래그가 실제 반영되는지 Vercel 로그에서 추적.
+    console.log("[phase-request] fillMissingWithAi 판정", {
+      sessionId,
+      rawFlag: rawFillMissingWithAi,
+      appliedFlag: fillMissingWithAi,
+      hostByUserId,
+      hostByCookie,
+      hasUser: Boolean(currentUser?.id),
+    });
+  }
 
   try {
     const { session: persistedSession, result } = await mutateSessionWithRetry(

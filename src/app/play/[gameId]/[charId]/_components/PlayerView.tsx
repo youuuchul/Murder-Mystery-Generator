@@ -2358,9 +2358,9 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
-      {/* 발견/오류 알림 스택 */}
+      {/* 발견/오류 알림 스택 — 모달(z-50) 위에도 뜨도록 z-[60] */}
       {discoveryNotices.length > 0 && (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1.5 max-w-[92%] pointer-events-none">
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1.5 max-w-[92%] pointer-events-none">
           {discoveryNotices.map((n) => (
             <div
               key={n.id}

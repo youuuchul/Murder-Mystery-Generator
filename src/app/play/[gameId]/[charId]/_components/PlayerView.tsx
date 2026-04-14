@@ -1805,7 +1805,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const prevEndingStageRef = useRef<string | null>(null);
-  const [discoveryNotice, setDiscoveryNotice] = useState<{ id: string; message: string; tone?: "info" | "error" } | null>(null);
+  const [discoveryNotices, setDiscoveryNotices] = useState<{ id: string; message: string; tone?: "info" | "error" }[]>([]);
   const lastSseAtRef = useRef<number>(0);
 
   // 엔딩 단계 변경 시 스크롤 상단으로
@@ -1981,6 +1981,14 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     }
   );
 
+  // 동시 다발 알림을 스택으로 쌓고 각각 2초 뒤 자동 제거.
+  const pushNotice = (notice: { id: string; message: string; tone?: "info" | "error" }) => {
+    setDiscoveryNotices((prev) => [notice, ...prev]);
+    setTimeout(() => {
+      setDiscoveryNotices((prev) => prev.filter((n) => n.id !== notice.id));
+    }, 2000);
+  };
+
   // Supabase Realtime Broadcast — cross-instance 실시간 알림 (Vercel 서버리스 대응).
   // SSE broadcaster는 in-memory여서 서버 인스턴스가 나뉘면 다른 클라에 도달 못 함.
   // 단일 인스턴스 환경(로컬 dev)에서는 서버가 SSE도 함께 쏘지만 클라는 Realtime만 구독해 중복 방지.
@@ -1999,7 +2007,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       const clue = game.clues.find((c) => c.id === d.clueId);
       const title = clue?.title ?? "공용 단서";
       const who = formatActorName(d.discovererName, d.discovererCharacterName);
-      setDiscoveryNotice({
+      pushNotice({
         id: `${d.clueId}-${Date.now()}`,
         message: `${who}이(가) 「${title}」을(를) 발견했어요`,
       });
@@ -2011,7 +2019,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       const loc = game.locations?.find((l) => l.id === d.locationId);
       const where = loc?.name ?? "어떤 장소";
       const who = formatActorName(d.acquirerName, d.acquirerCharacterName);
-      setDiscoveryNotice({
+      pushNotice({
         id: `${d.clueId}-${Date.now()}`,
         message: `${who}이(가) ${where}에서 단서를 확보했어요`,
       });
@@ -2021,14 +2029,8 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     return () => {
       void client.removeChannel(channel);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, game, charId, shouldStopPolling]);
-
-  // 알림 자동 dismiss (3s)
-  useEffect(() => {
-    if (!discoveryNotice) return;
-    const t = setTimeout(() => setDiscoveryNotice(null), 3000);
-    return () => clearTimeout(t);
-  }, [discoveryNotice]);
 
   useEffect(() => {
     if (sessionMode === "player-consensus" && !initializedConsensusTabRef.current) {
@@ -2062,7 +2064,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const msg = err.error ?? "획득 실패";
-        setDiscoveryNotice({ id: `err-${Date.now()}`, message: msg, tone: "error" });
+        pushNotice({ id: `err-${Date.now()}`, message: msg, tone: "error" });
         // 409 "이미 다른 플레이어가 보유" → 해당 단서를 즉시 takenByOther 상태로 전환
         if (res.status === 409 && typeof msg === "string" && msg.includes("이미 다른 플레이어")) {
           setSharedState((prev) => prev
@@ -2351,17 +2353,21 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
-      {/* 발견/오류 알림 */}
-      {discoveryNotice && (
-        <div
-          key={discoveryNotice.id}
-          className={`fixed top-2 left-1/2 -translate-x-1/2 z-50 max-w-[92%] px-3 py-1.5 rounded-full backdrop-blur text-xs border shadow-lg animate-fade-in pointer-events-none ${
-            discoveryNotice.tone === "error"
-              ? "bg-red-900/70 text-red-100 border-red-700/50"
-              : "bg-sky-900/70 text-sky-100 border-sky-700/50"
-          }`}
-        >
-          {discoveryNotice.message}
+      {/* 발견/오류 알림 스택 */}
+      {discoveryNotices.length > 0 && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1.5 max-w-[92%] pointer-events-none">
+          {discoveryNotices.map((n) => (
+            <div
+              key={n.id}
+              className={`px-3 py-1.5 rounded-full backdrop-blur text-xs border shadow-lg animate-fade-in ${
+                n.tone === "error"
+                  ? "bg-red-900/70 text-red-100 border-red-700/50"
+                  : "bg-sky-900/70 text-sky-100 border-sky-700/50"
+              }`}
+            >
+              {n.message}
+            </div>
+          ))}
         </div>
       )}
       {/* 상단 상태 바 */}

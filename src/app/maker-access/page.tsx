@@ -1,3 +1,4 @@
+/** @screen P-005 (서브: P-005.1~P-005.4 mode 쿼리 분기) — docs/screens.json 참조 */
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {

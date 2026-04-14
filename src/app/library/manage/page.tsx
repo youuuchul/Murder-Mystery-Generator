@@ -1,3 +1,4 @@
+/** @screen P-009 (+ P-009.1 admin scope) — docs/screens.json 참조 */
 import Link from "next/link";
 import {
   canAccessGmPlay,

@@ -1,3 +1,4 @@
+/** @screen P-010 — docs/screens.json 참조 */
 import Link from "next/link";
 import { listGames } from "@/lib/game-repository";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";

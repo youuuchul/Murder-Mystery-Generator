@@ -1,3 +1,4 @@
+/** @screen P-014 — docs/screens.json 참조 */
 "use client";
 
 import { useEffect, useState } from "react";

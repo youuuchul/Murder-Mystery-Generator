@@ -1,3 +1,4 @@
+/** @screen P-012 — docs/screens.json 참조 */
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";

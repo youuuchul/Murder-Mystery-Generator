@@ -1,3 +1,4 @@
+/** @screen P-008 — docs/screens.json 참조 */
 import { Suspense } from "react";
 import LibraryCountsBadges, {
   LibraryCountsBadgesSkeleton,

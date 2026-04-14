@@ -1,3 +1,4 @@
+/** @screen P-015 — docs/screens.json 참조 */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getGame } from "@/lib/game-repository";

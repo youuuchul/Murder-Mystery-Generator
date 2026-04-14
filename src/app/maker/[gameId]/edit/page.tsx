@@ -1,3 +1,4 @@
+/** @screen P-007 (서브: P-007.1~P-007.6 — SettingsForm/StoryEditor/PlayerEditor/LocationEditor/ScriptEditor/EndingEditor) — docs/screens.json 참조 */
 import { Suspense } from "react";
 import Link from "next/link";
 import MakerEditorLoader, {

@@ -1,3 +1,4 @@
+/** @screen P-011 — docs/screens.json 참조 */
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listGames } from "@/lib/game-repository";

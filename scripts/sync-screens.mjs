@@ -52,6 +52,7 @@ const sheets = google.sheets({ version: "v4", auth });
 /** 시트 단위 쓰기 작업 한 묶음을 기술한다. */
 function buildSheetUpdates(screens) {
   const header = [
+    "ID",
     "구분",
     "페이지 경로",
     "파일 경로",
@@ -64,6 +65,7 @@ function buildSheetUpdates(screens) {
     "비고",
   ];
   const rows = screens.map((s) => [
+    s.id ?? "",
     s.category ?? "",
     s.route ?? "",
     s.file ?? "",

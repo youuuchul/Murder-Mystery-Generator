@@ -1,3 +1,4 @@
+/** @screen P-013 — docs/screens.json 참조 */
 "use client";
 
 import JoinCodeEntryForm from "./_components/JoinCodeEntryForm";

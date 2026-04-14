@@ -1,3 +1,4 @@
+/** @screen P-002 — docs/screens.json 참조 */
 import Link from "next/link";
 
 import { GuidePolicySection } from "./_components/GuidePolicySection";

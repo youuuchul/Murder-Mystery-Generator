@@ -1,3 +1,4 @@
+/** @screen P-017 (서브: P-017.1~P-017.6 탭/엔딩 단계) — docs/screens.json 참조 */
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";

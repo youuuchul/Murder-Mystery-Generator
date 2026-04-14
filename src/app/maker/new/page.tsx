@@ -1,3 +1,4 @@
+/** @screen P-006 — docs/screens.json 참조 */
 import Link from "next/link";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
 import StepWizard from "./_components/StepWizard";

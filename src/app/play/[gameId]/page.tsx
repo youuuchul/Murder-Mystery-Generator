@@ -1,3 +1,4 @@
+/** @screen P-016 — docs/screens.json 참조 */
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";

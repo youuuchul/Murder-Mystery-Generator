@@ -193,6 +193,12 @@ export interface Relationship {
 export interface PlayerTimelineEntry {
   slotId: string;
   action: string;
+  /**
+   * true면 이 캐릭터가 해당 슬롯에 의도적으로 등장/행동하지 않는다는 표시.
+   * 검증(누락 경고)과 AI 도우미가 "아직 안 적은 것"과 "일부러 비운 것"을 구분하기 위해 쓴다.
+   * 기본값은 false(= 일반 미입력 상태).
+   */
+  inactive?: boolean;
 }
 
 export interface Player {

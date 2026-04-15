@@ -121,6 +121,7 @@ function alignTimelineEntries(player: Player, timeline: StoryTimeline): Player {
       return {
         slotId: slot.id,
         action: existing?.action ?? "",
+        inactive: existing?.inactive === true,
       };
     }),
   };
@@ -220,6 +221,24 @@ function TimelineMatrixEditor({
     );
   }
 
+  function updateTimelineInactive(playerId: string, slotId: string, inactive: boolean) {
+    onChange(
+      players.map((player) => (
+        player.id === playerId
+          ? {
+              ...player,
+              timelineEntries: player.timelineEntries.map((entry) => (
+                entry.slotId === slotId
+                  // 비활성으로 바꾸면 의도적 N/A이므로 기존 action 텍스트는 정리해 혼선 제거.
+                  ? { ...entry, inactive, action: inactive ? "" : entry.action }
+                  : entry
+              )),
+            }
+          : player
+      ))
+    );
+  }
+
   if (!timeline.enabled) {
     return (
       <div className="text-center py-10 border border-dashed border-dark-700 rounded-xl">
@@ -269,21 +288,62 @@ function TimelineMatrixEditor({
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {players.map((player) => {
               const entry = player.timelineEntries.find((item) => item.slotId === slot.id);
+              const isInactive = entry?.inactive === true;
+              const isFilled = (entry?.action ?? "").trim().length > 0;
+              const statusLabel = isInactive ? "비활성" : isFilled ? "입력됨" : "미입력";
+              const statusClass = isInactive
+                ? "text-dark-500"
+                : isFilled
+                  ? "text-emerald-400/80"
+                  : "text-amber-400/80";
 
               return (
-                <div key={player.id} className="border border-dark-800 bg-dark-900/60 rounded-xl p-3 space-y-2">
+                <div
+                  key={player.id}
+                  className={[
+                    "rounded-xl p-3 space-y-2 border transition-colors",
+                    isInactive
+                      ? "border-dark-800 bg-dark-950/70"
+                      : "border-dark-800 bg-dark-900/60",
+                  ].join(" ")}
+                >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-dark-100">{player.name || "이름 없는 캐릭터"}</p>
-                    <span className="text-[11px] text-dark-600 shrink-0">
-                      {(entry?.action ?? "").trim().length > 0 ? "입력됨" : "미입력"}
-                    </span>
+                    <p className={[
+                      "text-sm font-medium",
+                      isInactive ? "text-dark-500 line-through" : "text-dark-100",
+                    ].join(" ")}>
+                      {player.name || "이름 없는 캐릭터"}
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[11px] ${statusClass}`}>{statusLabel}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isInactive}
+                        onClick={() => updateTimelineInactive(player.id, slot.id, !isInactive)}
+                        title={isInactive
+                          ? "비활성 해제 — 이 캐릭터가 이 시간대에 행동하게 설정"
+                          : "비활성으로 설정 — 이 캐릭터는 이 시간대에 등장/행동 없음"}
+                        className={[
+                          "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                          isInactive
+                            ? "border-dark-600 bg-dark-800 text-dark-300 hover:border-dark-500"
+                            : "border-dark-700 bg-dark-900 text-dark-500 hover:border-dark-500 hover:text-dark-300",
+                        ].join(" ")}
+                      >
+                        {isInactive ? "비활성 ◉" : "활성 ◯"}
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     rows={3}
                     value={entry?.action ?? ""}
                     onChange={(e) => updateTimelineAction(player.id, slot.id, e.target.value)}
-                    placeholder="예: 서재에서 유언장을 찾다가 복도로 이동했다."
-                    className={ta}
+                    placeholder={isInactive
+                      ? "비활성 상태: 이 시간대에 이 캐릭터는 등장/행동하지 않습니다."
+                      : "예: 서재에서 유언장을 찾다가 복도로 이동했다."}
+                    disabled={isInactive}
+                    className={[ta, isInactive ? "opacity-50 cursor-not-allowed" : ""].join(" ")}
                   />
                 </div>
               );

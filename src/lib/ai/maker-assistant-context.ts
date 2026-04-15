@@ -192,7 +192,9 @@ function buildCompletionSummary(game: GamePackage): MakerAssistantContext["compl
     playersWithoutStory: game.players.filter((player) => !player.story.trim()).length,
     playersWithoutSecret: game.players.filter((player) => !player.secret.trim()).length,
     playersWithoutTimeline: game.story.timeline.enabled
-      ? game.players.filter((player) => !player.timelineEntries.some((entry) => entry.action.trim())).length
+      ? game.players.filter((player) =>
+          !player.timelineEntries.some((entry) => entry.action.trim() || entry.inactive === true)
+        ).length
       : 0,
     blankTimelineSlots: game.story.timeline.slots.filter((slot) => !slot.label.trim()).length,
     locationsWithoutClues: game.locations.filter((location) => location.clueIds.length === 0).length,
@@ -207,10 +209,17 @@ function buildCompletionSummary(game: GamePackage): MakerAssistantContext["compl
 function mapTimelineEntries(
   entries: PlayerTimelineEntry[],
   slotMap: Map<string, string>
-): Array<{ slotId: string; slotLabel: string; action: string }> {
-  return entries.map((entry) => ({
-    slotId: entry.slotId,
-    slotLabel: slotMap.get(entry.slotId) ?? "",
-    action: entry.action,
-  }));
+): Array<{ slotId: string; slotLabel: string; action: string; inactive: boolean; status: "filled" | "inactive" | "empty" }> {
+  return entries.map((entry) => {
+    const inactive = entry.inactive === true;
+    const hasAction = entry.action.trim().length > 0;
+    return {
+      slotId: entry.slotId,
+      slotLabel: slotMap.get(entry.slotId) ?? "",
+      action: entry.action,
+      inactive,
+      // 모델이 "미입력"과 "의도적 N/A"를 혼동하지 않도록 명시적 상태 문자열을 함께 넘긴다.
+      status: inactive ? "inactive" : hasAction ? "filled" : "empty",
+    };
+  });
 }

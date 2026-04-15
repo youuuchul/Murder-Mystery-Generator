@@ -160,6 +160,7 @@ function normalizePlayerTimelineEntries(
     return {
       slotId: slot.id,
       action: asTrimmedString(matched?.action),
+      inactive: matched?.inactive === true ? true : false,
     };
   });
 }

@@ -239,10 +239,10 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
   const voteChoiceRows = (voteQuestionChoicesResult.data ?? []) as any[];
 
   // 3. 인덱스 맵 구축
-  const timelineByPlayer = new Map<string, Array<{ slotId: string; action: string }>>();
+  const timelineByPlayer = new Map<string, Array<{ slotId: string; action: string; inactive: boolean }>>();
   for (const te of timelineEntries) {
     const list = timelineByPlayer.get(te.player_id) ?? [];
-    list.push({ slotId: te.slot_id, action: te.action });
+    list.push({ slotId: te.slot_id, action: te.action, inactive: te.inactive === true });
     timelineByPlayer.set(te.player_id, list);
   }
 
@@ -559,11 +559,17 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
     );
     if (pError) throw new Error(`Failed to insert game_players: ${pError.message}`);
 
-    // timeline entries
+    // timeline entries — action이 비어도 inactive=true면 행을 남겨 "의도적 N/A" 플래그를 보존한다.
     const teRows = normalizedGame.players.flatMap((p) =>
-      p.timelineEntries.filter((te) => te.slotId && te.action).map((te) => ({
-        game_id: gameId, player_id: p.id, slot_id: te.slotId, action: te.action,
-      }))
+      p.timelineEntries
+        .filter((te) => te.slotId && (te.action.trim().length > 0 || te.inactive === true))
+        .map((te) => ({
+          game_id: gameId,
+          player_id: p.id,
+          slot_id: te.slotId,
+          action: te.action,
+          inactive: te.inactive === true,
+        }))
     );
     if (teRows.length > 0) {
       const { error } = await supabase.from("player_timeline_entries").insert(teRows);

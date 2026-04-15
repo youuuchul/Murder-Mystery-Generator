@@ -60,10 +60,14 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     const backgroundlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.background));
     const storylessPlayers = countPlayersBy(game.players, (player) => isBlank(player.story));
     const secretlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.secret));
+    // 타임라인 사용 중일 때, 어떤 슬롯에도 "행동 입력"이나 "의도적 비활성" 둘 다 없는 캐릭터만 누락으로 본다.
+    // 비활성으로 명시한 캐릭터는 제작자가 N/A 결정을 내린 상태이므로 경고에서 제외한다.
     const timelineMissingPlayers = game.story.timeline.enabled
       ? countPlayersBy(
           game.players,
-          (player) => !player.timelineEntries?.some((entry) => !isBlank(entry.action))
+          (player) => !player.timelineEntries?.some((entry) =>
+            !isBlank(entry.action) || entry.inactive === true
+          )
         )
       : 0;
 

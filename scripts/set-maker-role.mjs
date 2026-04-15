@@ -2,11 +2,11 @@
 
 /**
  * 메이커 계정 role을 `creator` 또는 `admin`으로 바꾸는 운영 스크립트.
- * Supabase provider면 `profiles.role`을, local provider면 makers JSON 레코드를 갱신한다.
+ * `profiles.role` 을 Supabase 에서 직접 갱신한다.
  *
  * Usage:
  *   node scripts/set-maker-role.mjs <loginId> <role>
- *   node scripts/set-maker-role.mjs REDACTED_LOGIN admin
+ *   node scripts/set-maker-role.mjs <loginId> admin
  */
 
 import fs from "fs";
@@ -14,8 +14,6 @@ import path from "path";
 import { createClient } from "@supabase/supabase-js";
 
 const ROOT_DIR = process.cwd();
-const LOCAL_MAKER_ACCOUNTS_PATH = path.join(ROOT_DIR, "data", "makers", "accounts.json");
-const LOCAL_MAKER_USERS_PATH = path.join(ROOT_DIR, "data", "makers", "index.json");
 
 /**
  * 간단한 `.env` 파일을 읽어 키/값 맵으로 바꾼다.
@@ -56,66 +54,7 @@ function normalizeLoginId(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-/** JSON 배열 파일을 읽는다. */
-function readJsonArray(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-/** JSON 배열 파일을 저장한다. */
-function writeJsonArray(filePath, items) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(items, null, 2), "utf8");
-}
-
-/** local JSON provider에서 계정과 작업자 레코드 role을 함께 맞춘다. */
-function updateLocalMakerRole(loginId, role) {
-  const accounts = readJsonArray(LOCAL_MAKER_ACCOUNTS_PATH);
-  const accountIndex = accounts.findIndex((account) => normalizeLoginId(account.loginId) === loginId);
-  if (accountIndex === -1) {
-    throw new Error(`No local maker account found for login ID "${loginId}".`);
-  }
-
-  const account = accounts[accountIndex];
-  const updatedAt = new Date().toISOString();
-  const nextAccount = {
-    ...account,
-    role,
-    updatedAt,
-  };
-  const nextAccounts = [...accounts];
-  nextAccounts[accountIndex] = nextAccount;
-  writeJsonArray(LOCAL_MAKER_ACCOUNTS_PATH, nextAccounts);
-
-  const users = readJsonArray(LOCAL_MAKER_USERS_PATH);
-  const userIndex = users.findIndex((user) => String(user.id || "").trim() === String(account.id || "").trim());
-  if (userIndex !== -1) {
-    const nextUsers = [...users];
-    nextUsers[userIndex] = {
-      ...nextUsers[userIndex],
-      role,
-      updatedAt,
-    };
-    writeJsonArray(LOCAL_MAKER_USERS_PATH, nextUsers);
-  }
-
-  return {
-    userId: account.id,
-    displayName: account.displayName,
-    loginId: account.loginId,
-    role,
-  };
-}
-
-/** Supabase provider에서 profiles.role을 갱신한다. */
+/** Supabase profiles.role 을 갱신한다. */
 async function updateSupabaseMakerRole(env, loginId, role) {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || "";
   const supabaseSecretKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -175,10 +114,7 @@ async function main() {
   }
 
   const env = parseEnvFile(path.join(ROOT_DIR, ".env"));
-  const provider = String(env.MAKER_AUTH_PROVIDER || "local").trim().toLowerCase();
-  const result = provider === "supabase"
-    ? await updateSupabaseMakerRole(env, loginId, role)
-    : updateLocalMakerRole(loginId, role);
+  const result = await updateSupabaseMakerRole(env, loginId, role);
 
   console.log(`loginId: ${result.loginId}`);
   console.log(`displayName: ${result.displayName}`);

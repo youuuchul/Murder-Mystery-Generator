@@ -2,7 +2,7 @@ import {
   applyMigrationPlan,
   buildMigrationPlan,
   formatMigrationPlan,
-} from "./lib/local-data-migration.mjs";
+} from "../lib/local-data-migration.mjs";
 
 /**
  * `--flag=value` 또는 `--flag value` 형태의 CLI 인자를 읽는다.

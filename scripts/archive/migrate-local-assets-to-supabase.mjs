@@ -2,7 +2,7 @@ import {
   applyLocalAssetMigration,
   buildLocalAssetMigrationPlan,
   formatLocalAssetMigrationPlan,
-} from "./lib/local-asset-migration.mjs";
+} from "./local-asset-migration.mjs";
 
 /**
  * 로컬 game asset 파일을 Supabase Storage로 복사한다.

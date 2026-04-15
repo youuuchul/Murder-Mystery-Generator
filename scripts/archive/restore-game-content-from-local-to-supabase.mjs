@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   createMigrationSupabaseClient,
   parseEnvFile,
-} from "./lib/local-data-migration.mjs";
+} from "../lib/local-data-migration.mjs";
 
 const ROOT_DIR = process.cwd();
 const DEFAULT_CONTENT_BACKUPS_BUCKET = "game-content-backups";

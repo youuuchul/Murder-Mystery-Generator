@@ -3,7 +3,7 @@ import path from "path";
 import {
   createMigrationSupabaseClient,
   parseEnvFile,
-} from "./local-data-migration.mjs";
+} from "../lib/local-data-migration.mjs";
 
 const ROOT_DIR = process.cwd();
 const GAMES_DIR = path.join(ROOT_DIR, "data", "games");

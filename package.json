@@ -15,11 +15,6 @@
     "admin:delete-game": "node scripts/delete-game-safe.mjs",
     "admin:cleanup-smoke": "node scripts/cleanup-smoke-users.mjs",
     "admin:sync-auth-emails": "node scripts/sync-maker-auth-emails.mjs",
-    "migrate:local-data:dry-run": "node scripts/migrate-local-data-to-supabase.mjs --dry-run",
-    "migrate:local-data": "node scripts/migrate-local-data-to-supabase.mjs --apply",
-    "migrate:local-assets:dry-run": "node scripts/migrate-local-assets-to-supabase.mjs --dry-run",
-    "migrate:local-assets": "node scripts/migrate-local-assets-to-supabase.mjs --apply",
-    "restore:game:to-supabase": "node scripts/restore-game-content-from-local-to-supabase.mjs",
     "sync:screens": "node scripts/sync-screens.mjs"
   },
   "dependencies": {

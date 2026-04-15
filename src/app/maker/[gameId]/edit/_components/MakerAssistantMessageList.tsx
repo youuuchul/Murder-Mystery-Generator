@@ -138,27 +138,58 @@ function renderAssistantResult(messageId: string, result: MakerAssistantGuideRes
             주요 포인트
           </p>
           <div className="space-y-2">
-            {result.findings.map((finding, index) => (
-              <article
-                key={`${messageId}-finding-${index}`}
-                className={[
-                  "rounded-xl border px-3 py-3",
-                  getFindingClasses(finding),
-                ].join(" ")}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">{finding.title}</p>
-                  {finding.relatedStep ? (
-                    <span className="text-[11px] uppercase tracking-[0.18em] opacity-80">
-                      Step {finding.relatedStep}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1.5 text-sm leading-relaxed opacity-90">
-                  {finding.detail}
-                </p>
-              </article>
-            ))}
+            {result.findings.map((finding, index) => {
+              const structured = parseClueFindingDetail(finding.detail);
+
+              return (
+                <article
+                  key={`${messageId}-finding-${index}`}
+                  className={[
+                    "rounded-xl border px-3 py-3 space-y-2",
+                    getFindingClasses(finding),
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">{finding.title}</p>
+                    {finding.relatedStep ? (
+                      <span className="text-[11px] uppercase tracking-[0.18em] opacity-80">
+                        Step {finding.relatedStep}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {structured ? (
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-dark-700/70 bg-dark-950/40 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-dark-500">
+                            카드 본문
+                          </p>
+                          <CopyButton value={structured.body} label="본문만 복사" />
+                        </div>
+                        <p className="mt-1.5 text-sm leading-relaxed text-dark-100 whitespace-pre-line">
+                          {structured.body}
+                        </p>
+                      </div>
+                      {structured.reason ? (
+                        <div className="rounded-lg border border-dashed border-dark-700/60 bg-transparent px-3 py-2">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-dark-500">
+                            왜 필요한가 (참고용)
+                          </p>
+                          <p className="mt-1.5 text-sm leading-relaxed opacity-80 whitespace-pre-line">
+                            {structured.reason}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-relaxed opacity-90 whitespace-pre-line">
+                      {finding.detail}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </div>
       )}
@@ -203,6 +234,27 @@ function renderAssistantResult(messageId: string, result: MakerAssistantGuideRes
       )}
     </div>
   );
+}
+
+/**
+ * suggest_clues의 FINDING.detail에 담긴 `[본문] ... [근거] ...` 포맷을 분리한다.
+ * 두 라벨 중 하나라도 없으면 null을 반환해 기존 단일 문단 뷰로 폴백한다.
+ * 일부 UUID가 섞여 나오는 경우를 대비해 본문에서 `(abcdef01-1234-...)` 형태를 제거해준다.
+ */
+function parseClueFindingDetail(detail: string): { body: string; reason: string } | null {
+  if (!detail) return null;
+  const match = detail.match(/\[본문\]\s*([\s\S]*?)\s*\[근거\]\s*([\s\S]*?)$/);
+  if (!match) return null;
+  const clean = (value: string) => value
+    // UUID 괄호 주석 제거: "이름 (4fae50d6-...)" → "이름"
+    .replace(/\s*\(?\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)?/gi, "")
+    // 잘린 짧은 hex id도 정리: " (4fa050d6…)" 혹은 " (d2783794f...)"
+    .replace(/\s*\(\s*[0-9a-f]{6,}[…\.]*\s*\)/gi, "")
+    .trim();
+  const body = clean(match[1]);
+  const reason = clean(match[2]);
+  if (!body) return null;
+  return { body, reason };
 }
 
 interface TimelineEntry {

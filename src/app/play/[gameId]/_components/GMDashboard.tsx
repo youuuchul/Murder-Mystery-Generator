@@ -92,7 +92,6 @@ interface PhaseBoardContent {
   title: string;
   badge: string;
   narrationBlocks: { label: string; text: string }[];
-  guideText?: string;
   imageUrl?: string;
   videoUrl?: string;
   backgroundMusic?: string;
@@ -140,7 +139,6 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       title: "대기실",
       badge: "Lobby",
       narrationBlocks: [],
-      guideText: game.scripts.lobby.gmNote,
       videoUrl: game.scripts.lobby.videoUrl,
       backgroundMusic: game.scripts.lobby.backgroundMusic,
       showSharedImage: true,
@@ -154,7 +152,6 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       narrationBlocks: game.scripts.opening.narration
         ? [{ label: "스토리 텍스트", text: game.scripts.opening.narration }]
         : [],
-      guideText: game.scripts.opening.gmNote,
       imageUrl: game.story.mapImageUrl,
       videoUrl: game.scripts.opening.videoUrl,
       backgroundMusic: game.scripts.opening.backgroundMusic,
@@ -170,7 +167,6 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       narrationBlocks: roundScript?.narration
         ? [{ label: `Round ${roundNum} 이벤트`, text: roundScript.narration }]
         : [],
-      guideText: roundScript?.gmNote,
       imageUrl: roundScript?.imageUrl,
       videoUrl: roundScript?.videoUrl,
       backgroundMusic: roundScript?.backgroundMusic,
@@ -185,7 +181,6 @@ function getPhaseBoardContent(game: GamePackage, sharedState: SharedState): Phas
       narrationBlocks: game.scripts.vote.narration
         ? [{ label: "투표 안내", text: game.scripts.vote.narration }]
         : [],
-      guideText: game.scripts.vote.gmNote,
       videoUrl: game.scripts.vote.videoUrl,
       backgroundMusic: game.scripts.vote.backgroundMusic,
       showSharedImage: true,
@@ -342,25 +337,6 @@ function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardCont
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function PhaseGuide({ content }: { content: PhaseBoardContent }) {
-  if (!content.guideText?.trim()) {
-    return null;
-  }
-
-  return (
-    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-dark-200">진행 가이드</h3>
-        <span className="rounded-full border border-dark-700 px-2 py-0.5 text-[11px] text-dark-400">
-          {content.badge}
-        </span>
-      </div>
-
-      <p className="text-sm leading-relaxed text-dark-300 whitespace-pre-line">{content.guideText}</p>
     </div>
   );
 }
@@ -2021,9 +1997,6 @@ export default function GMDashboard({
               onSubPhaseChange={advanceSubPhase}
               advancing={advancing}
             />
-
-            {/* 페이즈 안내 */}
-            {phaseContent && <PhaseGuide content={phaseContent} />}
 
             {/* 세션 관리 */}
             <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">

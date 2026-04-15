@@ -107,13 +107,15 @@ export default async function GameCoverPage({
             </div>
           )}
 
+          {/* 일부공개 커버는 링크를 받은 플레이어를 위한 진입점이라 '플레이어 참여'만 노출.
+              이후 세션 진입 퍼널(/play/[id]/join)은 공개 경로와 동일. GM이 필요하면 URL 직접 진입으로만 허용. */}
           <div className="mt-8">
             {game.access.visibility === "unlisted" ? (
               <Link
                 href={`/play/${game.id}/join`}
                 className="inline-flex w-full items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-5 py-3.5 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
               >
-                게임 참여
+                플레이어 참여
               </Link>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

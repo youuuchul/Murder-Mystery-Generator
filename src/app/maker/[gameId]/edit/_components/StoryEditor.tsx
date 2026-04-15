@@ -165,16 +165,6 @@ export default function StoryEditor({
           />
         </Field>
 
-        <Field label="오프닝 진행 가이드">
-          <textarea
-            rows={4}
-            value={opening.gmNote ?? ""}
-            onChange={(e) => onChangeOpening({ ...opening, gmNote: e.target.value || undefined })}
-            placeholder="영상 재생, 오프닝 텍스트 낭독, 첫 안내 순서 등을 간단히 정리하세요."
-            className={ta}
-          />
-        </Field>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="오프닝 영상 URL">
             <input

@@ -301,7 +301,6 @@ export interface ScriptSegment {
   narration: string;
   videoUrl?: string;
   backgroundMusic?: string;
-  gmNote?: string; // 해당 페이즈의 GM 메인 화면 메모
 }
 
 export interface RoundScript {
@@ -311,7 +310,6 @@ export interface RoundScript {
   imageUrl?: string;
   videoUrl?: string;
   backgroundMusic?: string;
-  gmNote?: string; // 해당 라운드의 GM 메인 화면 메모
 }
 
 export interface Scripts {

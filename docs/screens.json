@@ -294,13 +294,13 @@
       "category": "게임 상세",
       "route": "/game/[gameId]",
       "file": "src/app/game/[gameId]/page.tsx",
-      "purpose": "unlisted 게임 커버. 토큰 URL 공유용 미리보기.",
-      "components": [],
+      "purpose": "게임 커버. 공개는 GM/플레이어 2-버튼, 일부공개는 링크 공유 대상을 플레이어로 한정해 '플레이어 참여'만 노출.",
+      "components": ["CoverHero"],
       "dependencies": ["Supabase games"],
-      "auth": "공개(visibility 따라 제한)",
+      "auth": "공개/일부공개(비공개는 소유자만)",
       "backlog": [],
-      "reviewedAt": "2026-04-14",
-      "notes": ""
+      "reviewedAt": "2026-04-15",
+      "notes": "일부공개는 플레이어 전용 진입점. 이후 세션 진입 퍼널(/play/[gameId]/join)은 공개 경로와 동일."
     },
     {
       "id": "P-013",

@@ -250,7 +250,6 @@ function createEmptyRoundScript(round: number): RoundScript {
     unlockedLocationIds: [],
     videoUrl: undefined,
     backgroundMusic: undefined,
-    gmNote: undefined,
   };
 }
 
@@ -263,7 +262,6 @@ export function createEmptyScriptSegment(): ScriptSegment {
     narration: "",
     videoUrl: undefined,
     backgroundMusic: undefined,
-    gmNote: undefined,
   };
 }
 

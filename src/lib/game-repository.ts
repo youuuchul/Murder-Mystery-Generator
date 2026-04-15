@@ -292,7 +292,6 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       narration: row.narration || "",
       videoUrl: row.video_url || undefined,
       backgroundMusic: row.background_music || undefined,
-      gmNote: row.gm_note || undefined,
     };
   }
 
@@ -428,7 +427,6 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
         imageUrl: s.image_url ?? undefined,
         videoUrl: s.video_url ?? undefined,
         backgroundMusic: s.background_music ?? undefined,
-        gmNote: s.gm_note ?? undefined,
       })),
       vote: toScriptSegment(scriptMap.get("vote")),
       ending: toScriptSegment(scriptMap.get("ending")),
@@ -632,7 +630,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
     scriptRows.push({
       game_id: gameId, phase, round_number: 0,
       narration: seg.narration || "", video_url: seg.videoUrl ?? null,
-      background_music: seg.backgroundMusic ?? null, gm_note: seg.gmNote ?? null,
+      background_music: seg.backgroundMusic ?? null,
       unlocked_location_ids: [],
     });
   }
@@ -641,7 +639,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       game_id: gameId, phase: "round", round_number: rs.round,
       narration: rs.narration || "", image_url: rs.imageUrl ?? null,
       video_url: rs.videoUrl ?? null, background_music: rs.backgroundMusic ?? null,
-      gm_note: rs.gmNote ?? null, unlocked_location_ids: rs.unlockedLocationIds ?? [],
+      unlocked_location_ids: rs.unlockedLocationIds ?? [],
     });
   }
   if (scriptRows.length > 0) {

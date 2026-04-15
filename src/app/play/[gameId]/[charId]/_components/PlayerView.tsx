@@ -2527,48 +2527,6 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
         {/* ── 캐릭터 카드 ── */}
         {tab === "character" && (
           <div className="space-y-4">
-            {/* 승리 조건은 오프닝 안내 때 확인하면 충분하고, 게임 중 카드 재확인 시
-                옆사람에게 노출되면 몰입이 깨지므로 기본 접힘. 엔딩 페이즈에선 자동 펼침.
-                (사용자가 수동으로 연 경우에도 계속 펼친 상태 유지) */}
-            {(() => {
-              const isEndingPhase = sharedState?.phase === "ending";
-              const expanded = isEndingPhase || showVictoryCondition;
-              const colorClass = VICTORY_COLOR[character.victoryCondition] ?? "border-dark-700 bg-dark-900";
-
-              if (!expanded) {
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setShowVictoryCondition(true)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-dashed border-dark-700 bg-dark-900/40 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
-                  >
-                    <span className="text-xs text-dark-400">승리 조건 (탭해서 확인)</span>
-                    <span aria-hidden className="text-dark-500 text-lg leading-none">＋</span>
-                  </button>
-                );
-              }
-
-              return (
-                <div className={`p-4 rounded-xl border ${colorClass}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs opacity-70">승리 조건</p>
-                    {!isEndingPhase && (
-                      <button
-                        type="button"
-                        onClick={() => setShowVictoryCondition(false)}
-                        className="text-xs opacity-60 hover:opacity-100 transition-opacity"
-                      >
-                        숨기기
-                      </button>
-                    )}
-                  </div>
-                  <p className="font-bold text-base">{VICTORY_LABEL[character.victoryCondition] ?? character.victoryCondition}</p>
-                  {character.victoryCondition === "personal-goal" && character.personalGoal && (
-                    <p className="text-sm mt-2 opacity-80">{character.personalGoal}</p>
-                  )}
-                </div>
-              );
-            })()}
             <div className="flex gap-1 bg-dark-900 p-1 rounded-xl border border-dark-800">
               {(["profile", "people", "timeline"] as CharacterPanel[]).map((panel) => {
                 const disabled = panel === "timeline" && (!game.story.timeline.enabled || game.story.timeline.slots.length === 0);
@@ -2610,6 +2568,47 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                     {character.background || "입력된 배경이 없습니다."}
                   </p>
                 </div>
+                {/* 승리 조건 — 배경과 상세 스토리 사이에 두어 프로필 컨텍스트 안에서 열람.
+                    옆사람 노출 방지를 위해 기본 접힘, 엔딩 페이즈에선 자동 펼침. */}
+                {(() => {
+                  const isEndingPhase = sharedState?.phase === "ending";
+                  const expanded = isEndingPhase || showVictoryCondition;
+                  const colorClass = VICTORY_COLOR[character.victoryCondition] ?? "border-dark-800 bg-dark-900";
+
+                  if (!expanded) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setShowVictoryCondition(true)}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-dashed border-dark-700 bg-dark-900/40 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
+                      >
+                        <span className="text-xs text-dark-400">승리 조건 (탭해서 확인)</span>
+                        <span aria-hidden className="text-dark-500 text-lg leading-none">＋</span>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div className={`rounded-xl border p-4 space-y-2 ${colorClass}`}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs opacity-70">승리 조건</p>
+                        {!isEndingPhase && (
+                          <button
+                            type="button"
+                            onClick={() => setShowVictoryCondition(false)}
+                            className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+                          >
+                            숨기기
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold">{VICTORY_LABEL[character.victoryCondition] ?? character.victoryCondition}</p>
+                      {character.victoryCondition === "personal-goal" && character.personalGoal && (
+                        <p className="text-sm opacity-80 leading-relaxed whitespace-pre-line">{character.personalGoal}</p>
+                      )}
+                    </div>
+                  );
+                })()}
                 {character.story ? (
                   <PrivateTextToggle
                     title="상세 스토리 (본인만 열람)"

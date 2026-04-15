@@ -26,7 +26,6 @@ interface SegmentGuidance {
   intro: string;
   narrationPrompt: string;
   narrationExample: string;
-  guideExample: string;
 }
 
 const textareaClass =
@@ -38,33 +37,28 @@ const inputClass =
 const SEGMENT_GUIDANCE: Record<"lobby" | "opening" | "ending" | "endingSuccess" | "endingFail", SegmentGuidance> = {
   lobby: {
     intro: "대기실은 입장 확인과 시작 직전 안내에 집중하면 됩니다.",
-    narrationPrompt: "참가자들이 준비를 마칠 때 GM이 읽어 줄 짧은 안내 문구를 적어주세요.",
+    narrationPrompt: "참가자들이 준비를 마칠 때 공통 화면에 띄울 짧은 안내 문구를 적어주세요.",
     narrationExample: "모든 참가자 입장을 확인합니다.\n캐릭터 선택과 이름 입력이 끝나면 곧 오프닝을 시작합니다.",
-    guideExample: "1. 접속 완료 인원 확인\n2. 세션 코드 재안내\n3. 준비가 끝나면 오프닝으로 이동",
   },
   opening: {
     intro: "오프닝은 사건 분위기와 현재 상황을 한 번에 잡아주는 구간입니다.",
     narrationPrompt: "사건 발생 시점, 장소 분위기, 플레이어가 처음 받아야 할 인상을 중심으로 작성하세요.",
     narrationExample: "밤이 깊어질 무렵, 저택의 거실에 모두가 다시 모였습니다.\n잠시 후 한 비명이 울리고, 평온하던 저녁은 사건의 시작으로 바뀝니다.",
-    guideExample: "1. 오프닝 영상 또는 음악 재생\n2. 사건 설명 낭독\n3. 피해자 정보와 첫 행동 규칙 안내",
   },
   ending: {
     intro: "공통 엔딩은 결과와 무관하게 모든 플레이어가 같이 듣는 마무리 문장입니다.",
     narrationPrompt: "결과 공개 직전 분위기를 정리하는 문장이나 사건을 닫는 공통 문장을 작성하세요.",
     narrationExample: "모든 선택이 끝났습니다.\n이제 사건의 결말과 각자의 선택이 어떤 결과를 만들었는지 확인합니다.",
-    guideExample: "1. 결과 공개 전 주목 유도\n2. 공통 엔딩 낭독\n3. 이후 성공/실패 분기 엔딩으로 연결",
   },
   endingSuccess: {
     intro: "검거 성공 엔딩은 단서가 어떻게 맞물렸는지 보여주는 구간입니다.",
     narrationPrompt: "범인이 특정된 이유와 사건이 정리되는 느낌을 중심으로 써주세요.",
     narrationExample: "흩어져 있던 단서들이 하나로 이어지며 범인의 동선이 드러났습니다.\n마침내 방 안의 침묵은 진실을 인정하는 순간으로 바뀝니다.",
-    guideExample: "1. 핵심 단서 연결 요약\n2. 범인 검거 결과 설명\n3. 플레이어 승점 정리로 연결",
   },
   endingFail: {
     intro: "도주 성공 엔딩은 왜 수사가 실패했는지와 남는 여운을 정리하는 편이 좋습니다.",
     narrationPrompt: "결정적 증거가 부족했던 이유와 범인이 빠져나간 뒤의 분위기를 써주세요.",
     narrationExample: "결정적인 한 조각이 끝내 맞춰지지 않았고, 범인은 혼란 속에서 흔적을 지웠습니다.\n남겨진 사람들은 늦게 도착한 진실의 조각만 바라보게 됩니다.",
-    guideExample: "1. 실패 원인 또는 놓친 단서 언급\n2. 범인 도주 결과 설명\n3. 플레이어 승점 정리로 연결",
   },
 };
 
@@ -76,25 +70,17 @@ function hasContent(value?: string): boolean {
 }
 
 /**
- * 나레이션/가이드 기준으로 세그먼트 작성 상태를 계산한다.
+ * 안내 텍스트 기준으로 세그먼트 작성 상태를 계산한다.
  */
 function getSegmentStatus(segment: ScriptSegment): EditorStatus {
-  const filled = [segment.narration, segment.gmNote].filter(hasContent).length;
-
-  if (filled === 0) return "empty";
-  if (filled === 2) return "complete";
-  return "partial";
+  return hasContent(segment.narration) ? "complete" : "empty";
 }
 
 /**
- * 라운드 스크립트의 핵심 필드 작성 상태를 계산한다.
+ * 라운드 스크립트 작성 상태를 라운드 이벤트 기준으로 계산한다.
  */
 function getRoundStatus(round: RoundScript): EditorStatus {
-  const filled = [round.narration, round.gmNote].filter(hasContent).length;
-
-  if (filled === 0) return "empty";
-  if (filled === 2) return "complete";
-  return "partial";
+  return hasContent(round.narration) ? "complete" : "empty";
 }
 
 /**
@@ -199,16 +185,14 @@ function MediaLinkField({
 
 function SegmentEditor({
   label,
-  phaseLabel,
   segment,
   guidance,
   onChange,
   textLabel,
-  textBadgeLabel = "나레이션",
+  textBadgeLabel = "안내 텍스트",
   hideTextField = false,
 }: {
   label: string;
-  phaseLabel: string;
   segment: ScriptSegment;
   guidance: SegmentGuidance;
   onChange: (segment: ScriptSegment) => void;
@@ -218,7 +202,6 @@ function SegmentEditor({
 }) {
   const status = getSegmentStatus(segment);
   const hasNarration = hasContent(segment.narration);
-  const hasGuide = hasContent(segment.gmNote);
   const hasMusic = hasContent(segment.backgroundMusic);
   const hasVideo = hasContent(segment.videoUrl);
 
@@ -237,9 +220,6 @@ function SegmentEditor({
           <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
           </span>
-          <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-            진행 가이드 {hasGuide ? "작성됨" : "미작성"}
-          </span>
           <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
           </span>
@@ -251,7 +231,7 @@ function SegmentEditor({
 
       {!hideTextField && (
         <div>
-          <FieldHeader label={textLabel ?? `${label} 나레이션`} filled={hasNarration} />
+          <FieldHeader label={textLabel ?? `${label} 안내 텍스트`} filled={hasNarration} />
           <textarea
             rows={8}
             value={segment.narration}
@@ -271,26 +251,6 @@ function SegmentEditor({
           )}
         </div>
       )}
-
-      <div>
-        <FieldHeader label={`${phaseLabel} 진행 가이드`} filled={hasGuide} />
-        <textarea
-          rows={5}
-          value={segment.gmNote ?? ""}
-          onChange={(e) => onChange({ ...segment, gmNote: e.target.value || undefined })}
-          placeholder="GM이 실제로 확인할 진행 순서, 주의사항, 다음 전환 조건을 적어주세요."
-          className={textareaClass}
-        />
-        {!hasGuide && (
-          <div className="mt-3">
-            <ExamplePanel
-              title="예시 진행 가이드"
-              description="GM 화면에 그대로 보이므로 체크리스트처럼 짧게 쓰는 편이 읽기 쉽습니다."
-              example={guidance.guideExample}
-            />
-          </div>
-        )}
-      </div>
 
       <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -344,7 +304,6 @@ function RoundScriptForm({
   const unlockedLocations = locations.filter((location) => location.unlocksAtRound === round.round);
   const status = getRoundStatus(round);
   const hasNarration = hasContent(round.narration);
-  const hasGuide = hasContent(round.gmNote);
   const hasMusic = hasContent(round.backgroundMusic);
   const hasVideo = hasContent(round.videoUrl);
 
@@ -374,13 +333,10 @@ function RoundScriptForm({
                 <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
                   라운드 이벤트 {hasNarration ? "작성됨" : "미작성"}
                 </span>
-                <span className={`rounded-full border px-2 py-0.5 ${hasGuide ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-                  진행 가이드 {hasGuide ? "작성됨" : "미작성"}
-                </span>
               </div>
             </div>
             <p className="text-xs text-dark-500">
-              각 라운드는 시작 멘트, 열린 장소 안내, 종료 직전 공지 순서로 적으면 읽기 편합니다.
+              라운드 이벤트는 시작 멘트, 열린 장소, 종료 직전 공지 순서로 적으면 읽기 편합니다.
             </p>
           </div>
 
@@ -421,26 +377,6 @@ function RoundScriptForm({
                     {location.name || "이름 없는 장소"}
                   </span>
                 ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <FieldHeader label={`Round ${round.round} 진행 가이드`} filled={hasGuide} />
-            <textarea
-              rows={4}
-              value={round.gmNote ?? ""}
-              onChange={(e) => onChange({ ...round, gmNote: e.target.value || undefined })}
-              placeholder={`Round ${round.round}에서 GM이 확인할 진행 순서와 종료 기준을 적어주세요.`}
-              className={textareaClass}
-            />
-            {!hasGuide && (
-              <div className="mt-3">
-                <ExamplePanel
-                  title={`Round ${round.round} 진행 가이드 예시`}
-                  description="GM 전용 체크리스트처럼 짧게 적어 두면 실제 세션에서 읽기가 빠릅니다."
-                  example={`1. 라운드 시작 선언\n2. 열린 장소 확인\n3. 종료 3분 전 공지\n4. 타이머 종료 후 다음 단계 준비`}
-                />
               </div>
             )}
           </div>
@@ -536,7 +472,6 @@ export default function ScriptEditor({
           imageUrl: undefined,
           videoUrl: undefined,
           backgroundMusic: undefined,
-          gmNote: undefined,
         }
       );
     }
@@ -625,7 +560,6 @@ export default function ScriptEditor({
       {activeTab === "lobby" && (
         <SegmentEditor
           label="대기실"
-          phaseLabel="대기실"
           segment={scripts.lobby}
           guidance={SEGMENT_GUIDANCE.lobby}
           onChange={(lobby) => onChange({ ...scripts, lobby })}

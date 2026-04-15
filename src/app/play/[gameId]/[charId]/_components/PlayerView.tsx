@@ -204,9 +204,22 @@ function CollapsibleSection({
 function PrivateTextToggle({ title, content }: { title: string; content: string }) {
   if (!content.trim()) return null;
 
+  const lines = content.split("\n");
+  const nonEmpty = lines.filter((line) => line.trim().length > 0);
+  const bulletLines = nonEmpty.filter((line) => /^\s*[-•]\s+/.test(line));
+  const isBulletList = nonEmpty.length >= 2 && bulletLines.length === nonEmpty.length;
+
   return (
     <CollapsibleSection title={title}>
-      <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
+      {isBulletList ? (
+        <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-dark-200 marker:text-dark-500">
+          {nonEmpty.map((line, idx) => (
+            <li key={idx}>{line.replace(/^\s*[-•]\s+/, "")}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm leading-relaxed text-dark-200 whitespace-pre-line">{content}</p>
+      )}
     </CollapsibleSection>
   );
 }

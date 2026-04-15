@@ -645,12 +645,15 @@ function PlayerForm({
                   비밀 정보
                 </label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   value={player.secret}
                   onChange={(e) => update("secret", e.target.value)}
-                  placeholder="후반 공개용 비밀, 숨긴 행동, 진범 여부와 연결되는 핵심 정보를 적으세요."
+                  placeholder={"한 줄마다 ‘-’로 시작하는 간단한 사실 단위로 적으세요.\n예)\n- 피해자와 3주 전 금전 관계로 크게 다툼\n- 사건 당일 03:10 뒷문으로 몰래 진입\n- 진범은 아님. 다만 흉기를 숨겨줬음"}
                   className={ta}
                 />
+                <p className="mt-1 text-[11px] text-dark-500">
+                  서술형 문단보다 ‘-’ 불릿형 사실 리스트가 GM/플레이어가 빠르게 훑기 좋고, AI 도우미가 문안을 뽑을 때도 구조를 재활용하기 쉽습니다.
+                </p>
               </div>
             </div>
           )}

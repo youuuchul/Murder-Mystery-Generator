@@ -8,7 +8,7 @@ import {
   type MakerAssistantTask,
 } from "@/types/assistant";
 
-type DraftWritingProfile = "narrative_prose" | "descriptive_copy" | "gm_guide";
+type DraftWritingProfile = "narrative_prose" | "descriptive_copy" | "gm_guide" | "bullet_facts";
 
 interface DraftIntent {
   targetLabel: string;
@@ -192,7 +192,15 @@ function getDraftFocusHint(currentStep: number): string {
 function inferDraftIntent(message: string | undefined, currentStep: number): DraftIntent {
   const normalized = message?.trim() ?? "";
 
-  if (/(오프닝|스토리\s*텍스트|사건\s*개요|상세\s*스토리|비밀|반전|엔딩|배경|피해자\s*배경|npc\s*소개|인물\s*소개)/iu.test(normalized)) {
+  // 비밀 정보는 후반 공개용 사실 리스트라 산문보다 불릿형 사실 단위가 재활용하기 쉽다.
+  if (/(비밀|반전)/iu.test(normalized)) {
+    return {
+      targetLabel: detectDraftTargetLabel(normalized, currentStep),
+      profile: "bullet_facts",
+    };
+  }
+
+  if (/(오프닝|스토리\s*텍스트|사건\s*개요|상세\s*스토리|엔딩|배경|피해자\s*배경|npc\s*소개|인물\s*소개)/iu.test(normalized)) {
     return {
       targetLabel: detectDraftTargetLabel(normalized, currentStep),
       profile: "narrative_prose",
@@ -246,6 +254,14 @@ function getDraftStyleRules(intent: DraftIntent): string[] {
         "- 진행 순서와 안내가 핵심이므로 직접적인 말투를 사용할 수 있다.",
         "- 다만 설정 요약이나 플레이어 수 같은 불필요한 메타 정보는 반복하지 않는다.",
       ];
+    case "bullet_facts":
+      return [
+        "- 본문은 '-'로 시작하는 불릿 목록으로만 작성한다. 서두, 마무리, 도입 문단을 넣지 않는다.",
+        "- 각 항목은 한 줄짜리 사실 단위로 끊고, 감정 묘사나 분위기 형용사는 생략한다.",
+        "- 한 항목에 한 가지 사실만 담고, 시간/장소/행동/동기처럼 추적 가능한 구체 정보를 넣는다.",
+        "- 3~7개 항목으로 제한하고, 중복되는 내용은 합친다.",
+        "- 진범 여부, 알리바이의 허점, 은폐한 증거처럼 '후반 공개 시 판이 흔들리는' 정보 위주로 고른다.",
+      ];
   }
 }
 
@@ -283,6 +299,21 @@ function buildDraftPromptContext(context: MakerAssistantContext, intent: DraftIn
       ...baseContext,
       players: context.players,
       locations: context.locations,
+      clues: context.clues,
+    };
+  }
+
+  if (intent.profile === "bullet_facts") {
+    // 비밀 정보는 같은 캐릭터의 배경/상세 스토리와 다른 플레이어 관계가 핵심 단서이므로 이것만 유지한다.
+    return {
+      ...baseContext,
+      players: (context.players ?? []).map((player) => ({
+        id: player.id,
+        name: player.name,
+        background: player.background,
+        story: player.story,
+        secret: player.secret,
+      })),
       clues: context.clues,
     };
   }

@@ -93,7 +93,7 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     }
 
     if (secretlessPlayers > 0) {
-      addIssue(issues, 3, "warning", `비밀 / 반전 정보가 비어 있는 캐릭터가 ${secretlessPlayers}명 있습니다.`);
+      addIssue(issues, 3, "warning", `비밀 정보가 비어 있는 캐릭터가 ${secretlessPlayers}명 있습니다.`);
     }
 
     if (timelineMissingPlayers > 0) {

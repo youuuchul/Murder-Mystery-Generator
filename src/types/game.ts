@@ -202,8 +202,8 @@ export interface Player {
   personalGoal?: string; // victoryCondition === "personal-goal"일 때 목표 설명
   scoreConditions: ScoreCondition[]; // 승점 조건 목록
   background: string; // 캐릭터 배경 (전원 공개)
-  story: string; // 캐릭터 상세 스토리 (본인만 열람)
-  secret: string; // 비밀 / 반전 정보 (본인만 열람)
+  story: string; // 캐릭터 상세 스토리
+  secret: string; // 비밀 정보
   /** legacy field — 기존 데이터 호환용 */
   alibi?: string;
   timelineEntries: PlayerTimelineEntry[]; // 슬롯별 행동 타임라인
@@ -394,6 +394,8 @@ export interface VoteQuestion {
   description?: string;
   targetMode: VoteTargetMode;
   purpose: VoteQuestionPurpose;              // ending = 엔딩 결정, personal = 개인 목표
+  /** purpose === "personal"일 때, 이 질문을 받을 플레이어 ID. 미지정이면 전원에게 표시한다. */
+  personalTargetPlayerId?: string;
   sortOrder: number;
   triggerCondition?: VoteQuestionTriggerCondition; // 2차 투표 트리거 조건
   preStoryText?: string;                     // 2차 투표 전 스토리 텍스트

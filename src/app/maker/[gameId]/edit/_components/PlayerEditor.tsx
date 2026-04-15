@@ -627,7 +627,7 @@ function PlayerForm({
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
-                  상세 스토리 <span className="text-mystery-500">(본인만 열람)</span>
+                  상세 스토리
                 </label>
                 <textarea
                   rows={5}
@@ -642,7 +642,7 @@ function PlayerForm({
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
-                  비밀 / 반전 정보 <span className="text-mystery-500">(본인만 열람)</span>
+                  비밀 정보
                 </label>
                 <textarea
                   rows={4}

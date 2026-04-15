@@ -501,6 +501,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
 
         const isAdvanced = game.advancedVotingEnabled && questionVotes && Object.keys(questionVotes).length > 0;
+        const hasBasicVote = Boolean(targetPlayerId);
+        const hasPersonalVotes = !isAdvanced && questionVotes && Object.keys(questionVotes).length > 0;
 
         if (isAdvanced) {
           // 고급 투표: 질문별 저장
@@ -523,9 +525,20 @@ export async function POST(req: NextRequest, { params }: Params) {
           latestSession.sharedState.voteCount = latestSession.sharedState.voteCount ?? 0;
 
           const alreadyVoted = token in latestSession.votes;
-          latestSession.votes[token] = targetPlayerId!;
+          if (hasBasicVote) {
+            latestSession.votes[token] = targetPlayerId!;
+          }
 
-          if (!alreadyVoted) {
+          // 개인 목표 질문은 별도 저장 (고급 투표 경로와 동일한 advancedVotes 맵을 재활용)
+          if (hasPersonalVotes) {
+            latestSession.advancedVotes = latestSession.advancedVotes ?? {};
+            latestSession.advancedVotes[token] = {
+              ...(latestSession.advancedVotes[token] ?? {}),
+              ...questionVotes,
+            };
+          }
+
+          if (!alreadyVoted && hasBasicVote) {
             latestSession.sharedState.voteCount++;
             latestSession.sharedState.eventLog.push({
               id: crypto.randomUUID(),

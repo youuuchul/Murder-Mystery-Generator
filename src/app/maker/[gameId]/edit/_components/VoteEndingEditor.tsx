@@ -184,6 +184,26 @@ function VoteQuestionForm({
             />
           </div>
 
+          {/* 개인 목표 투표 대상 플레이어 */}
+          {question.purpose === "personal" && (
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">이 개인 투표를 받을 플레이어</label>
+              <select
+                value={question.personalTargetPlayerId ?? ""}
+                onChange={(e) => onChange({ personalTargetPlayerId: e.target.value || undefined })}
+                className={inp}
+              >
+                <option value="">-- 플레이어 선택 (미지정 시 전원에게 표시) --</option>
+                {players.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name || "(이름 없음)"}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-dark-600">
+                지정한 플레이어에게만 투표 화면 하단에 이 개인 투표가 표시됩니다.
+              </p>
+            </div>
+          )}
+
           {/* 투표 대상 */}
           <div>
             <label className="block text-xs text-dark-500 mb-1">투표 대상</label>

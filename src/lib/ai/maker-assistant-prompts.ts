@@ -174,7 +174,7 @@ function getDraftFocusHint(currentStep: number): string {
     case 2:
       return "오프닝 내레이션, 사건 개요, 피해자 배경, NPC 소개";
     case 3:
-      return "캐릭터 배경, 상세 스토리, 비밀/반전 정보";
+      return "캐릭터 배경, 상세 스토리, 비밀 정보";
     case 4:
       return "장소 설명, 단서 카드 본문, 조건 힌트";
     case 5:
@@ -350,7 +350,7 @@ function detectDraftTargetLabel(message: string, currentStep: number): string {
   if (/피해자\s*배경/u.test(message)) return "피해자 배경";
   if (/npc\s*소개|인물\s*소개/u.test(message)) return "NPC/인물 소개";
   if (/상세\s*스토리/u.test(message)) return "상세 스토리";
-  if (/비밀|반전/u.test(message)) return "비밀 / 반전 정보";
+  if (/비밀|반전/u.test(message)) return "비밀 정보";
   if (/엔딩/u.test(message)) return "엔딩 텍스트";
   if (/단서|카드/u.test(message)) return "단서 카드 텍스트";
   if (/장소/u.test(message)) return "장소 설명";

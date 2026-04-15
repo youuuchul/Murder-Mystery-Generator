@@ -394,7 +394,7 @@ function TimelinePanel({
   return (
     <div className="space-y-3">
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-        <p className="text-xs text-dark-500">행동 타임라인 (본인만 열람)</p>
+        <p className="text-xs text-dark-500">행동 타임라인</p>
       </div>
       {filledTimeline.map(({ slot, entry }) => (
         <div key={slot.id} className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
@@ -795,6 +795,16 @@ function VoteScreen({
     ? game.voteQuestions.filter((q) => q.voteRound === currentVoteRound)
     : [];
 
+  // 기본 투표 모드에서 하단에 함께 표시할 개인 목표 질문.
+  // 본인에게 지정됐거나 지정 대상이 없는 1차 개인 질문만 노출한다.
+  const personalQuestions = !isAdvanced
+    ? game.voteQuestions.filter((q) =>
+        q.purpose === "personal"
+        && q.voteRound === 1
+        && (!q.personalTargetPlayerId || q.personalTargetPlayerId === myPlayerId)
+      )
+    : [];
+
   const revoteCandidateIds = sharedState.revoteCandidateIds;
   const revoteCount = sharedState.revoteCount ?? 0;
   const isRevote = Boolean(revoteCandidateIds?.length);
@@ -825,14 +835,18 @@ function VoteScreen({
 
   const allQuestionsAnswered = isAdvanced
     ? activeQuestions.every((q) => questionSelections[q.id])
-    : Boolean(selectedId);
+    : Boolean(selectedId) && personalQuestions.every((q) => questionSelections[q.id]);
 
   async function submitVote() {
     if (!allQuestionsAnswered) return;
     setSubmitting(true);
     const body = isAdvanced
       ? { token, questionVotes: questionSelections }
-      : { token, targetPlayerId: selectedId };
+      : {
+          token,
+          targetPlayerId: selectedId,
+          ...(personalQuestions.length > 0 ? { questionVotes: questionSelections } : {}),
+        };
     const res = await fetch(`/api/sessions/${sessionId}/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1006,9 +1020,61 @@ function VoteScreen({
         ))}
       </div>
 
+      {!isRevote && personalQuestions.length > 0 && (
+        <div className="space-y-4 rounded-xl border border-purple-900/50 bg-purple-950/10 p-4">
+          <div>
+            <p className="text-xs font-medium text-purple-300 tracking-wide uppercase">개인 목표 투표</p>
+            <p className="mt-1 text-xs text-dark-500">
+              본인에게만 표시되는 개인 목표 질문입니다. 함께 제출해 주세요.
+            </p>
+          </div>
+          {personalQuestions.map((q) => {
+            const targets = q.targetMode === "custom-choices"
+              ? q.choices.map((c) => ({ id: c.id, name: c.label, image: undefined as string | undefined }))
+              : q.targetMode === "players-and-npcs"
+              ? [
+                  ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
+                  ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
+                ]
+              : game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage }));
+
+            return (
+              <div key={q.id} className="space-y-2">
+                <p className="text-sm font-semibold text-dark-100">{q.label || "개인 목표 질문"}</p>
+                {q.description && <p className="text-xs text-dark-500">{q.description}</p>}
+                <div className="space-y-2">
+                  {targets.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setQuestionSelection(q.id, t.id)}
+                      className={[
+                        "w-full rounded-xl border px-4 py-3 text-left transition-all",
+                        questionSelections[q.id] === t.id
+                          ? "border-purple-500 bg-purple-950/40 ring-1 ring-purple-500"
+                          : "border-dark-700 bg-dark-900 hover:border-dark-500",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center gap-3">
+                        {t.image ? (
+                          <div className="w-12 shrink-0">
+                            <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
+                          </div>
+                        ) : null}
+                        <p className="text-sm font-medium text-dark-100">{t.name}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <button
         onClick={submitVote}
-        disabled={!selectedId || submitting}
+        disabled={!allQuestionsAnswered || submitting}
         className="w-full py-3.5 bg-mystery-700 hover:bg-mystery-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-40"
       >
         {submitting ? "제출 중…" : "투표 제출"}
@@ -1626,7 +1692,7 @@ function SharedBoardPanel({
         phase={phase}
       />
 
-      {content.narrationBlocks.map((block) => (
+      {phase !== "opening" && content.narrationBlocks.map((block) => (
         <div key={block.label} className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
           <p className="text-xs text-dark-500">{block.label}</p>
           <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-dark-200">{block.text}</p>
@@ -1688,11 +1754,7 @@ function SharedBoardPanel({
             </div>
           ) : null}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
-          현재 페이즈에 공개된 공통 화면 자료가 없습니다.
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -2517,9 +2579,6 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                 isLobby={false}
               />
             ) : null}
-            <div className="rounded-2xl border border-dashed border-dark-800 bg-dark-900/60 px-4 py-8 text-center text-sm text-dark-500">
-              현재 단계에서 볼 공통 화면이 없습니다.
-            </div>
             <PlayerRoomRosterPanel slots={sharedState.characterSlots} players={game.players} />
           </div>
         )}
@@ -2580,10 +2639,10 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                       <button
                         type="button"
                         onClick={() => setShowVictoryCondition(true)}
-                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-dashed border-dark-700 bg-dark-900/40 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-purple-700/70 bg-purple-950/30 text-left transition-colors hover:border-purple-500 hover:bg-purple-900/40"
                       >
-                        <span className="text-xs text-dark-400">승리 조건 (탭해서 확인)</span>
-                        <span aria-hidden className="text-dark-500 text-lg leading-none">＋</span>
+                        <span className="text-xs font-medium text-purple-200">승리 조건 (탭해서 확인)</span>
+                        <span aria-hidden className="text-purple-300 text-lg leading-none">＋</span>
                       </button>
                     );
                   }
@@ -2611,13 +2670,13 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                 })()}
                 {character.story ? (
                   <PrivateTextToggle
-                    title="상세 스토리 (본인만 열람)"
+                    title="상세 스토리"
                     content={character.story}
                   />
                 ) : null}
                 {character.secret ? (
                   <PrivateTextToggle
-                    title="비밀 / 반전 정보 (본인만 열람)"
+                    title="비밀 정보"
                     content={character.secret}
                   />
                 ) : null}
@@ -2915,7 +2974,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                       </p>
                                     ) : takenByOther ? (
                                       <>
-                                        <p className="text-sm text-dark-600">카드 #{idx + 1}</p>
+                                        <p className="text-sm text-dark-600">{`${loc.name || "장소"} #${idx + 1}`}</p>
                                         <p className="text-xs text-dark-700">다른 플레이어가 보유 중</p>
                                       </>
                                     ) : clue.condition ? (

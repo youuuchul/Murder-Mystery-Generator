@@ -200,7 +200,7 @@ function SegmentEditor({
   textBadgeLabel?: string;
   hideTextField?: boolean;
 }) {
-  const status = getSegmentStatus(segment);
+  const status: EditorStatus = hideTextField ? "complete" : getSegmentStatus(segment);
   const hasNarration = hasContent(segment.narration);
   const hasMusic = hasContent(segment.backgroundMusic);
   const hasVideo = hasContent(segment.videoUrl);
@@ -217,9 +217,11 @@ function SegmentEditor({
         </div>
 
         <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-            {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
-          </span>
+          {!hideTextField && (
+            <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
+              {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
+            </span>
+          )}
           <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
             배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
           </span>
@@ -483,7 +485,7 @@ export default function ScriptEditor({
   const normalizedRounds = ensureRounds(roundCount);
   const roundStatuses = normalizedRounds.map((round) => getRoundStatus(round));
   const tabs: { id: Tab; label: string; status: EditorStatus }[] = [
-    { id: "lobby", label: "대기실", status: getSegmentStatus(scripts.lobby) },
+    { id: "lobby", label: "대기실", status: "complete" as EditorStatus },
     { id: "rounds", label: `라운드 (${roundCount}개)`, status: getRoundsTabStatus(normalizedRounds) },
   ];
 

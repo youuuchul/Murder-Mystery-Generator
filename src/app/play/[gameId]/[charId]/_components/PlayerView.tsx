@@ -698,27 +698,37 @@ function PersonalEndingPanel({
             const isManual = r.achieved === null;
             const achieved = r.achieved === true;
             const failed = r.achieved === false;
+            const isManualDesigned = isManual && (r.condition.type ?? "manual") === "manual";
+            const isMisconfigured = isManual && !isManualDesigned;
             return (
-              <div key={i} className="flex items-center justify-between text-sm gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {achieved && (
-                    <span className="text-xs text-emerald-400 shrink-0">달성</span>
-                  )}
-                  {failed && (
-                    <span className="text-xs text-dark-600 shrink-0">미달성</span>
-                  )}
-                  {isManual && (
-                    <span className="text-xs text-yellow-500/70 shrink-0">수동 확인</span>
-                  )}
-                  <span className={failed ? "text-dark-500 line-through" : "text-dark-300"}>
-                    {r.condition.description || "(설명 없음)"}
+              <div key={i} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-sm gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {achieved && (
+                      <span className="text-xs text-emerald-400 shrink-0">달성</span>
+                    )}
+                    {failed && (
+                      <span className="text-xs text-dark-600 shrink-0">미달성</span>
+                    )}
+                    {isManualDesigned && (
+                      <span className="text-xs text-yellow-500/70 shrink-0">수동 확인</span>
+                    )}
+                    {isMisconfigured && (
+                      <span className="text-xs text-red-400/80 shrink-0">조건 미완성</span>
+                    )}
+                    <span className={failed ? "text-dark-500 line-through" : "text-dark-300"}>
+                      {r.condition.description || "(설명 없음)"}
+                    </span>
+                  </div>
+                  <span className={`font-bold shrink-0 ${
+                    failed ? "text-dark-600" : isManual ? "text-yellow-500/70" : "text-mystery-400"
+                  }`}>
+                    +{r.condition.points}점
                   </span>
                 </div>
-                <span className={`font-bold shrink-0 ${
-                  failed ? "text-dark-600" : isManual ? "text-yellow-500/70" : "text-mystery-400"
-                }`}>
-                  +{r.condition.points}점
-                </span>
+                {r.missingConfigReason && (
+                  <p className="text-[11px] text-red-400/70 pl-1">{r.missingConfigReason}</p>
+                )}
               </div>
             );
           })}

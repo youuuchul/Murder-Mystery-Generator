@@ -6,6 +6,8 @@ export interface ScoreConditionResult {
   condition: ScoreCondition;
   achieved: boolean | null; // null = 수동 판정 (표시 안 함)
   points: number;           // 달성 시 획득 점수 (미달성/수동 시 0)
+  /** 자동 판정 타입인데 config가 비어 결과를 낼 수 없는 경우 안내 문구 */
+  missingConfigReason?: string;
 }
 
 /**
@@ -41,7 +43,15 @@ export function evaluateScoreCondition({
 
   if (type === "clue-ownership") {
     const clueId = condition.config?.clueId;
-    if (!clueId || !inventory) {
+    if (!clueId) {
+      return {
+        condition,
+        achieved: null,
+        points: 0,
+        missingConfigReason: "대상 단서가 선택되지 않아 자동 판정을 건너뜁니다.",
+      };
+    }
+    if (!inventory) {
       return { condition, achieved: null, points: 0 };
     }
     const hasIt = inventory.some((item) => item.cardId === clueId);
@@ -53,7 +63,15 @@ export function evaluateScoreCondition({
   if (type === "vote-answer") {
     const questionId = condition.config?.questionId;
     const expectedAnswerId = condition.config?.expectedAnswerId;
-    if (!questionId || !expectedAnswerId || !myVotes) {
+    if (!questionId || !expectedAnswerId) {
+      return {
+        condition,
+        achieved: null,
+        points: 0,
+        missingConfigReason: "대상 질문 또는 기대 답변이 지정되지 않아 자동 판정을 건너뜁니다.",
+      };
+    }
+    if (!myVotes) {
       return { condition, achieved: null, points: 0 };
     }
     const myAnswer = myVotes[questionId];

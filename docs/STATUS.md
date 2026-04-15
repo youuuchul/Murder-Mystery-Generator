@@ -101,6 +101,7 @@
 ## 미착수 — 우선순위순
 
 ### 🚨 긴급
+- [x] **승점 조건 자동 판정 진단 UI** — `ScoreConditionResult.missingConfigReason` 추가. clue-ownership/vote-answer에서 config가 비어 자동 판정 불가일 때 이유 문자열을 반환. PlayerView 결과 화면에서 설계상 수동(`type==="manual"`)과 조건 미완성(자동 타입인데 config 누락)을 분리 표시. 메이커 ScoreConditionsEditor의 clue-ownership 행에서 clueId 미선택 시 빨간 경고 배너 노출 → 사용자가 대상 단서를 지정해야 엔딩 시 인벤토리 기반 자동 판정이 동작함을 명시. ✅ 완료 (2026-04-15)
 - [x] **플레이 UI 잔버그 일괄 수정** — (1) 오프닝 페이즈 내레이션 중복(opening banner + SharedBoardPanel) 제거: opening일 때 SharedBoardPanel narrationBlocks 숨김. (2) 공통화면 자료 없을 때 placeholder 박스 제거. (3) "보유됨" 단서 라벨을 `카드 #N` 하드코딩에서 `{장소명} #N`으로 교체. (4) 메이커 스텝 대기실: `hideTextField` 시 텍스트 뱃지/상태를 작성완료로 처리. (5) 개인 투표 통합: `VoteQuestion.personalTargetPlayerId` 추가 → 메이커 VoteQuestionForm에 플레이어 선택 UI, 플레이어 기본 범인투표 하단에 본인용 개인 질문 렌더 + 동시 제출, 서버 vote route basic + questionVotes 동시 수락. (6) UI 정리: 승리조건 접힘 버튼 보라 강조, "(본인만 열람)" 라벨 전부 삭제, "비밀 / 반전 정보" → "비밀 정보"로 메이커/플레이어/검증/AI 프롬프트 통일. ✅ 완료 (2026-04-15)
 - [x] **모바일 첫 진입 뷰포트 확대 이슈** — `src/app/layout.tsx`에 viewport meta export 누락이 주 원인. Next.js App Router `viewport` export(`width=device-width, initial-scale=1, viewport-fit=cover`) 추가. `globals.css`에 `html,body { overflow-x: hidden; max-width: 100vw }` 보강(iOS Safari가 html에 걸려있지 않으면 자식 overflow-x-hidden 무시 케이스 회피). 부수 발견: `/library/manage/my-sessions` · `/library/manage/sessions` 검색 input이 `min-w-[18rem]`로 고정돼 320px 기기에서 overflow → `w-full sm:w-auto sm:min-w-[18rem]`로 교체. 렌더된 HTML에 viewport meta 삽입 검증. ✅ 완료 (2026-04-15)
 

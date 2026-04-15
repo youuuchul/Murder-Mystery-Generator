@@ -1073,6 +1073,11 @@ function ScoreConditionsEditor({
                     ))}
                   </select>
                 </div>
+                {!sc.config?.clueId && (
+                  <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
+                    대상 단서를 선택해야 엔딩 시 자동 판정이 됩니다. 미선택 시 결과 화면에서 조건 미완성으로 표시됩니다.
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
                   <label className="text-[11px] text-dark-500 shrink-0">조건</label>
                   <select

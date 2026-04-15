@@ -191,9 +191,10 @@ export default function useMakerAssistant({
 
             if (eventType === "chunk" && "text" in data) {
               streamedText += data.text;
+              const displayText = extractStreamingDisplay(streamedText);
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === streamingMsgId ? { ...m, content: streamedText } : m
+                  m.id === streamingMsgId ? { ...m, content: displayText } : m
                 )
               );
             } else if (eventType === "done" && "result" in data) {
@@ -269,6 +270,33 @@ export default function useMakerAssistant({
  * Responses API의 server-side conversation state 대신,
  * 최근 대화 몇 턴을 직접 prompt에 붙일 수 있도록 가벼운 이력만 추린다.
  */
+/**
+ * 스트리밍 도중 화면에 노출할 본문 텍스트를 뽑아낸다.
+ * guide/draft 모드 모두 SUMMARY/BODY 본문만 읽고, 이후 구조 마커(FINDINGS/ACTIONS/QUESTIONS/NOTES 등)나
+ * 파이프 포맷 라인(FINDING|, ACTION|, QUESTION|, NOTE|)은 UI에서 감춘다.
+ * 섹션 시작 마커가 아직 도착하지 않은 구간은 "응답 생성 중…"으로 대체해 날 텍스트를 노출하지 않는다.
+ */
+function extractStreamingDisplay(raw: string): string {
+  if (!raw) return "";
+
+  const bodyMatch = raw.match(/(?:^|\n)BODY:\s*\n?([\s\S]*?)(?:\n(?:NOTES|NOTE|TITLE):|$)/i);
+  if (bodyMatch) {
+    return bodyMatch[1].trim();
+  }
+
+  const summaryMatch = raw.match(/(?:^|\n)SUMMARY:\s*\n?([\s\S]*?)(?:\n(?:FINDINGS|ACTIONS|QUESTIONS|FINDING|ACTION|QUESTION)\b|$)/i);
+  if (summaryMatch) {
+    return summaryMatch[1].trim();
+  }
+
+  const titleOnlyMatch = raw.match(/(?:^|\n)TITLE:\s*\n?(.*?)(?:\n|$)/i);
+  if (titleOnlyMatch && !raw.includes("BODY:")) {
+    return titleOnlyMatch[1].trim();
+  }
+
+  return "응답 생성 중…";
+}
+
 function buildConversationHistory(messages: MakerAssistantChatMessage[]): MakerAssistantConversationTurn[] {
   return messages.slice(-8).map((message) => ({
     role: message.role,

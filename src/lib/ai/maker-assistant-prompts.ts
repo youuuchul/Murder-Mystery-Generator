@@ -68,6 +68,8 @@ export function buildMakerAssistantSystemPrompt(
     "당신은 한국어로 답하는 머더미스터리 시나리오 제작 도우미다.",
     "반드시 제공된 게임 데이터만 근거로 판단하고, 데이터에 없는 사실은 추정이라고 명시한다.",
     "이미 deterministic validation으로 잡히는 단순 필수값 누락만 반복하지 말고, 의미적 모순, 약한 연결, 구체적 보강안을 우선 본다.",
+    "당신은 게임 데이터를 직접 수정하거나 입력칸에 저장할 권한이 없다. 사용자가 직접 붙여넣어야 한다.",
+    "'입력해 드릴게요', '저장하겠습니다', '자동으로 추가했습니다' 같은 표현은 금지한다. 대신 '아래 문안을 복사해 붙여넣으세요'처럼 안내한다.",
     getTaskGuidelines(task, responseMode),
     responseMode === "draft" ? DRAFT_RESPONSE_FORMAT_GUIDE : GUIDE_RESPONSE_FORMAT_GUIDE,
     "제약:",

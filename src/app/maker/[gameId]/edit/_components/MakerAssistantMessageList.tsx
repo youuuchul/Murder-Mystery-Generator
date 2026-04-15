@@ -205,6 +205,136 @@ function renderAssistantResult(messageId: string, result: MakerAssistantGuideRes
   );
 }
 
+interface TimelineEntry {
+  player: string;
+  action: string;
+}
+
+interface TimelineSlot {
+  label: string;
+  description: string;
+  entries: TimelineEntry[];
+}
+
+/**
+ * timeline_plan draft가 뱉는 SLOT|{label}|{desc} + ENTRY|{player}|{action} 포맷을
+ * 메이커가 항목별로 복사할 수 있는 구조체로 뽑는다. SLOT 라인이 하나도 없으면 null.
+ */
+function parseTimelinePlan(body: string): TimelineSlot[] | null {
+  const lines = body.split("\n").map((line) => line.replace(/\r$/, ""));
+  const slots: TimelineSlot[] = [];
+  let current: TimelineSlot | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (/^SLOT\s*\|/i.test(trimmed)) {
+      const parts = trimmed.split("|").map((segment) => segment.trim());
+      const label = parts[1] ?? "";
+      const description = parts.slice(2).join(" | ");
+      current = { label, description, entries: [] };
+      slots.push(current);
+      continue;
+    }
+
+    if (/^ENTRY\s*\|/i.test(trimmed) && current) {
+      const parts = trimmed.split("|").map((segment) => segment.trim());
+      const player = parts[1] ?? "";
+      const action = parts.slice(2).join(" | ");
+      if (player && action) {
+        current.entries.push({ player, action });
+      }
+    }
+  }
+
+  if (slots.length === 0) return null;
+  // SLOT은 있는데 ENTRY가 하나도 없으면 일반 본문 뷰로 폴백
+  if (slots.every((slot) => slot.entries.length === 0)) return null;
+  return slots;
+}
+
+function CopyButton({ value, label = "복사" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleClick() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      alert("복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="shrink-0 rounded-md border border-mystery-700/60 bg-mystery-950/30 px-2 py-0.5 text-[11px] font-medium text-mystery-200 transition-colors hover:border-mystery-500 hover:bg-mystery-950/50"
+    >
+      {copied ? "복사됨" : label}
+    </button>
+  );
+}
+
+function TimelinePlanView({ slots }: { slots: TimelineSlot[] }) {
+  return (
+    <div className="space-y-3">
+      {slots.map((slot, slotIndex) => {
+        const slotCopyText = [
+          slot.description ? `${slot.label} — ${slot.description}` : slot.label,
+          ...slot.entries.map((entry) => `· ${entry.player}: ${entry.action}`),
+        ].join("\n");
+
+        return (
+          <div
+            key={`slot-${slotIndex}`}
+            className="rounded-xl border border-mystery-900/50 bg-dark-950/40"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-dark-800/80 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-mystery-300/80">
+                  슬롯 {slotIndex + 1}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-dark-50 break-words">
+                  {slot.label || "(라벨 없음)"}
+                </p>
+                {slot.description ? (
+                  <p className="mt-0.5 text-xs text-dark-400 break-words">{slot.description}</p>
+                ) : null}
+              </div>
+              <CopyButton value={slotCopyText} label="슬롯 전체 복사" />
+            </div>
+            {slot.entries.length > 0 ? (
+              <ul className="divide-y divide-dark-800/60">
+                {slot.entries.map((entry, entryIndex) => (
+                  <li
+                    key={`slot-${slotIndex}-entry-${entryIndex}`}
+                    className="flex items-start justify-between gap-3 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-dark-500">
+                        {entry.player}
+                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-dark-100 break-words whitespace-pre-line">
+                        {entry.action}
+                      </p>
+                    </div>
+                    <CopyButton value={entry.action} label="행동만 복사" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-3 py-2 text-xs text-dark-500">이 슬롯에는 제안된 행동이 없습니다.</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DraftResultPanel({
   messageId,
   result,
@@ -213,6 +343,7 @@ function DraftResultPanel({
   result: MakerAssistantDraftResult;
 }) {
   const [copied, setCopied] = useState(false);
+  const timelineSlots = parseTimelinePlan(result.body);
 
   async function handleCopy() {
     try {
@@ -233,21 +364,39 @@ function DraftResultPanel({
           <p className="mt-2 text-sm font-medium text-dark-50">{result.title}</p>
         </div>
       ) : null}
-      <div className="rounded-xl border border-mystery-900/60 bg-[linear-gradient(180deg,rgba(58,16,20,0.32),rgba(23,15,18,0.2))] px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="rounded-lg border border-mystery-700/70 bg-mystery-950/30 px-3 py-1.5 text-xs font-medium text-mystery-200 transition-colors hover:border-mystery-600 hover:bg-mystery-950/45"
-          >
-            {copied ? "복사됨" : "본문 복사"}
-          </button>
+      {timelineSlots ? (
+        <div className="rounded-xl border border-mystery-900/60 bg-[linear-gradient(180deg,rgba(58,16,20,0.32),rgba(23,15,18,0.2))] px-3 py-3 space-y-3">
+          <div className="flex items-center justify-between gap-3 px-1">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">
+              타임라인 제안 · 항목별 복사
+            </p>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-lg border border-mystery-700/70 bg-mystery-950/30 px-3 py-1.5 text-xs font-medium text-mystery-200 transition-colors hover:border-mystery-600 hover:bg-mystery-950/45"
+            >
+              {copied ? "복사됨" : "원문 전체 복사"}
+            </button>
+          </div>
+          <TimelinePlanView slots={timelineSlots} />
         </div>
-        <pre className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-dark-50 font-sans">
-          {result.body}
-        </pre>
-      </div>
+      ) : (
+        <div className="rounded-xl border border-mystery-900/60 bg-[linear-gradient(180deg,rgba(58,16,20,0.32),rgba(23,15,18,0.2))] px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">붙여넣기용 본문</p>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-lg border border-mystery-700/70 bg-mystery-950/30 px-3 py-1.5 text-xs font-medium text-mystery-200 transition-colors hover:border-mystery-600 hover:bg-mystery-950/45"
+            >
+              {copied ? "복사됨" : "본문 복사"}
+            </button>
+          </div>
+          <pre className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-dark-50 font-sans">
+            {result.body}
+          </pre>
+        </div>
+      )}
       {result.notes.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-dark-500">짧은 메모</p>

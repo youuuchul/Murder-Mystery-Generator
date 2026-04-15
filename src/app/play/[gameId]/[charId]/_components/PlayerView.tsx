@@ -1881,6 +1881,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const [locationSubTab, setLocationSubTab] = useState<LocationSubTab>("clues");
   const [characterPanel, setCharacterPanel] = useState<CharacterPanel>("profile");
   const [acquiring, setAcquiring] = useState<string | null>(null);
+  const [unlockingLocationId, setUnlockingLocationId] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<InventoryCard | null>(null);
   const [selectedSceneClue, setSelectedSceneClue] = useState<Clue | null>(null);
   const previousPhaseRef = useRef<string | null>(null);
@@ -2115,6 +2116,14 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       });
     });
 
+    channel.on("broadcast", { event: "location_unlocked" }, ({ payload }) => {
+      const d = payload as { locationId: string; locationName: string };
+      pushNotice({
+        id: `unlock-${d.locationId}-${Date.now()}`,
+        message: `「${d.locationName}」이(가) 열렸습니다.`,
+      });
+    });
+
     channel.subscribe();
     return () => {
       void client.removeChannel(channel);
@@ -2188,6 +2197,35 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       }
     } finally {
       setAcquiring(null);
+    }
+  }
+
+  async function unlockLocation(locationId: string) {
+    setUnlockingLocationId(locationId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/locations/${locationId}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        pushNotice({
+          id: `unlock-err-${Date.now()}`,
+          message: err.error ?? "장소를 열 수 없습니다.",
+          tone: "error",
+        });
+        return;
+      }
+      // 응답 즉시 sharedState 동기화 — SSE 대기 없이 잠금 해제 반영
+      setSharedState((prev) => {
+        if (!prev) return prev;
+        const list = prev.unlockedLocationIds ?? [];
+        if (list.includes(locationId)) return prev;
+        return { ...prev, unlockedLocationIds: [...list, locationId] };
+      });
+    } finally {
+      setUnlockingLocationId(null);
     }
   }
 
@@ -2893,9 +2931,22 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                     })();
 
                     // 장소 입장 조건 클라이언트 체크
-                    const locationCondMet = checkConditionLocally(loc.accessCondition);
-                    // has_items 조건이 명확히 미충족인 경우만 잠금 표시
-                    const locationLocked = locationCondMet === false;
+                    const cond = loc.accessCondition;
+                    const isCharCondition = cond?.type === "character_has_item";
+                    const isUnlocked = (sharedState.unlockedLocationIds ?? []).includes(loc.id);
+                    const isUnlockTarget = isCharCondition && cond?.targetCharacterId === charId;
+                    const targetHasAllRequired = isCharCondition
+                      ? (cond?.requiredClueIds ?? []).every((id) => inventoryIds.has(id))
+                      : false;
+
+                    // character_has_item: 영구 해제 상태(unlockedLocationIds)를 우선 본다
+                    const locationCondMet = isCharCondition
+                      ? (isUnlocked ? true : null)
+                      : checkConditionLocally(cond);
+                    // 잠금 표시: has_items 미충족 OR character_has_item & 미해제
+                    const locationLocked = isCharCondition
+                      ? !isUnlocked
+                      : locationCondMet === false;
 
                     return (
                       <div key={loc.id} className={`bg-dark-900 border rounded-xl overflow-hidden ${
@@ -2921,7 +2972,9 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                                   ? "text-green-400 border-green-800 bg-green-950/20"
                                   : "text-yellow-400 border-yellow-800 bg-yellow-950/20"
                               }`}>
-                                {locationLocked ? "입장 불가" : locationCondMet === true ? "조건 충족" : "조건 확인 중"}
+                                {isCharCondition
+                                  ? isUnlocked ? "열림" : "잠김"
+                                  : locationLocked ? "입장 불가" : locationCondMet === true ? "조건 충족" : "조건 확인 중"}
                               </span>
                             )}
                             {!allowRevisit && visitedThisRound && !locationLocked && (
@@ -2930,6 +2983,24 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                               </span>
                             )}
                           </div>
+                          {/* character_has_item — 타겟 캐릭터 본인에게만 열기 액션 노출 */}
+                          {isCharCondition && !isUnlocked && isUnlockTarget && (
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                              <span className="text-xs text-dark-500">
+                                {targetHasAllRequired
+                                  ? "필요한 단서가 모두 모였어요"
+                                  : "열 수 없습니다 — 필요한 단서를 모두 보유해야 합니다"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => unlockLocation(loc.id)}
+                                disabled={!targetHasAllRequired || unlockingLocationId === loc.id}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-mystery-800 hover:bg-mystery-700 text-mystery-200 border border-mystery-700 shrink-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {unlockingLocationId === loc.id ? "…" : "열기"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {/* 장소 조건 힌트 */}
                         {loc.accessCondition?.hint && (

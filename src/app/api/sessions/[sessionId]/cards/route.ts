@@ -130,14 +130,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "자신의 공간 단서는 획득 불가" }, { status: 403 });
     }
 
-    // 장소 입장 조건 체크
+    // 장소 입장 조건 체크 — character_has_item 타입은 영구 잠금 해제(unlockedLocationIds) 시 조건 무시
     if (location.accessCondition) {
-      const condResult = evaluateCondition(location.accessCondition, pState, session.playerStates);
-      if (!condResult.ok) {
-        return NextResponse.json(
-          { error: `[장소 입장 불가] ${condResult.reason}` },
-          { status: 403 }
-        );
+      const unlocked = session.sharedState.unlockedLocationIds?.includes(location.id) ?? false;
+      const skipByUnlock = unlocked && location.accessCondition.type === "character_has_item";
+      if (!skipByUnlock) {
+        const condResult = evaluateCondition(location.accessCondition, pState, session.playerStates);
+        if (!condResult.ok) {
+          return NextResponse.json(
+            { error: `[장소 입장 불가] ${condResult.reason}` },
+            { status: 403 }
+          );
+        }
       }
     }
 

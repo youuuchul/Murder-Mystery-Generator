@@ -131,6 +131,8 @@ export interface SharedState {
   publicClueIds: string[];
   /** 누군가 보유 중인 단서 ID 목록 — 장소에서 중복 획득 방지용 */
   acquiredClueIds: string[];
+  /** `character_has_item` 조건으로 영구 해제된 장소 ID 목록 */
+  unlockedLocationIds?: string[];
   eventLog: EventLogEntry[];
   characterSlots: CharacterSlot[];
   /** 다음 단계 진행 요청을 누른 플레이어 ID 목록 */

@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-15 (모바일 뷰포트 meta 누락 수정, iOS input 포커스 자동 확대 차단, 캐릭터 카드 승리조건 배치 정돈, 게임 커버 GM/플레이어 버튼 정책 정리, GM 전용 진행 가이드(gmNote) 폐지, 퍼스널/과거 기록 git 추적 제외 + set-maker-role.mjs Supabase 전용 단순화)
+> 마지막 업데이트: 2026-04-15 (모바일 뷰포트 meta 누락 수정, iOS input 포커스 자동 확대 차단, 캐릭터 카드 승리조건 배치 정돈, 게임 커버 GM/플레이어 버튼 정책 정리, GM 전용 진행 가이드(gmNote) 폐지, 퍼스널/과거 기록 git 추적 제외 + set-maker-role.mjs Supabase 전용 단순화, 장소 character_has_item 조건을 "열기" 액션 + sky-pill 알림으로 전환)
 
 ---
 

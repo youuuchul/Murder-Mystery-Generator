@@ -501,7 +501,24 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       // AI 플레이어가 이어서 획득한 단서들도 동일한 알림 이벤트로 브로드캐스트
       for (const outcome of result.autoAcquireOutcomes ?? []) {
-        if (!outcome.acted || !outcome.acquiredClueId || !outcome.actorPlayerId) continue;
+        if (!outcome.acted || !outcome.actorPlayerId) continue;
+
+        // AI가 해제 액션을 먼저 쓴 경우 → location_unlocked 이벤트만 쏘고 다음 outcome으로.
+        if (outcome.unlockedLocationId) {
+          const aiState = persistedSession.playerStates.find((p) => p.playerId === outcome.actorPlayerId);
+          const unlockPayload = {
+            locationId: outcome.unlockedLocationId,
+            locationName: outcome.unlockedLocationName ?? "",
+            unlockerPlayerId: outcome.actorPlayerId,
+            unlockerName: aiState?.playerName ?? outcome.actorCharacterName ?? "AI",
+            unlockerCharacterName: outcome.actorCharacterName ?? null,
+          };
+          broadcast(sessionId, "location_unlocked", unlockPayload);
+          void publishSessionRealtime(sessionId, "location_unlocked", unlockPayload);
+          continue;
+        }
+
+        if (!outcome.acquiredClueId) continue;
         const aiClue = game.clues.find((c) => c.id === outcome.acquiredClueId);
         if (!aiClue) continue;
         const aiState = persistedSession.playerStates.find((p) => p.playerId === outcome.actorPlayerId);

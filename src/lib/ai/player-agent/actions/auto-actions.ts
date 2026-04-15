@@ -26,6 +26,8 @@ export interface PlayerAgentAutoAcquireOutcome {
   actorCharacterName?: string;
   acquiredClueId?: string;
   acquiredClueTitle?: string;
+  unlockedLocationId?: string;
+  unlockedLocationName?: string;
   reason?: string;
 }
 
@@ -105,6 +107,45 @@ export function applyPlayerAgentAutoAcquireReaction(
   const aiPlayerState = ensureAiPlayerState(session, characterSlot.playerId);
   const actor = game.players.find((player) => player.id === characterSlot.playerId);
   const actorName = actor?.name ?? "AI 캐릭터";
+
+  // 해제 가능한 장소가 있으면 단서 획득보다 먼저 해제 액션을 쓴다.
+  // 같은 턴에 "열기 → 줍기"를 동시에 하지 않고, 다음 트리거로 넘긴다(인간 플레이어 흐름과 동일).
+  const unlockableLocation = findUnlockableLocationForAi({
+    game,
+    session,
+    playerState: aiPlayerState,
+    playerId: characterSlot.playerId,
+  });
+  if (unlockableLocation) {
+    session.sharedState.unlockedLocationIds = session.sharedState.unlockedLocationIds ?? [];
+    if (!session.sharedState.unlockedLocationIds.includes(unlockableLocation.id)) {
+      session.sharedState.unlockedLocationIds.push(unlockableLocation.id);
+    }
+
+    session.sharedState.eventLog.push({
+      id: crypto.randomUUID(),
+      timestamp: now,
+      message: `${actorName}(AI)이(가) 「${unlockableLocation.name}」을(를) 열었습니다.`,
+      type: "system",
+    });
+
+    agentSlot.runtimeStatus = "acting";
+    // 로테이션에서 이번 턴에 이미 행동했음을 기록해 연속 선택을 방지한다.
+    agentSlot.actionState = withUpdatedActionState(agentSlot.actionState, {
+      lastClueAcquiredAt: now,
+      deferredReason: undefined,
+    });
+
+    return {
+      acted: true,
+      trigger: input.trigger,
+      triggerPlayerId: input.triggerPlayerId,
+      actorPlayerId: characterSlot.playerId,
+      actorCharacterName: actorName,
+      unlockedLocationId: unlockableLocation.id,
+      unlockedLocationName: unlockableLocation.name,
+    };
+  }
 
   const selectableClues = listSelectableCluesForAi({
     game,
@@ -462,6 +503,39 @@ function ensureAiPlayerState(session: GameSession, playerId: string): PlayerStat
 
   session.playerStates.push(nextState);
   return nextState;
+}
+
+/**
+ * character_has_item 조건 장소 중 현재 AI가 targetCharacter이고,
+ * 필요 단서를 모두 보유 + 라운드 개방 조건을 만족 + 아직 해제되지 않은 장소를 찾아 반환한다.
+ */
+function findUnlockableLocationForAi(input: {
+  game: GamePackage;
+  session: GameSession;
+  playerState: PlayerState;
+  playerId: string;
+}): GamePackage["locations"][number] | null {
+  const unlockedIds = input.session.sharedState.unlockedLocationIds ?? [];
+  const currentRound = input.session.sharedState.currentRound;
+
+  for (const location of input.game.locations ?? []) {
+    const condition = location.accessCondition;
+    if (!condition || condition.type !== "character_has_item") continue;
+    if (condition.targetCharacterId !== input.playerId) continue;
+    if (unlockedIds.includes(location.id)) continue;
+    if (
+      typeof location.unlocksAtRound === "number"
+      && location.unlocksAtRound > currentRound
+    ) continue;
+
+    const hasAll = condition.requiredClueIds.every((requiredId) =>
+      input.playerState.inventory.some((item) => item.cardId === requiredId)
+    );
+    if (!hasAll) continue;
+
+    return location;
+  }
+  return null;
 }
 
 function listSelectableCluesForAi(input: {

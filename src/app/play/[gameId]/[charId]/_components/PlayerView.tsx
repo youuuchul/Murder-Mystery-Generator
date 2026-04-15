@@ -3002,15 +3002,13 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                             </div>
                           )}
                         </div>
-                        {/* 장소 조건 힌트 */}
-                        {loc.accessCondition?.hint && (
-                          <div className={`px-4 py-2 text-xs ${
-                            locationLocked ? "text-red-400 bg-red-950/10" : "text-yellow-400/80 bg-yellow-950/10"
-                          }`}>
+                        {/* 잠금 중이면 힌트만, 해제되면 설명만 노출 — 스포일러/중복 방지 */}
+                        {locationLocked && loc.accessCondition?.hint && (
+                          <div className="px-4 py-2 text-xs text-red-400 bg-red-950/10">
                             {loc.accessCondition.hint}
                           </div>
                         )}
-                        {loc.imageUrl && (
+                        {!locationLocked && loc.imageUrl && (
                           <div className="px-4 pt-4">
                             <ImageFrame
                               src={loc.imageUrl}
@@ -3018,7 +3016,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                             />
                           </div>
                         )}
-                        {loc.description && (
+                        {!locationLocked && loc.description && (
                           <p className="px-4 pt-3 text-xs leading-relaxed break-words text-dark-500">{loc.description}</p>
                         )}
                         <div className="p-3 space-y-2">

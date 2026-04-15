@@ -97,7 +97,24 @@ function ConditionForm({
     onChange({ ...condition, [key]: value });
   }
 
-  const selectableClues = allClues.filter((c) => c.id !== excludeClueId);
+  const locationOrder = new Map(allLocations.map((loc, index) => [loc.id, index]));
+  const clueOrderInLocation = new Map<string, number>();
+  allLocations.forEach((loc) => {
+    (loc.clueIds ?? []).forEach((clueId, index) => {
+      clueOrderInLocation.set(clueId, index);
+    });
+  });
+  const selectableClues = allClues
+    .filter((c) => c.id !== excludeClueId)
+    .slice()
+    .sort((a, b) => {
+      const aLoc = locationOrder.get(a.locationId ?? "") ?? Number.MAX_SAFE_INTEGER;
+      const bLoc = locationOrder.get(b.locationId ?? "") ?? Number.MAX_SAFE_INTEGER;
+      if (aLoc !== bLoc) return aLoc - bLoc;
+      const aIdx = clueOrderInLocation.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bIdx = clueOrderInLocation.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return aIdx - bIdx;
+    });
   const needsTarget = condition?.type === "character_has_item";
 
   return (

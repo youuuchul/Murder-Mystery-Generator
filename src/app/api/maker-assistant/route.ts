@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     await startLangfuseTracing();
 
-    const context = buildMakerAssistantContext(payload.game, payload.task, payload.currentStep);
+    const context = buildMakerAssistantContext(payload.game, payload.task, payload.currentStep, payload.message);
     const responseMode = resolveMakerAssistantResponseMode({
       task: payload.task,
       message: payload.message,

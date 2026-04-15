@@ -8,7 +8,7 @@ import {
   type MakerAssistantTask,
 } from "@/types/assistant";
 
-type DraftWritingProfile = "narrative_prose" | "descriptive_copy" | "gm_guide" | "bullet_facts";
+type DraftWritingProfile = "narrative_prose" | "descriptive_copy" | "gm_guide" | "bullet_facts" | "timeline_plan";
 
 interface DraftIntent {
   targetLabel: string;
@@ -192,6 +192,14 @@ function getDraftFocusHint(currentStep: number): string {
 function inferDraftIntent(message: string | undefined, currentStep: number): DraftIntent {
   const normalized = message?.trim() ?? "";
 
+  // 타임라인은 슬롯별/플레이어별 복붙용이라 산문이 아닌 SLOT/ENTRY 구조로 나눠 뽑는다.
+  if (/(타임라인|시간대|시각표|시간표)/iu.test(normalized)) {
+    return {
+      targetLabel: "타임라인 슬롯/엔트리 제안",
+      profile: "timeline_plan",
+    };
+  }
+
   // 비밀 정보는 후반 공개용 사실 리스트라 산문보다 불릿형 사실 단위가 재활용하기 쉽다.
   if (/(비밀|반전)/iu.test(normalized)) {
     return {
@@ -262,6 +270,19 @@ function getDraftStyleRules(intent: DraftIntent): string[] {
         "- 3~7개 항목으로 제한하고, 중복되는 내용은 합친다.",
         "- 진범 여부, 알리바이의 허점, 은폐한 증거처럼 '후반 공개 시 판이 흔들리는' 정보 위주로 고른다.",
       ];
+    case "timeline_plan":
+      return [
+        "- 반드시 다음 포맷만 사용한다. 도입, 설명, 마무리 문단을 쓰지 않는다.",
+        "  SLOT|{시간대 라벨}|{슬롯 설명(선택, 비워도 됨)}",
+        "  ENTRY|{플레이어 이름}|{해당 슬롯에 그 인물이 한 행동 1~2문장}",
+        "  - SLOT과 ENTRY는 같은 줄에 쓰고 줄마다 정확히 파이프(|)로 3 또는 3개 필드를 유지한다.",
+        "  - SLOT 블록 사이는 빈 줄 1개로 구분한다.",
+        "- 슬롯은 사건 흐름상 의미 있는 최소 개수만 만든다(예: 3~6개). 모든 시간대에 전원을 넣지 않는다.",
+        "- 각 SLOT 안에는 해당 시점에 실제 행동/관찰/결정을 한 인물만 ENTRY로 넣는다. 앞뒤 맥락으로 추론 가능한 인물은 굳이 넣지 않는다.",
+        "- ENTRY 본문은 해당 플레이어의 상세 스토리와 비밀에서 비롯된 구체 행동으로 쓴다. 다른 캐릭터의 비밀을 폭로하거나 내레이션 톤으로 서술하지 않는다.",
+        "- 이미 메이커에 등록된 타임라인 슬롯이 컨텍스트에 있으면 그 라벨을 우선 재사용하고, 새 슬롯이 필요하면 자연 시각 표기(예: '저녁 19:00', '의식 개시 직후')로 짧게 명명한다.",
+        "- NOTES에 '이 슬롯은 기존 X 슬롯과 합쳐도 됩니다'처럼 구조 제안만 최대 3개까지 남겨도 된다. 서사 요약은 금지.",
+      ];
   }
 }
 
@@ -315,6 +336,16 @@ function buildDraftPromptContext(context: MakerAssistantContext, intent: DraftIn
         secret: player.secret,
       })),
       clues: context.clues,
+    };
+  }
+
+  if (intent.profile === "timeline_plan") {
+    // 타임라인 제안은 인물 행동 근거가 상세 스토리/비밀이므로 이 둘과 기존 슬롯, 피해자 사망 경위를 주입한다.
+    // context.players 는 step 3/validate_consistency 경로에서 이미 story/secret/timeline 을 포함한 형태로 매핑된다.
+    return {
+      ...baseContext,
+      story: context.story,
+      players: context.players ?? [],
     };
   }
 

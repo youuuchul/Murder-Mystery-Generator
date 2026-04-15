@@ -53,6 +53,13 @@ interface GamesRow {
 // ─── Helpers ───────────────────────────────────────────────
 
 function buildMetadataFromRow(row: GamesRow): GameMetadata {
+  // lifecycle_status는 저장 시점 getGamePublishReadiness 결과를 그대로 반영한다.
+  // 목록용 fallback은 원본 콘텐츠(scripts/ending_branches)까지 조회하지 않으므로
+  // "ready"면 전 항목 통과, "draft"면 row에서 판별 가능한 항목만 체크하고
+  // 콘텐츠 기반 항목(opening/ending)은 동일한 ready 플래그로 위임한다.
+  // 과거에는 opening/ending을 항상 `passed: false`로 박아두어, 실제로는 작성이 끝난
+  // 게임에서도 라이브러리 카드에 "오프닝/엔딩 스크립트가 필요합니다"가 상시 노출되는 오탐이 있었다.
+  const ready = row.lifecycle_status === "ready";
   const titlePassed = Boolean(row.title.trim());
   const summaryPassed = Boolean(row.summary?.trim());
   const playersPassed = row.player_count > 0;
@@ -83,13 +90,13 @@ function buildMetadataFromRow(row: GamesRow): GameMetadata {
     clueCount: row.clue_count,
     locationCount: row.location_count,
     publishReadiness: {
-      ready: row.lifecycle_status === "ready",
+      ready,
       checklist: [
         { id: "title", label: "제목", passed: titlePassed, detail: "제목이 필요합니다." },
         { id: "summary", label: "라이브러리 소개글", passed: summaryPassed, detail: "라이브러리 소개글이 필요합니다." },
         { id: "players", label: "플레이어 수", passed: playersPassed, detail: "등록된 플레이어 수를 기본 설정 인원 수와 맞춰주세요." },
-        { id: "opening", label: "오프닝 기본 스크립트", passed: false, detail: "오프닝 기본 스크립트가 필요합니다." },
-        { id: "ending", label: "엔딩", passed: false, detail: "엔딩 분기 또는 엔딩 스크립트가 필요합니다." },
+        { id: "opening", label: "오프닝 기본 스크립트", passed: ready, detail: "오프닝 스크립트 확인이 필요합니다. 메이커에서 상세 내용을 확인하세요." },
+        { id: "ending", label: "엔딩", passed: ready, detail: "엔딩 분기 또는 엔딩 스크립트 확인이 필요합니다. 메이커에서 상세 내용을 확인하세요." },
       ],
     },
   };

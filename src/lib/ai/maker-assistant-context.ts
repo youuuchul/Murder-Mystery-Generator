@@ -60,7 +60,8 @@ export interface MakerAssistantContext {
 export function buildMakerAssistantContext(
   game: GamePackage,
   task: MakerAssistantTask,
-  currentStep: number
+  currentStep: number,
+  message?: string
 ): MakerAssistantContext {
   const normalizedGame = normalizeGame(game);
   const validation = validateMakerGame(normalizedGame);
@@ -121,7 +122,13 @@ export function buildMakerAssistantContext(
   }
 
   // Step별 컨텍스트 최적화: 불필요한 데이터를 줄여 토큰 사용을 절감한다.
-  const needsFullPlayers = currentStep === 3 || task === "validate_consistency" || task === "suggest_clues";
+  // 채팅 메시지가 타임라인/인물 행동 관련이면 story/secret/timeline이 포함된 full players가 필요하다.
+  const mentionsTimelineIntent = typeof message === "string"
+    && /(타임라인|시간대|시각표|시간표|행동\s*(?:순서|흐름))/iu.test(message);
+  const needsFullPlayers = currentStep === 3
+    || task === "validate_consistency"
+    || task === "suggest_clues"
+    || mentionsTimelineIntent;
   const needsLocations = currentStep === 4 || task === "validate_consistency" || task === "suggest_clues";
   const needsClues = currentStep === 4 || task === "validate_consistency" || task === "suggest_clues";
 

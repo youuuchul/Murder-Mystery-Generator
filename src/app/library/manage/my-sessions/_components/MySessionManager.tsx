@@ -90,7 +90,7 @@ export default function MySessionManager({ sessions, maxSessions }: MySessionMan
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="게임, 방 제목, 코드 검색"
-          className="min-w-[18rem] rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-100 outline-none transition focus:border-mystery-500"
+          className="w-full rounded-xl border border-dark-700 bg-dark-950 px-4 py-3 text-sm text-dark-100 outline-none transition focus:border-mystery-500 sm:w-auto sm:min-w-[18rem]"
         />
       </div>
 

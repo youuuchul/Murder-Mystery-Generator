@@ -932,40 +932,56 @@ export default function PlayerEditor({
             <div>
               <p className="text-sm font-semibold text-dark-100">범인 지정</p>
               <p className="mt-1 text-xs text-dark-500">
-                엔딩 분기와 투표 결과 판정에 사용할 범인을 플레이어 · 피해자 · NPC 중에서 선택합니다.
+                엔딩 분기·투표 결과 판정에 쓰는 범인입니다. 플레이어·피해자·NPC 중에서 선택할 수 있습니다.
+                투표 탭의 "플레이어 + NPC + 피해자" 옵션과 동일한 후보군으로 노출됩니다.
               </p>
             </div>
 
             <select
               value={story.culpritPlayerId}
               onChange={(e) => onChangeCulprit(e.target.value)}
-              disabled={noCandidates}
               className={inp}
             >
               <option value="">— 범인을 선택하세요 —</option>
-              {syncedPlayers.length > 0 && (
-                <optgroup label="플레이어">
-                  {syncedPlayers.map((player) => (
+
+              <optgroup label="플레이어">
+                {syncedPlayers.length === 0 ? (
+                  <option value="" disabled>
+                    플레이어를 먼저 추가하세요
+                  </option>
+                ) : (
+                  syncedPlayers.map((player) => (
                     <option key={player.id} value={player.id}>
                       {player.name || "(이름 없음)"}
                     </option>
-                  ))}
-                </optgroup>
-              )}
-              {victimName && (
-                <optgroup label="피해자">
+                  ))
+                )}
+              </optgroup>
+
+              <optgroup label="피해자">
+                {victimName ? (
                   <option value={CULPRIT_VICTIM_ID}>{victimName}</option>
-                </optgroup>
-              )}
-              {npcOptions.length > 0 && (
-                <optgroup label="NPC">
-                  {npcOptions.map((npc) => (
+                ) : (
+                  <option value="" disabled>
+                    사건 개요 탭에서 피해자 이름을 입력하세요
+                  </option>
+                )}
+              </optgroup>
+
+              <optgroup label="NPC">
+                {npcOptions.length === 0 ? (
+                  <option value="" disabled>
+                    사건 개요 탭에서 NPC 를 추가하세요
+                  </option>
+                ) : (
+                  npcOptions.map((npc) => (
                     <option key={npc.id} value={npc.id}>
                       {npc.name}
                     </option>
-                  ))}
-                </optgroup>
-              )}
+                  ))
+                )}
+              </optgroup>
+
               {staleCulpritId && (
                 <option value={staleCulpritId} disabled>
                   (삭제된 캐릭터)
@@ -975,7 +991,7 @@ export default function PlayerEditor({
 
             {noCandidates ? (
               <p className="text-xs text-dark-600">
-                플레이어를 추가하거나 사건 개요 탭에서 피해자/NPC를 등록한 뒤 범인을 선택할 수 있습니다.
+                플레이어를 추가하거나 사건 개요 탭에서 피해자/NPC 를 등록한 뒤 범인을 선택할 수 있습니다.
               </p>
             ) : culpritIdentity ? (
               <p className="text-xs text-mystery-400">

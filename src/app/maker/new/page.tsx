@@ -1,7 +1,6 @@
 /** @screen P-006 — docs/screens.json 참조 */
 import Link from "next/link";
 import { requireCurrentMakerUser } from "@/lib/maker-user.server";
-import StepWizard from "./_components/StepWizard";
 import SettingsForm from "./_components/SettingsForm";
 
 export default async function NewGamePage() {
@@ -9,9 +8,8 @@ export default async function NewGamePage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(87,100,91,0.08),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(42,13,18,0.12),transparent_28%),linear-gradient(180deg,rgba(15,9,12,1),rgba(23,15,18,1))]">
-      {/* 헤더 */}
       <header className="sticky top-0 z-10 border-b border-dark-700 bg-[rgba(15,9,12,0.88)] backdrop-blur-xl">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/library/manage" className="text-dark-400 hover:text-dark-200 transition-colors">
               ← 내 게임 관리
@@ -22,18 +20,12 @@ export default async function NewGamePage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        {/* 스텝 위자드 */}
-        <div className="mb-10 rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.62),rgba(23,15,18,0.9))] p-5 shadow-[0_18px_40px_rgba(23,15,18,0.35)]">
-          <StepWizard currentStep={1} />
-        </div>
-
-        {/* 단계별 콘텐츠 */}
-        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 shadow-[0_20px_48px_rgba(23,15,18,0.4)] sm:p-8">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 sm:p-8 shadow-[0_20px_48px_rgba(23,15,18,0.4)]">
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-dark-50">기본 설정</h2>
+            <h1 className="text-xl font-bold text-dark-50">새 게임 만들기</h1>
             <p className="text-sm text-dark-500 mt-1">
-              게임의 기본 정보를 설정합니다. 이후 단계에서 언제든 수정할 수 있습니다.
+              제목과 소개글만 먼저 정해 주세요. 나머지 설정은 편집 화면에서 이어서 작성합니다.
             </p>
           </div>
 

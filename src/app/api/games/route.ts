@@ -4,23 +4,19 @@ import { canReadGameSource, canViewAllGames } from "@/lib/game-access";
 import { buildDefaultGameRules } from "@/lib/game-rules";
 import { listGames, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
-import type { GamePackage, GameRules } from "@/types/game";
+import type { GamePackage } from "@/types/game";
 
+/**
+ * 신규 게임 생성은 "제목 + 소개글"만 받는 가벼운 셸을 만들고,
+ * 나머지 설정/규칙/스토리 블록은 기본값으로 채워 곧바로 편집 화면에서 이어 작성한다.
+ */
 const CreateGameSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(100),
-  settings: z.object({
-    playerCount: z.number().int().min(1).max(8),
-    difficulty: z.enum(["easy", "normal", "hard"]),
-    tags: z.array(z.string().min(1)).min(1),
-    estimatedDuration: z.number().int().min(30).max(300),
-    summary: z.string().max(220).optional(),
-    coverImageUrl: z.string().url().optional(),
-    coverImagePosition: z.object({
-      x: z.number().min(0).max(100),
-      y: z.number().min(0).max(100),
-    }).optional(),
-  }),
+  summary: z.string().max(220).optional(),
 });
+
+const DEFAULT_PLAYER_COUNT = 5;
+const DEFAULT_ESTIMATED_DURATION = 120;
 
 /** GET /api/games — 현재 권한에 맞는 게임 목록 */
 export async function GET(request: NextRequest) {
@@ -64,8 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, settings } = parsed.data;
-    const incomingRules = (body as { rules?: GameRules }).rules;
+    const { title, summary } = parsed.data;
     const now = new Date().toISOString();
 
     const game: GamePackage = {
@@ -78,8 +73,14 @@ export async function POST(request: NextRequest) {
         visibility: "private",
         publishedAt: undefined,
       },
-      settings,
-      rules: incomingRules ?? buildDefaultGameRules(settings.playerCount),
+      settings: {
+        playerCount: DEFAULT_PLAYER_COUNT,
+        difficulty: "normal",
+        tags: [],
+        estimatedDuration: DEFAULT_ESTIMATED_DURATION,
+        summary: summary?.trim() || undefined,
+      },
+      rules: buildDefaultGameRules(DEFAULT_PLAYER_COUNT),
       story: {
         synopsis: "",
         victim: { name: "", background: "", imageUrl: undefined },

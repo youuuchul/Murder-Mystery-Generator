@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-15 (모바일 뷰포트 meta 누락 수정, iOS input 포커스 자동 확대 차단, 캐릭터 카드 승리조건 배치 정돈, 게임 커버 GM/플레이어 버튼 정책 정리, GM 전용 진행 가이드(gmNote) 폐지, 퍼스널/과거 기록 git 추적 제외 + set-maker-role.mjs Supabase 전용 단순화, 장소 character_has_item 조건을 "열기" 액션 + sky-pill 알림으로 전환)
+> 마지막 업데이트: 2026-04-16 (신규 게임 생성 페이지를 제목+소개글만 받는 얇은 셸로 단순화, 편집 화면 저장/네비 액션바를 드래그 가능한 플로팅 바로 전환 + AI 런처 겹침 회피 + 콘텐츠 하단 여백 자동 확보, 모바일 뷰포트 meta 누락 수정, iOS input 포커스 자동 확대 차단, 캐릭터 카드 승리조건 배치 정돈, 게임 커버 GM/플레이어 버튼 정책 정리, GM 전용 진행 가이드(gmNote) 폐지, 퍼스널/과거 기록 git 추적 제외 + set-maker-role.mjs Supabase 전용 단순화, 장소 character_has_item 조건을 "열기" 액션 + sky-pill 알림으로 전환)
 
 ---
 
@@ -101,6 +101,7 @@
 ## 미착수 — 우선순위순
 
 ### 🚨 긴급
+- [x] **메이커 신규 생성 페이지 경량화 + 편집 액션바 플로팅 전환** — (1) `/maker/new`가 편집 화면의 과거 버전 Step1을 담고 있어 `/maker/[id]/edit` 최신 `SettingsEditor`와 UI·필드가 어긋나 있던 문제. 신규 생성 페이지는 "제목 + 소개글"만 받는 얇은 셸로 교체(`SettingsForm.tsx` 재작성, `StepWizard` 제거). API `POST /api/games` 스키마도 `{ title, summary? }`만 받고 playerCount/difficulty/tags/estimatedDuration/rules는 서버에서 기본값(5인, normal, [], 120분, `buildDefaultGameRules(5)`)으로 채운 뒤 즉시 편집 화면으로 라우팅. 상세 편집은 `/edit`의 단일 `SettingsEditor`가 진실 소스로 동작하도록 일원화. (2) 편집 화면 하단 저장/네비 액션바가 `sticky bottom-4`라 길이가 긴 스텝에선 뷰포트에 안 붙고 콘텐츠 맨 아래로 밀려 사용성이 나빴음. `position: fixed` + 드래그 가능한 플로팅 바로 전환 — 좌측 `⋮⋮` 그랩 핸들(`PointerEvent` + `setPointerCapture`), 위치는 `localStorage` 키 `maker-editor-actionbar-pos-v1`로 영속화, 윈도우 리사이즈 시 뷰포트 안쪽으로 clamp. 기본 위치는 하단 중앙. AI 런처와의 겹침은 rect 교차 판정으로 감지해 겹치면 런처를 액션바 위로 밀어 올리고 평소엔 `bottom: 24px`로 복귀. 플로팅 바가 마지막 필드를 가리지 않도록 콘텐츠 래퍼에 `paddingBottom = barHeight(ResizeObserver로 추적) + 런처 예상 높이 48 + 여백 16`을 자동 부여. ✅ 완료 (2026-04-16)
 - [x] **잠긴 장소 UI 스포일러 정리 + AI 자동 해제 + 조건 picker 정렬** — (1) 플레이어 장소 카드가 잠금 상태에서 해제 힌트와 장소 설명을 동시에 노출해 정답이 새던 문제. 잠금 중엔 `accessCondition.hint`만, 해제 후엔 `description`+이미지만 보이도록 `PlayerView.tsx` 분기 수정. (2) `applyPlayerAgentAutoAcquireReaction`에 `findUnlockableLocationForAi` 추가 — AI가 `character_has_item` 대상이고 필요 단서 모두 보유 + `unlocksAtRound` 조건 만족 + 아직 미해제인 장소가 있으면 단서 획득보다 먼저 해제 액션 실행. outcome에 `unlockedLocationId/Name` 필드 추가, `cards/route.ts`에서 AI 해제 시 `location_unlocked` 이벤트 브로드캐스트. 한 턴에 "열기 + 줍기" 동시 처리는 금지(인간 플레이어 흐름과 일치). (3) 메이커 `LocationEditor`의 필요 단서/아이템 체크박스 목록이 단서 생성 순서로 나와 긴 목록에서 장소별 묶음이 깨지던 문제. 장소 순서 → 각 장소 `clueIds` 배치 순서로 정렬. ✅ 완료 (2026-04-15)
 - [x] **단서 본문 중괄호 누출 차단** — `suggest_clues` 시스템 프롬프트가 FINDING.detail 포맷을 `{...}` 자리표시자로 안내했더니 모델이 카드 본문을 `{...}`로 감싸 출력하던 버그. 자리표시 표기를 `→ 이 자리에 ... 적는다`로 바꾸고 "안내문에 쓰인 →·{·} 같은 자리표시 기호는 실제 출력에 절대 포함하지 않는다" 규칙 명시. ✅ 완료 (2026-04-15)
 - [x] **장소 설명 스포일러 방지 규칙** — draft `descriptive_copy` 프로필이 장소 설명을 뽑을 때, 컨텍스트로 받은 해당 장소 단서를 그대로 본문에 지목해 "탐색 전 정답 공개"가 되던 가능성이 있던 부분을 프롬프트 레벨에서 차단. `getDraftStyleRules`에서 intent.targetLabel에 "장소"가 포함되면 추가 규칙 블록 주입: (1) 감각·배경 스토리로 몰입 올리는 묘사만, (2) 단서 존재/위치/외형/제목/해석 힌트 금지, (3) '쪽지가 있다/수상한 물건이 보인다' 류 발견 유도 문장 금지, (4) 단서에 해당하는 아이템은 본문에서 지목하지 말고 자연스러운 가구·흔적·분위기로 대체. 단서 목록은 맥락 참고용으로만 프롬프트에 남김. ✅ 완료 (2026-04-15)

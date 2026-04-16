@@ -22,6 +22,22 @@ interface MakerEditorProps {
 }
 
 const STEP_COUNT = 6;
+const ACTION_BAR_POS_STORAGE_KEY = "maker-editor-actionbar-pos-v1";
+const VIEWPORT_MARGIN = 12;
+/** AI 런처 버튼 예상 높이 (텍스트 2줄 + 패딩). 콘텐츠 하단 여백 계산용. */
+const LAUNCHER_HEIGHT_ESTIMATE = 48;
+
+type BarPosition = { x: number; y: number };
+
+function clampPositionToViewport(pos: BarPosition, width: number, height: number): BarPosition {
+  if (typeof window === "undefined") return pos;
+  const maxX = Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN);
+  const maxY = Math.max(VIEWPORT_MARGIN, window.innerHeight - height - VIEWPORT_MARGIN);
+  return {
+    x: Math.min(Math.max(VIEWPORT_MARGIN, pos.x), maxX),
+    y: Math.min(Math.max(VIEWPORT_MARGIN, pos.y), maxY),
+  };
+}
 
 /**
  * 스텝 2/3 편집 중 삭제된 플레이어/NPC를 가리키는 관계를 자동 정리한다.
@@ -71,7 +87,16 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [assistantLauncherBottomOffset, setAssistantLauncherBottomOffset] = useState(120);
+  const [assistantLauncherBottomOffset, setAssistantLauncherBottomOffset] = useState(24);
+  const [barPosition, setBarPosition] = useState<BarPosition | null>(null);
+  const [barHeight, setBarHeight] = useState<number>(80);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ target: string | null; token: number }>({
     target: null,
     token: 0,
@@ -141,40 +166,172 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     return () => document.removeEventListener("click", handleClick, true);
   }, [initialGame.id]);
 
+  /**
+   * 액션바 초기 위치 복원/계산:
+   * - 마지막에 저장된 위치가 있으면 복원, 없으면 화면 하단 중앙.
+   * - 첫 렌더 직후 실제 크기가 잡힌 뒤 한 번 세팅한다.
+   */
   useEffect(() => {
-    const actionBar = actionBarRef.current;
-    if (!actionBar) {
+    const bar = actionBarRef.current;
+    if (!bar || barPosition) {
       return;
     }
 
-    /**
-     * 모바일에서 AI 런처가 하단 액션바와 겹치지 않도록
-     * 현재 액션바 높이를 기준으로 런처의 bottom offset을 계산한다.
-     */
+    const width = bar.offsetWidth;
+    const height = bar.offsetHeight;
+    if (!width || !height) {
+      return;
+    }
+
+    const saved = window.localStorage.getItem(ACTION_BAR_POS_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as BarPosition;
+        if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
+          setBarPosition(clampPositionToViewport(parsed, width, height));
+          return;
+        }
+      } catch {
+        // 잘못된 저장값은 무시
+      }
+    }
+
+    setBarPosition(
+      clampPositionToViewport(
+        {
+          x: Math.round((window.innerWidth - width) / 2),
+          y: window.innerHeight - height - 24,
+        },
+        width,
+        height,
+      ),
+    );
+  }, [barPosition]);
+
+  /** 창 크기 변경 시 액션바가 뷰포트 밖으로 나가지 않도록 clamp. */
+  useEffect(() => {
+    function handleResize() {
+      const bar = actionBarRef.current;
+      if (!bar) return;
+      setBarPosition((prev) =>
+        prev ? clampPositionToViewport(prev, bar.offsetWidth, bar.offsetHeight) : prev,
+      );
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  /** 액션바 높이를 추적해 콘텐츠 하단 패딩에 사용. 바가 콘텐츠를 가리지 않도록 여백을 확보한다. */
+  useEffect(() => {
+    const bar = actionBarRef.current;
+    if (!bar) return;
+    const update = () => {
+      const nextHeight = bar.offsetHeight;
+      if (nextHeight > 0) setBarHeight(nextHeight);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * AI 런처(우측 하단 고정)와 플로팅 액션바가 겹치는지 계산해,
+   * 겹치면 런처를 액션바 위로 밀어 올린다. 평소엔 기본 위치(24px) 유지.
+   */
+  useEffect(() => {
     function updateLauncherOffset() {
-      const currentActionBar = actionBarRef.current;
-      if (!currentActionBar) {
+      const bar = actionBarRef.current;
+      if (!bar || !barPosition) {
+        setAssistantLauncherBottomOffset(24);
         return;
       }
+      const rect = bar.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-      const height = Math.ceil(currentActionBar.getBoundingClientRect().height);
-      setAssistantLauncherBottomOffset(height + 24);
+      // 런처 footprint 추정: 우측 여백 16, 폭 240, 기본 높이 72, 아래 여백 24.
+      const launcherLeft = vw - 256;
+      const launcherRight = vw - 12;
+      const launcherTop = vh - 120;
+      const launcherBottom = vh - 12;
+
+      const overlaps =
+        rect.left < launcherRight &&
+        rect.right > launcherLeft &&
+        rect.top < launcherBottom &&
+        rect.bottom > launcherTop;
+
+      if (overlaps) {
+        const desired = Math.max(24, vh - rect.top + 12);
+        setAssistantLauncherBottomOffset(desired);
+      } else {
+        setAssistantLauncherBottomOffset(24);
+      }
     }
 
     updateLauncherOffset();
 
-    const observer = new ResizeObserver(() => {
-      updateLauncherOffset();
-    });
-
-    observer.observe(actionBar);
+    const bar = actionBarRef.current;
+    const observer = bar ? new ResizeObserver(updateLauncherOffset) : null;
+    if (bar && observer) observer.observe(bar);
     window.addEventListener("resize", updateLauncherOffset);
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener("resize", updateLauncherOffset);
     };
+  }, [barPosition]);
+
+  /** 드래그 시작/중/종료. 드래그 종료 시 localStorage에 위치를 저장한다. */
+  const handleBarDragStart = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const bar = actionBarRef.current;
+    if (!bar || !barPosition) return;
+    event.preventDefault();
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: barPosition.x,
+      origY: barPosition.y,
+    };
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // setPointerCapture 미지원 환경은 무시
+    }
+  }, [barPosition]);
+
+  const handleBarDragMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const drag = dragStateRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const bar = actionBarRef.current;
+    if (!bar) return;
+    const next = clampPositionToViewport(
+      { x: drag.origX + (event.clientX - drag.startX), y: drag.origY + (event.clientY - drag.startY) },
+      bar.offsetWidth,
+      bar.offsetHeight,
+    );
+    setBarPosition(next);
   }, []);
+
+  const handleBarDragEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const drag = dragStateRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragStateRef.current = null;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // 무시
+    }
+    if (barPosition) {
+      try {
+        window.localStorage.setItem(ACTION_BAR_POS_STORAGE_KEY, JSON.stringify(barPosition));
+      } catch {
+        // 쿼터 초과 등은 무시
+      }
+    }
+  }, [barPosition]);
 
   /**
    * 검증 이슈 문구를 현재 편집기 내부 섹션 anchor로 매핑한다.
@@ -331,7 +488,16 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
 
   return (
     <>
-      <div className="space-y-6">
+      <div
+        className="space-y-6"
+        style={{
+          /**
+           * 액션바가 하단에 있으면서 AI 런처와 스택될 때(런처가 바 위로 밀려 올라감)의 최악 케이스까지
+           * 커버하도록 여백을 잡는다: 액션바 높이 + 런처 높이 + 여백.
+           */
+          paddingBottom: `${barHeight + LAUNCHER_HEIGHT_ESTIMATE + 16}px`,
+        }}
+      >
         <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.62),rgba(23,15,18,0.9))] p-5 shadow-[0_18px_40px_rgba(23,15,18,0.35)]">
           <StepWizard
             currentStep={currentStep}
@@ -477,54 +643,85 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           )}
         </div>
 
-        <div ref={actionBarRef} className="sticky bottom-4 z-10">
-          <div className="flex flex-col gap-4 rounded-2xl border border-dark-600 bg-[linear-gradient(180deg,rgba(23,15,18,0.95),rgba(42,46,47,0.82))] px-5 py-4 shadow-[0_20px_48px_rgba(23,15,18,0.55)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className={`text-sm font-medium ${
-                saveError
-                  ? "text-red-300"
-                  : hasUnsavedChanges
-                    ? "text-yellow-300"
-                    : "text-sage-300"
-              }`}>
-                {saveHeadline}
-              </p>
-              <p className="mt-1 text-xs text-dark-500">{saveHint}</p>
-            </div>
+      </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => { void moveToStep(Math.max(1, currentStep - 1)); }}
-                disabled={currentStep <= 1 || saving}
-              >
-                ← 이전
-              </Button>
-              {currentStep < STEP_COUNT ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    onClick={() => { void save(); }}
-                    loading={saving}
-                    disabled={saving || !hasUnsavedChanges}
-                  >
-                    {saveButtonLabel}
-                  </Button>
-                  <Button onClick={() => { void moveToStep(currentStep + 1); }} disabled={saving}>
-                    다음 →
-                  </Button>
-                </>
-              ) : (
+      <div
+        ref={actionBarRef}
+        style={{
+          position: "fixed",
+          left: barPosition ? `${barPosition.x}px` : "-9999px",
+          top: barPosition ? `${barPosition.y}px` : "-9999px",
+          visibility: barPosition ? "visible" : "hidden",
+          maxWidth: "min(720px, calc(100vw - 24px))",
+        }}
+        className="z-30"
+      >
+        <div className="flex items-stretch gap-2 rounded-2xl border border-dark-600 bg-[linear-gradient(180deg,rgba(23,15,18,0.95),rgba(42,46,47,0.82))] px-3 py-3 shadow-[0_20px_48px_rgba(23,15,18,0.55)] backdrop-blur-xl sm:gap-3 sm:px-4">
+          <button
+            type="button"
+            onPointerDown={handleBarDragStart}
+            onPointerMove={handleBarDragMove}
+            onPointerUp={handleBarDragEnd}
+            onPointerCancel={handleBarDragEnd}
+            className="flex w-6 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-lg text-dark-500 hover:bg-dark-800/60 hover:text-dark-200 active:cursor-grabbing"
+            aria-label="도구막대 위치 이동"
+            title="드래그해서 위치 이동"
+          >
+            <span aria-hidden className="text-xs leading-none tracking-tighter">⋮⋮</span>
+          </button>
+
+          <div className="flex min-w-0 flex-1 flex-col justify-center">
+            <p className={`truncate text-sm font-medium ${
+              saveError
+                ? "text-red-300"
+                : hasUnsavedChanges
+                  ? "text-yellow-300"
+                  : "text-sage-300"
+            }`}>
+              {saveHeadline}
+            </p>
+            <p className="mt-0.5 hidden truncate text-xs text-dark-500 sm:block">{saveHint}</p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { void moveToStep(Math.max(1, currentStep - 1)); }}
+              disabled={currentStep <= 1 || saving}
+            >
+              ← 이전
+            </Button>
+            {currentStep < STEP_COUNT ? (
+              <>
                 <Button
                   variant="secondary"
+                  size="sm"
                   onClick={() => { void save(); }}
                   loading={saving}
                   disabled={saving || !hasUnsavedChanges}
                 >
-                  {hasUnsavedChanges ? "최종 저장" : "최종 저장 완료"}
+                  {saveButtonLabel}
                 </Button>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  onClick={() => { void moveToStep(currentStep + 1); }}
+                  disabled={saving}
+                >
+                  다음 →
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { void save(); }}
+                loading={saving}
+                disabled={saving || !hasUnsavedChanges}
+              >
+                {hasUnsavedChanges ? "최종 저장" : "최종 저장 완료"}
+              </Button>
+            )}
           </div>
         </div>
       </div>

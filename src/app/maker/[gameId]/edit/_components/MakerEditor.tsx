@@ -621,6 +621,38 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                   culpritPlayerId,
                 },
               })}
+              onChangeCulpritScope={(mode) => {
+                /**
+                 * 범인 박스의 후보군 모드를 투표 탭 주 질문 targetMode 와 동기화.
+                 * 주 질문이 없으면 새로 만들어 끼워 넣는다(VoteEndingEditor 의 자동 생성과 동일한 형태).
+                 */
+                const questions = game.voteQuestions ?? [];
+                const primary = questions.find(
+                  (q) => q.purpose === "ending" && q.voteRound === 1,
+                );
+                if (primary) {
+                  updateGame({
+                    voteQuestions: questions.map((q) =>
+                      q.id === primary.id ? { ...q, targetMode: mode, choices: [] } : q,
+                    ),
+                  });
+                  return;
+                }
+                updateGame({
+                  voteQuestions: [
+                    {
+                      id: crypto.randomUUID(),
+                      voteRound: 1,
+                      label: "",
+                      targetMode: mode,
+                      purpose: "ending",
+                      sortOrder: 0,
+                      choices: [],
+                    },
+                    ...questions,
+                  ],
+                });
+              }}
               focusTarget={focusRequest.target}
               focusToken={focusRequest.token}
             />

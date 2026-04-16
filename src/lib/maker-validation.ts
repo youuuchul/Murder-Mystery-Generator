@@ -1,4 +1,5 @@
 import type { GamePackage, RoundScript, ScriptSegment } from "@/types/game";
+import { isCulpritIdValid } from "@/lib/culprit";
 
 export type MakerValidationLevel = "warning" | "error";
 
@@ -84,8 +85,8 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
       addIssue(issues, 3, "error", `이름이 비어 있는 캐릭터가 ${namelessPlayers}명 있습니다.`);
     }
 
-    if (isBlank(game.story.culpritPlayerId) || !game.players.some((player) => player.id === game.story.culpritPlayerId)) {
-      addIssue(issues, 3, "error", "범인을 지정하세요.");
+    if (!isCulpritIdValid(game.story.culpritPlayerId, game.players, game.story)) {
+      addIssue(issues, 3, "error", "범인을 지정하세요. 플레이어·NPC·피해자 중에서 선택할 수 있습니다.");
     }
 
     if (backgroundlessPlayers > 0) {

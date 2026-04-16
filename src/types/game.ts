@@ -117,7 +117,15 @@ export interface Story {
   gmOverview?: string; // GM 메인 화면 공통 메모
   mapImageUrl?: string; // GM 메인 화면 공통 지도/이미지
   timeline: StoryTimeline;
-  culpritPlayerId: string; // GM only — 진짜 범인 player ID
+  /**
+   * GM only — 진짜 범인의 식별자.
+   * 단일 문자열이지만 의미가 셋:
+   *  - 플레이어가 범인: `player.id`
+   *  - 피해자가 범인: 고정 문자열 `"victim"`  (`@/lib/culprit#CULPRIT_VICTIM_ID`)
+   *  - NPC 가 범인: `npc.id`
+   * 직접 문자열 비교 대신 `@/lib/culprit` 의 헬퍼(`resolveCulpritIdentity`, `isCulpritIdValid`)를 쓴다.
+   */
+  culpritPlayerId: string;
   motive: string; // GM only
   method: string; // GM only
 }

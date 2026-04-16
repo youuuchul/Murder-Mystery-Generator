@@ -17,6 +17,7 @@ import {
 } from "@/lib/ending-flow";
 import type { PlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { evaluatePlayerScore } from "@/lib/score-evaluator";
+import { CULPRIT_VICTIM_ID } from "@/lib/culprit";
 import { syncPlayerSessionCookieFromLocalStorage } from "@/lib/player-session-cookie";
 import {
   getAdvanceConfirmKind,
@@ -930,7 +931,14 @@ function VoteScreen({
             : q.targetMode === "players-and-npcs"
             ? [
                 ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
-                ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
+                ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+                ...(game.story.victim?.name?.trim()
+                  ? [{
+                      id: CULPRIT_VICTIM_ID,
+                      name: `${game.story.victim.name} (피해자)`,
+                      image: game.story.victim.imageUrl,
+                    }]
+                  : []),
               ]
             : game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage }));
 
@@ -1057,7 +1065,14 @@ function VoteScreen({
               : q.targetMode === "players-and-npcs"
               ? [
                   ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
-                  ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
+                  ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+                  ...(game.story.victim?.name?.trim()
+                    ? [{
+                        id: CULPRIT_VICTIM_ID,
+                        name: `${game.story.victim.name} (피해자)`,
+                        image: game.story.victim.imageUrl,
+                      }]
+                    : []),
                 ]
               : game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage }));
 

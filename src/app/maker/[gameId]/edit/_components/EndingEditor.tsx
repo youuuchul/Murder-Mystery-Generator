@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildPlayersNpcsVictimTargets } from "@/lib/culprit";
 import type {
   AuthorNote,
   EndingBranch,
@@ -8,6 +9,7 @@ import type {
   EndingConfig,
   Player,
   PersonalEnding,
+  Story,
   StoryNpc,
   VoteQuestion,
 } from "@/types/game";
@@ -16,6 +18,7 @@ interface EndingEditorProps {
   ending: EndingConfig;
   players: Player[];
   npcs?: StoryNpc[];
+  victim?: Story["victim"];
   voteQuestions: VoteQuestion[];
   advancedVotingEnabled: boolean;
   onChange: (ending: EndingConfig) => void;
@@ -26,14 +29,12 @@ interface EndingEditorProps {
 function getEffectiveChoices(
   q: VoteQuestion,
   players: Player[],
-  npcs: StoryNpc[]
+  npcs: StoryNpc[],
+  victim: Story["victim"] | undefined,
 ): { id: string; label: string }[] {
   if (q.targetMode === "custom-choices") return q.choices;
   if (q.targetMode === "players-and-npcs") {
-    return [
-      ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
-      ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
-    ];
+    return buildPlayersNpcsVictimTargets(players, npcs, victim);
   }
   return players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
 }
@@ -255,6 +256,7 @@ export default function EndingEditor({
   ending,
   players,
   npcs,
+  victim,
   voteQuestions,
   advancedVotingEnabled,
   onChange,
@@ -460,7 +462,7 @@ export default function EndingEditor({
 
                   {/* 매핑된 분기들 */}
                   {round1Branches.map((branch) => {
-                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs);
+                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs, victim);
                     return (
                       <BranchStoryForm
                         key={branch.id}
@@ -499,7 +501,7 @@ export default function EndingEditor({
 
                   {/* 2차 투표로 넘어가는 선택지 안내 */}
                   {round2TriggerChoiceIds.size > 0 && (() => {
-                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs);
+                    const choices = getEffectiveChoices(endingQuestion1, players, allNpcs, victim);
                     const triggerChoices = choices.filter((c) => round2TriggerChoiceIds.has(c.id));
                     return triggerChoices.length > 0 ? (
                       <div className="rounded-xl border border-yellow-900/30 bg-yellow-950/10 p-3">
@@ -551,7 +553,7 @@ export default function EndingEditor({
                     2차 투표 결과 엔딩
                   </p>
                   {round2Questions.map((q2) => {
-                    const choices = getEffectiveChoices(q2, players, allNpcs);
+                    const choices = getEffectiveChoices(q2, players, allNpcs, victim);
                     const r2Branches = getRound2Branches(q2.id);
                     const r2Fallback = getRound2Fallback(q2.id);
 

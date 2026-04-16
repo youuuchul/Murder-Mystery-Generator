@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { isCulpritIdValid } from "@/lib/culprit";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
 import SettingsEditor from "./SettingsEditor";
 import StoryEditor from "./StoryEditor";
@@ -590,12 +591,24 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               story={game.story}
               timeline={game.story.timeline}
               voteQuestions={game.voteQuestions ?? []}
-              onChange={(players) => updateGame({
-                players,
-                story: players.some((player) => player.id === game.story.culpritPlayerId)
-                  ? game.story
-                  : { ...game.story, culpritPlayerId: "" },
-              })}
+              onChange={(players) => {
+                /**
+                 * 플레이어 목록이 바뀐 뒤 범인이 여전히 유효한지 확인.
+                 * - 플레이어 범인이 삭제되면 클리어한다.
+                 * - 피해자/NPC 범인은 이 콜백과 무관하므로 그대로 둔다.
+                 */
+                const culpritStillValid = isCulpritIdValid(
+                  game.story.culpritPlayerId,
+                  players,
+                  game.story,
+                );
+                updateGame({
+                  players,
+                  story: culpritStillValid
+                    ? game.story
+                    : { ...game.story, culpritPlayerId: "" },
+                });
+              }}
               onChangeTimeline={(timeline) => updateGame({
                 story: {
                   ...game.story,

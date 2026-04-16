@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import ImageAssetField from "./ImageAssetField";
+import {
+  CULPRIT_VICTIM_ID,
+  buildPlayersNpcsVictimTargets,
+  formatCulpritLabel,
+  resolveCulpritIdentity,
+} from "@/lib/culprit";
 import type {
   Player,
   Clue,
@@ -469,6 +475,7 @@ function PlayerForm({
   voteQuestions,
   players,
   npcs,
+  victim,
   isCulprit,
   onChange,
   onDelete,
@@ -481,6 +488,7 @@ function PlayerForm({
   voteQuestions: VoteQuestion[];
   players: Player[];
   npcs: Story["npcs"];
+  victim: Story["victim"] | undefined;
   isCulprit: boolean;
   onChange: (p: Player) => void;
   onDelete: () => void;
@@ -725,6 +733,7 @@ function PlayerForm({
               voteQuestions={voteQuestions}
               players={players}
               npcs={npcs}
+              victim={victim}
               onUpdate={(idx, patch) => updateScore(idx, patch)}
               onAdd={() => update("scoreConditions", [...player.scoreConditions, { description: "", points: 1, type: "manual" }])}
               onDelete={(idx) => update("scoreConditions", player.scoreConditions.filter((_, i) => i !== idx))}
@@ -911,38 +920,77 @@ export default function PlayerEditor({
         <Button size="sm" onClick={() => onChange([...players, createPlayer()])}>+ 플레이어 추가</Button>
       </div>
 
-      <div data-maker-anchor="step-3-culprit" className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
-        <div>
-          <p className="text-sm font-semibold text-dark-100">범인 지정</p>
-          <p className="mt-1 text-xs text-dark-500">
-            엔딩 분기와 투표 결과 판정에 사용할 범인을 플레이어 기준으로 선택합니다.
-          </p>
-        </div>
+      {(() => {
+        const culpritIdentity = resolveCulpritIdentity(story.culpritPlayerId, syncedPlayers, story);
+        const victimName = story.victim?.name?.trim() ?? "";
+        const npcOptions = (story.npcs ?? []).filter((n) => (n.name ?? "").trim().length > 0);
+        const noCandidates = syncedPlayers.length === 0 && !victimName && npcOptions.length === 0;
+        const staleCulpritId = story.culpritPlayerId && !culpritIdentity ? story.culpritPlayerId : null;
 
-        <select
-          value={story.culpritPlayerId}
-          onChange={(e) => onChangeCulprit(e.target.value)}
-          disabled={syncedPlayers.length === 0}
-          className={inp}
-        >
-          <option value="">— 범인을 선택하세요 —</option>
-          {syncedPlayers.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name || "(이름 없음)"}
-            </option>
-          ))}
-        </select>
+        return (
+          <div data-maker-anchor="step-3-culprit" className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-dark-100">범인 지정</p>
+              <p className="mt-1 text-xs text-dark-500">
+                엔딩 분기와 투표 결과 판정에 사용할 범인을 플레이어 · 피해자 · NPC 중에서 선택합니다.
+              </p>
+            </div>
 
-        {syncedPlayers.length === 0 ? (
-          <p className="text-xs text-dark-600">플레이어를 추가한 뒤 범인을 선택할 수 있습니다.</p>
-        ) : story.culpritPlayerId ? (
-          <p className="text-xs text-mystery-400">
-            선택됨: {syncedPlayers.find((player) => player.id === story.culpritPlayerId)?.name ?? story.culpritPlayerId}
-          </p>
-        ) : (
-          <p className="text-xs text-yellow-300">아직 범인이 지정되지 않았습니다.</p>
-        )}
-      </div>
+            <select
+              value={story.culpritPlayerId}
+              onChange={(e) => onChangeCulprit(e.target.value)}
+              disabled={noCandidates}
+              className={inp}
+            >
+              <option value="">— 범인을 선택하세요 —</option>
+              {syncedPlayers.length > 0 && (
+                <optgroup label="플레이어">
+                  {syncedPlayers.map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {player.name || "(이름 없음)"}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {victimName && (
+                <optgroup label="피해자">
+                  <option value={CULPRIT_VICTIM_ID}>{victimName}</option>
+                </optgroup>
+              )}
+              {npcOptions.length > 0 && (
+                <optgroup label="NPC">
+                  {npcOptions.map((npc) => (
+                    <option key={npc.id} value={npc.id}>
+                      {npc.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {staleCulpritId && (
+                <option value={staleCulpritId} disabled>
+                  (삭제된 캐릭터)
+                </option>
+              )}
+            </select>
+
+            {noCandidates ? (
+              <p className="text-xs text-dark-600">
+                플레이어를 추가하거나 사건 개요 탭에서 피해자/NPC를 등록한 뒤 범인을 선택할 수 있습니다.
+              </p>
+            ) : culpritIdentity ? (
+              <p className="text-xs text-mystery-400">
+                선택됨: {formatCulpritLabel(culpritIdentity)}
+              </p>
+            ) : staleCulpritId ? (
+              <p className="text-xs text-red-300">
+                기존에 지정한 범인이 삭제됐습니다. 다시 선택해 주세요.
+              </p>
+            ) : (
+              <p className="text-xs text-yellow-300">아직 범인이 지정되지 않았습니다.</p>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="flex gap-1 bg-dark-900 p-1 rounded-xl border border-dark-800">
         <button
@@ -1011,6 +1059,7 @@ export default function PlayerEditor({
               voteQuestions={voteQuestions}
               players={syncedPlayers}
               npcs={story.npcs}
+              victim={story.victim}
               isCulprit={player.id === story.culpritPlayerId}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}
               onDelete={() => onChange(players.filter((_, i) => i !== idx))}
@@ -1037,6 +1086,7 @@ function ScoreConditionsEditor({
   voteQuestions,
   players,
   npcs,
+  victim,
   onUpdate,
   onAdd,
   onDelete,
@@ -1046,6 +1096,7 @@ function ScoreConditionsEditor({
   voteQuestions: VoteQuestion[];
   players: Player[];
   npcs: Story["npcs"];
+  victim: Story["victim"] | undefined;
   onUpdate: (idx: number, patch: Partial<ScoreCondition>) => void;
   onAdd: () => void;
   onDelete: (idx: number) => void;
@@ -1186,10 +1237,7 @@ function ScoreConditionsEditor({
                       const answers: { id: string; label: string }[] = q.targetMode === "custom-choices"
                         ? q.choices.map((c) => ({ id: c.id, label: c.label || "(선택지)" }))
                         : q.targetMode === "players-and-npcs"
-                          ? [
-                              ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
-                              ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
-                            ]
+                          ? buildPlayersNpcsVictimTargets(players, npcs, victim)
                           : players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
                       return (
                         <div className="flex items-center gap-2">

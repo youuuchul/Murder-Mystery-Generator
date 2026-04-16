@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import EndingEditor from "./EndingEditor";
+import { buildPlayersNpcsVictimTargets } from "@/lib/culprit";
 import type {
   EndingConfig,
   GamePackage,
   Player,
   ScriptSegment,
+  Story,
   StoryNpc,
   VoteQuestion,
   VoteQuestionChoice,
@@ -20,7 +22,7 @@ const inp =
 
 const TARGET_MODE_LABELS: Record<VoteTargetMode, string> = {
   "players-only": "플레이어만",
-  "players-and-npcs": "플레이어 + NPC",
+  "players-and-npcs": "플레이어 + NPC + 피해자",
   "custom-choices": "커스텀 선택지",
 };
 
@@ -40,20 +42,21 @@ function createVoteChoice(): VoteQuestionChoice {
   return { id: crypto.randomUUID(), label: "" };
 }
 
-/** 투표 대상이 플레이어/NPC 모드일 때 자동 선택지 목록 생성 */
+/**
+ * 투표 자동 선택지 생성.
+ * `players-and-npcs` 는 "플레이어 + NPC + 피해자(이름 있을 때)" 묶음.
+ */
 function buildAutoTargets(
   targetMode: VoteTargetMode,
   players: Player[],
-  npcs: StoryNpc[]
+  npcs: StoryNpc[],
+  victim: Story["victim"] | undefined,
 ): { id: string; label: string }[] {
   if (targetMode === "players-only") {
     return players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
   }
   if (targetMode === "players-and-npcs") {
-    return [
-      ...players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" })),
-      ...npcs.map((n) => ({ id: n.id, label: n.name || "(NPC)" })),
-    ];
+    return buildPlayersNpcsVictimTargets(players, npcs, victim);
   }
   return [];
 }
@@ -62,10 +65,11 @@ function buildAutoTargets(
 function getEffectiveChoices(
   q: VoteQuestion,
   players: Player[],
-  npcs: StoryNpc[]
+  npcs: StoryNpc[],
+  victim: Story["victim"] | undefined,
 ): { id: string; label: string }[] {
   if (q.targetMode === "custom-choices") return q.choices;
-  return buildAutoTargets(q.targetMode, players, npcs);
+  return buildAutoTargets(q.targetMode, players, npcs, victim);
 }
 
 // ─── VoteQuestionForm ─────────────────────────────────────
@@ -76,6 +80,7 @@ function VoteQuestionForm({
   firstRoundQuestion,
   players,
   npcs,
+  victim,
   onChange,
   onDelete,
   onChangeChoices,
@@ -85,13 +90,14 @@ function VoteQuestionForm({
   firstRoundQuestion?: VoteQuestion;
   players: Player[];
   npcs: StoryNpc[];
+  victim: Story["victim"] | undefined;
   onChange: (patch: Partial<VoteQuestion>) => void;
   onDelete: () => void;
   onChangeChoices: (c: VoteQuestionChoice[]) => void;
 }) {
   const [expanded, setExpanded] = useState(!question.label);
   const firstRoundChoices = firstRoundQuestion
-    ? getEffectiveChoices(firstRoundQuestion, players, npcs)
+    ? getEffectiveChoices(firstRoundQuestion, players, npcs, victim)
     : [];
 
   return (
@@ -224,7 +230,7 @@ function VoteQuestionForm({
             </select>
             {question.targetMode !== "custom-choices" && (
               <p className="text-xs text-dark-600 mt-1">
-                선택지: {buildAutoTargets(question.targetMode, players, npcs).map((t) => t.label).join(", ") || "없음"}
+                선택지: {buildAutoTargets(question.targetMode, players, npcs, victim).map((t) => t.label).join(", ") || "없음"}
               </p>
             )}
           </div>
@@ -310,6 +316,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
   const ending = game.ending;
   const players = game.players ?? [];
   const npcs = game.story?.npcs ?? [];
+  const victim = game.story?.victim;
   const voteQuestions = game.voteQuestions ?? [];
   const advancedVotingEnabled = game.advancedVotingEnabled ?? false;
   const voteScript = game.scripts.vote;
@@ -459,7 +466,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                   </select>
                   {currentPrimary.targetMode !== "custom-choices" && (
                     <p className="text-xs text-dark-600 mt-1">
-                      선택지: {buildAutoTargets(currentPrimary.targetMode, players, npcs).map((t) => t.label).join(", ") || "플레이어를 먼저 추가하세요"}
+                      선택지: {buildAutoTargets(currentPrimary.targetMode, players, npcs, victim).map((t) => t.label).join(", ") || "플레이어를 먼저 추가하세요"}
                     </p>
                   )}
                 </div>
@@ -581,6 +588,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                       question={q}
                       players={players}
                       npcs={npcs}
+                      victim={victim}
                       onChange={(patch) => updateQuestion(q.id, patch)}
                       onDelete={() => deleteQuestion(q.id)}
                       onChangeChoices={(c) => updateChoices(q.id, c)}
@@ -628,6 +636,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
                       firstRoundQuestion={currentPrimary}
                       players={players}
                       npcs={npcs}
+                      victim={victim}
                       onChange={(patch) => updateQuestion(q.id, patch)}
                       onDelete={() => deleteQuestion(q.id)}
                       onChangeChoices={(c) => updateChoices(q.id, c)}
@@ -646,6 +655,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
           ending={ending}
           players={players}
           npcs={npcs}
+          victim={victim}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}
@@ -659,6 +669,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
           ending={ending}
           players={players}
           npcs={npcs}
+          victim={victim}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}
@@ -672,6 +683,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
           ending={ending}
           players={players}
           npcs={npcs}
+          victim={victim}
           voteQuestions={voteQuestions}
           advancedVotingEnabled={advancedVotingEnabled}
           onChange={updateEnding}

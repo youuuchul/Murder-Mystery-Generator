@@ -3,6 +3,7 @@ import {
   applyPlayerAgentOccupancyToCharacterSlots,
   syncPlayerAgentRuntimeStatusForSharedPhase,
 } from "@/lib/ai/player-agent/core/player-agent-state";
+import { CULPRIT_VICTIM_ID } from "@/lib/culprit";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
 import { getGame } from "@/lib/game-repository";
@@ -133,8 +134,11 @@ function validateVoteTarget(game: GamePackage, targetMode: VoteTargetMode, targe
     case "players-only":
       return game.players.some((p) => p.id === targetId);
     case "players-and-npcs":
-      return game.players.some((p) => p.id === targetId)
-        || game.story.npcs.some((n) => n.id === targetId);
+      // players-and-npcs 는 "플레이어 + NPC + 피해자(이름이 있을 때)" 묶음.
+      if (game.players.some((p) => p.id === targetId)) return true;
+      if (game.story.npcs.some((n) => n.id === targetId)) return true;
+      if (targetId === CULPRIT_VICTIM_ID && (game.story.victim?.name ?? "").trim().length > 0) return true;
+      return false;
     case "custom-choices":
       return game.voteQuestions.some((q) =>
         q.choices.some((c) => c.id === targetId)

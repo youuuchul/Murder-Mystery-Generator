@@ -1,5 +1,6 @@
 import { normalizeGame } from "@/lib/game-normalizer";
 import { validateMakerGame } from "@/lib/maker-validation";
+import { resolveCulpritIdentity } from "@/lib/culprit";
 import type { GamePackage, PlayerTimelineEntry, TimelineSlot } from "@/types/game";
 import type { MakerAssistantTask } from "@/types/assistant";
 
@@ -97,6 +98,20 @@ export function buildMakerAssistantContext(
       victim: normalizedGame.story.victim,
       npcs: normalizedGame.story.npcs,
       incident: normalizedGame.story.incident,
+      /**
+       * 범인은 플레이어/피해자/NPC 중 하나일 수 있다.
+       * - culpritId: 저장된 그대로 (player.id | "victim" | npc.id)
+       * - culpritKind: "player" | "victim" | "npc" | "" (지정 안 됨)
+       * - culpritName: 표시용 이름. 캐릭터 삭제 등으로 stale id 면 빈 문자열.
+       * 레거시 culpritPlayerId / culpritPlayerName 도 호환을 위해 함께 노출하지만 신규 프롬프트는 culpritId/Name 을 쓴다.
+       */
+      culpritId: normalizedGame.story.culpritPlayerId,
+      culpritKind:
+        resolveCulpritIdentity(normalizedGame.story.culpritPlayerId, normalizedGame.players, normalizedGame.story)
+          ?.kind ?? "",
+      culpritName:
+        resolveCulpritIdentity(normalizedGame.story.culpritPlayerId, normalizedGame.players, normalizedGame.story)
+          ?.name ?? "",
       culpritPlayerId: normalizedGame.story.culpritPlayerId,
       culpritPlayerName:
         normalizedGame.players.find((player) => player.id === normalizedGame.story.culpritPlayerId)?.name

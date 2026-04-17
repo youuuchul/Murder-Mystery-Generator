@@ -357,12 +357,11 @@ export default function GameCard({
             >
               편집
             </Link>
-            <Link
-              href={`/play/${game.id}`}
-              className="text-center text-xs py-2 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
-            >
-              {playActionLabel}
-            </Link>
+            <PlayActionButton
+              gameId={game.id}
+              label={playActionLabel}
+              size="md"
+            />
             <Link
               href={`/play/${game.id}?create=1`}
               className="text-center text-xs py-2 px-3 rounded border border-amber-700 bg-amber-950/30 text-amber-200 transition-colors hover:bg-amber-900/40"
@@ -394,12 +393,9 @@ export default function GameCard({
               </span>
             )}
             {canPlay ? (
-              <Link
-                href={`/play/${game.id}`}
-                className="flex-1 text-center text-xs py-1.5 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
-              >
-                {playActionLabel}
-              </Link>
+              <div className="flex-1">
+                <PlayActionButton gameId={game.id} label={playActionLabel} size="sm" />
+              </div>
             ) : (
               <span className="flex-1 text-center text-xs py-1.5 px-3 rounded border border-dark-800 bg-dark-950 text-dark-600">
                 비공개
@@ -425,6 +421,87 @@ export default function GameCard({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * 라이브러리 게임 카드의 "플레이" 버튼.
+ * 클릭 시 GM 세션과 플레이어 참여 세션 중 하나를 선택하는 팝업을 띄운다.
+ * - GM 세션: /play/[gameId] — 기존 GM 진행 플로우
+ * - 플레이어 참여: /play/[gameId]/join — 참가 코드 입력 화면
+ */
+function PlayActionButton({
+  gameId,
+  label,
+  size,
+}: {
+  gameId: string;
+  label: string;
+  size: "sm" | "md";
+}) {
+  const [open, setOpen] = useState(false);
+
+  const triggerClass = size === "md"
+    ? "w-full text-center text-xs py-2 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors"
+    : "w-full text-center text-xs py-1.5 px-3 rounded bg-mystery-700 hover:bg-mystery-600 text-white border border-mystery-600 transition-colors";
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={triggerClass}>
+        {label}
+      </button>
+
+      {open ? (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-dark-950/80 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-xs uppercase tracking-[0.22em] text-mystery-300/70">Play Mode</p>
+            <h3 className="mt-2 text-lg font-semibold text-dark-50">어떻게 진행할까요?</h3>
+            <p className="mt-2 text-sm leading-6 text-dark-300">
+              GM이 진행을 맡거나 플레이어로 직접 참가할 수 있습니다.
+            </p>
+
+            <div className="mt-5 grid gap-3">
+              <Link
+                href={`/play/${gameId}`}
+                className="rounded-xl border border-mystery-700 bg-mystery-950/40 px-4 py-4 transition-colors hover:border-mystery-500 hover:bg-mystery-900/50"
+              >
+                <p className="text-sm font-semibold text-mystery-200">GM 세션</p>
+                <p className="mt-1 text-xs leading-5 text-mystery-200/70">
+                  GM으로 입장해 세션을 만들거나 진행 중인 세션을 이어서 운영합니다.
+                </p>
+              </Link>
+              <Link
+                href={`/play/${gameId}/join`}
+                className="rounded-xl border border-emerald-800 bg-emerald-950/30 px-4 py-4 transition-colors hover:border-emerald-500 hover:bg-emerald-900/40"
+              >
+                <p className="text-sm font-semibold text-emerald-200">플레이어 참여</p>
+                <p className="mt-1 text-xs leading-5 text-emerald-200/70">
+                  참가 코드로 방에 들어가거나 플레이어끼리 진행하는 방을 새로 만듭니다.
+                </p>
+              </Link>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

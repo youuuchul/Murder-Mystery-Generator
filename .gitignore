@@ -24,8 +24,12 @@ build/
 data/games/*/
 data/sessions/
 data/makers/*.json
+data/assets/
 backups/local-data/
 !data/README.md
+
+# Local assets 작업 폴더 (미공개)
+/assets/
 
 # Cloudflare tunnel temp file
 .tunnel-url

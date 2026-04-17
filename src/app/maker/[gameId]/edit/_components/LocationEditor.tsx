@@ -246,6 +246,10 @@ function LocationBlock({
   allLocations,
   allClues,
   allCharacters,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onChangeLocation,
   onDeleteLocation,
   onAddClue,
@@ -258,6 +262,10 @@ function LocationBlock({
   allLocations: Location[];
   allClues: Clue[];
   allCharacters: Player[];
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onChangeLocation: (l: Location) => void;
   onDeleteLocation: () => void;
   onAddClue: () => void;
@@ -353,6 +361,27 @@ function LocationBlock({
             >
               삭제
             </button>
+            <div className="flex overflow-hidden rounded-lg border border-dark-700">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+                disabled={!canMoveUp}
+                aria-label="위로 이동"
+                className="px-2.5 py-2 text-xs text-dark-400 transition-colors hover:bg-dark-800/60 hover:text-dark-200 disabled:cursor-not-allowed disabled:text-dark-700 disabled:hover:bg-transparent"
+              >
+                ↑
+              </button>
+              <span className="w-px bg-dark-700" aria-hidden />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+                disabled={!canMoveDown}
+                aria-label="아래로 이동"
+                className="px-2.5 py-2 text-xs text-dark-400 transition-colors hover:bg-dark-800/60 hover:text-dark-200 disabled:cursor-not-allowed disabled:text-dark-700 disabled:hover:bg-transparent"
+              >
+                ↓
+              </button>
+            </div>
             <span className="rounded-lg border border-dark-700 bg-dark-950/50 px-3 py-2 text-xs text-dark-400">
               {expanded ? "접기" : "열기"}
             </span>
@@ -803,6 +832,14 @@ export default function LocationEditor({
     onChangeLocations(locations.filter((_, i) => i !== idx));
   }
 
+  function moveLocation(idx: number, direction: -1 | 1) {
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= locations.length) return;
+    const next = locations.slice();
+    [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+    onChangeLocations(next);
+  }
+
   function addClue(locationId: string) {
     const newClue = createClue(locationId);
     // Location의 clueIds에도 추가
@@ -950,6 +987,10 @@ export default function LocationEditor({
                 allLocations={locations}
                 allClues={clues}
                 allCharacters={characters}
+                canMoveUp={idx > 0}
+                canMoveDown={idx < locations.length - 1}
+                onMoveUp={() => moveLocation(idx, -1)}
+                onMoveDown={() => moveLocation(idx, 1)}
                 onChangeLocation={(updated) => updateLocation(idx, updated)}
                 onDeleteLocation={() => deleteLocation(idx)}
                 onAddClue={() => addClue(location.id)}

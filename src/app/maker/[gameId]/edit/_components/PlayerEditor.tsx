@@ -502,6 +502,7 @@ function PlayerForm({
   const [expanded, setExpanded] = useState(true);
   const [tab, setTab] = useState<"basic" | "score" | "clues" | "rel">("basic");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [storyExpanded, setStoryExpanded] = useState(false);
 
   function update<K extends keyof Player>(key: K, value: Player[K]) {
     onChange({ ...player, [key]: value });
@@ -700,15 +701,25 @@ function PlayerForm({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-dark-400 mb-1">
-                  상세 스토리
-                </label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-medium text-dark-400">
+                    상세 스토리
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setStoryExpanded((v) => !v)}
+                    className="rounded-md border border-dark-700 bg-dark-900/60 px-2 py-1 text-[11px] text-dark-400 transition-colors hover:border-dark-500 hover:text-dark-200"
+                    aria-expanded={storyExpanded}
+                  >
+                    {storyExpanded ? "접기" : "펼치기"}
+                  </button>
+                </div>
                 <textarea
-                  rows={5}
+                  rows={storyExpanded ? undefined : 5}
                   value={player.story}
                   onChange={(e) => update("story", e.target.value)}
                   placeholder="이 캐릭터가 알고 있는 사건 전후 맥락, 감정선, 의심하는 대상, 숨기고 싶은 사정을 자세히 적으세요."
-                  className={ta}
+                  className={`${ta} ${storyExpanded ? "min-h-[33vh]" : ""}`}
                 />
                 <p className="mt-1 text-[11px] text-dark-500">
                   시간대별 행동과 알리바이는 위쪽 중앙 타임라인 탭에서 따로 입력합니다.

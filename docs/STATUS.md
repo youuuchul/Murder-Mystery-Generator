@@ -40,6 +40,8 @@
 - [x] 플레이어 참여용 세션 목록 화면
 - [x] 공개 카드 제작자 display name 노출
 - [x] 카드 이미지 표시 통일 (라이브러리/관리 화면)
+- [x] **관리 라이브러리 "플레이" 버튼에 GM 세션 / 플레이어 참여 선택 팝업** — 기존엔 `/play/[id]` GM 대시보드로 직행해서 플레이어 참여 입장이 막혀 있었음. GameCard에 `PlayActionButton` 모달 추가, 두 경로(`/play/[id]`, `/play/[id]/join`) 동시 접근 가능. ✅ 완료 (2026-04-17)
+- [x] **`/api/join/[code]` Supabase 쿼리 Next.js fetch 캐시 고착 버그** — App Router가 쿠키/헤더 미사용 라우트의 내부 fetch를 기본 force-cache 처리해서, join 엔드포인트가 콜드 스타트 당시의 게임 스냅샷(이미 삭제된 NPC, 구버전 플레이어 필드 등)을 계속 돌려줌. `createSupabasePersistenceClient`의 global fetch를 `cache: "no-store"`로 덮어써 전 persistence 경로에서 캐시 레이어 우회. ✅ 완료 (2026-04-17)
 
 ### 세션/플레이
 - [x] 세션 선택 화면 + 이름 자동생성 + 방 제목 수정

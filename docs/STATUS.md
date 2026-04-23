@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-16 (범인 지정에 피해자/NPC 허용 + 투표 `players-and-npcs` 모드에 피해자 자동 포함, 신규 게임 생성 페이지를 제목+소개글만 받는 얇은 셸로 단순화, 편집 화면 저장/네비 액션바를 드래그 가능한 플로팅 바로 전환 + AI 런처 겹침 회피 + 콘텐츠 하단 여백 자동 확보, 모바일 뷰포트 meta 누락 수정, iOS input 포커스 자동 확대 차단, 캐릭터 카드 승리조건 배치 정돈, 게임 커버 GM/플레이어 버튼 정책 정리, GM 전용 진행 가이드(gmNote) 폐지, 퍼스널/과거 기록 git 추적 제외 + set-maker-role.mjs Supabase 전용 단순화, 장소 character_has_item 조건을 "열기" 액션 + sky-pill 알림으로 전환)
+> 마지막 업데이트: 2026-04-23 (일부공개 게임 표지 버튼 "플레이어 참여" → "게임 시작"으로 바꾸고 세션 목록 경유 없이 방 바로 생성 후 입장, 표지 커버 이미지 wide screen 가운데 정렬 틀어지던 문제 수정 — 뷰포트 기준 높이를 컨테이너 비율 기준(`aspect-[8/5]`)으로 교체하고 히어로/카드를 동일 max-w-2xl 컨테이너에 묶음)
 
 ---
 
@@ -139,6 +139,7 @@
 - [x] **GM 진행 가이드(gmNote) 필드 폐지** — GM과 플레이어 진행 경험을 같게 만들기 위해 `ScriptSegment/RoundScript.gmNote` 및 `game_scripts.gm_note` 컬럼 제거. 메이커 UI에서 오프닝/대기실/라운드의 "진행 가이드" textarea 삭제, GMDashboard에서 `PhaseGuide` 섹션 제거. 메이커에서는 페이즈별 안내 텍스트(narration)만 입력하며 플레이어 공통화면과 GM 공통 보드에 같은 내용이 노출된다. ScriptEditor 기본 라벨을 "나레이션"에서 "안내 텍스트"로 교체. 기존 gm_note 테스트 데이터는 DB 마이그레이션으로 drop. ✅ 완료 (2026-04-15)
 - [x] **캐릭터 카드 승리조건 배치 정돈** — 플레이어 캐릭터 탭에서 상단에 독립으로 떠있던 승리조건 블록을 프로필 패널의 배경 ↔ 상세 스토리 사이로 이동해 다른 프로필 항목과 같은 계층으로 정렬. "탭해서 확인" 토글과 엔딩 페이즈 자동 펼침 동작은 그대로 유지. ✅ 완료 (2026-04-15)
 - [x] **게임 커버 GM/플레이어 진입 버튼 정책** — 공개 게임은 GM/플레이어 2-버튼, 일부공개는 링크 공유 대상을 플레이어로 한정하기 위해 플레이어 참여만 노출. 이후 세션 진입 퍼널(/play/[id]/join)은 두 가시성 공통. ✅ 완료 (2026-04-15)
+- [x] **일부공개 표지 "게임 시작" 원클릭 + 커버 정렬 수정** — 일부공개는 링크 수신자가 바로 플레이하는 퍼널이라 세션 목록(/play/[id]/join) 한 단계를 제거. 버튼을 "플레이어 참여" → "게임 시작"으로 바꾸고 `POST /api/sessions` (player-consensus)로 방을 즉시 만들어 `/join/[code]`로 이동. 세션 한도 초과 시 기존 `PlayerSessionEntry` 모달 패턴 재사용. 추가로 커버 표지가 와이드 스크린에서 왼쪽에 붙어 중앙 정렬이 틀어지던 문제를 해결 — 히어로 높이를 뷰포트 기준 `h-[min(50vh,62.5vw)]`에서 컨테이너 비율 기준 `aspect-[8/5]`로 교체하고 히어로/카드를 동일 `max-w-2xl` 컨테이너로 묶음. ✅ 완료 (2026-04-23)
 - [x] **Visibility 3-mode 리팩토링** — draft 제거, `private | unlisted | public` 3-mode 체계로 전환. DB CHECK 제약조건 + RLS 정책 unlisted 포함 마이그레이션. normalizer 버그 수정. UI 워딩 YouTube 스타일(비공개/일부 공개/공개). `/game/[gameId]` 커버 페이지 신규 추가. ✅ 완료 (2026-04-10)
 - [x] **통 JSON DB 컬럼 개선** — `game_content.content_json` 전면 정규화 완료. 15개 신규 테이블 생성(game_stories, game_players, game_locations, game_clues, game_scripts 등). games 테이블에 settings/rules 확장 컬럼 추가. game-repository.ts 완전 재작성(신규 테이블 기반 CRUD). content_json 비우고 backup 보존. LangChain(@langchain/core, @langchain/openai) + Langfuse 연동 검증 완료. ✅ 완료 (2026-04-10)
 - [x] **메이커 AI 도우미 LangChain 전환 + Langfuse 트레이싱** — Responses API → LangChain ChatOpenAI 전환. OTel span 직접 참조 방식으로 input/output 트레이싱 안정화. step별 컨텍스트 최적화. API 에러 분류(401/429/403) + UI 표시. AI 플레이어 밀담 채팅 API/UI 신규 추가. ✅ 완료 (2026-04-10)

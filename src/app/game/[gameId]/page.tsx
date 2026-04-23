@@ -8,6 +8,7 @@ import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { isMakerAdmin } from "@/lib/maker-role";
 import type { CoverImagePosition } from "@/types/game";
+import StartPlayerSessionButton from "./_components/StartPlayerSessionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -75,9 +76,9 @@ export default async function GameCoverPage({
           </Link>
         </div>
       </header>
-      <CoverHero title={game.title} imageUrl={coverUrl} imagePosition={coverPos} />
+      <div className="mx-auto max-w-2xl px-4 pb-16 sm:px-6">
+        <CoverHero title={game.title} imageUrl={coverUrl} imagePosition={coverPos} />
 
-      <div className="mx-auto max-w-2xl px-4 pb-16">
         <div className="-mt-12 relative z-10 rounded-3xl border border-dark-800 bg-dark-900/95 p-6 shadow-2xl backdrop-blur-sm sm:p-8">
           <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
             {game.title}
@@ -107,16 +108,11 @@ export default async function GameCoverPage({
             </div>
           )}
 
-          {/* 일부공개 커버는 링크를 받은 플레이어를 위한 진입점이라 '플레이어 참여'만 노출.
-              이후 세션 진입 퍼널(/play/[id]/join)은 공개 경로와 동일. GM이 필요하면 URL 직접 진입으로만 허용. */}
+          {/* 일부공개 커버는 링크를 받은 플레이어가 바로 방을 열고 입장할 수 있게 한다.
+              공개 게임은 GM 진행 선택지도 필요해 세션 목록 퍼널(/play/[id]/join)로 보낸다. */}
           <div className="mt-8">
             {game.access.visibility === "unlisted" ? (
-              <Link
-                href={`/play/${game.id}/join`}
-                className="inline-flex w-full items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-5 py-3.5 text-sm font-medium text-white transition-colors hover:bg-mystery-600"
-              >
-                플레이어 참여
-              </Link>
+              <StartPlayerSessionButton gameId={game.id} />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Link
@@ -150,7 +146,7 @@ function CoverHero({
   imagePosition?: CoverImagePosition;
 }) {
   return (
-    <div className="relative aspect-[16/10] max-h-[50vh] overflow-hidden">
+    <div className="relative w-full aspect-[8/5] overflow-hidden rounded-t-3xl">
       {imageUrl ? (
         <>
           <Image
@@ -158,7 +154,7 @@ function CoverHero({
             alt={title}
             fill
             priority
-            sizes="100vw"
+            sizes="(min-width: 768px) 672px, 100vw"
             className="object-cover"
             style={{
               objectPosition: `${imagePosition?.x ?? 50}% ${imagePosition?.y ?? 50}%`,

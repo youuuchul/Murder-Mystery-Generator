@@ -317,6 +317,12 @@ export default function EndingEditor({
   const endingQuestion1 = voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
   const round2Questions = voteQuestions.filter((q) => q.voteRound === 2);
 
+  // 1차 엔딩 투표가 커스텀 선택지 모드면 고급 엔딩 UI(선택지별 분기)를 강제 활성화.
+  // 기존 advancedVotingEnabled 플래그는 "2차 투표 도입"과 결합돼 있지만,
+  // custom-choices는 1차 분기만으로도 선택지 기반 엔딩이 필요하다.
+  const useCustomChoiceEnding = endingQuestion1?.targetMode === "custom-choices";
+  const useAdvancedEndingUI = advancedVotingEnabled || useCustomChoiceEnding;
+
   // 2차 투표로 넘어가는 1차 선택지 ID들
   const round2TriggerChoiceIds = new Set(
     round2Questions
@@ -381,8 +387,8 @@ export default function EndingEditor({
       {showBranches && (
         <div className="space-y-6">
 
-          {/* -- 기본 투표 모드 (2차 투표 OFF) -- */}
-          {!advancedVotingEnabled && (() => {
+          {/* -- 기본 투표 모드 (2차 투표 OFF + custom-choices 아님) -- */}
+          {!useAdvancedEndingUI && (() => {
             // 기본 모드에서 커스텀 선택지가 있으면 고급 엔딩 UI 대신 기본 2분기
             const captured = ending.branches.find((b) => b.triggerType === "culprit-captured")
               ?? { id: crypto.randomUUID(), label: "범인 검거", triggerType: "culprit-captured" as const, storyText: "" };
@@ -428,8 +434,8 @@ export default function EndingEditor({
             );
           })()}
 
-          {/* -- 2차 투표 모드 (advancedVotingEnabled) -- */}
-          {advancedVotingEnabled && (
+          {/* -- 선택지 기반 엔딩 분기 UI (advancedVotingEnabled 또는 custom-choices) -- */}
+          {useAdvancedEndingUI && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-dark-100">분기 엔딩</h3>

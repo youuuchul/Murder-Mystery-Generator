@@ -6,6 +6,7 @@ import {
 import { CULPRIT_VICTIM_ID } from "@/lib/culprit";
 import { canAccessGmPlay } from "@/lib/game-access";
 import { canResumeGmSessionDirectly } from "@/lib/gm-session-access";
+import { hasCustomChoiceEnding } from "@/lib/ending-flow";
 import { getGame } from "@/lib/game-repository";
 import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
@@ -241,7 +242,10 @@ async function revealVotes(
       const now = new Date().toISOString();
       const game = await getGame(latestSession.gameId);
       const culpritPlayerId = game?.story.culpritPlayerId ?? "";
-      const isAdvanced = game?.advancedVotingEnabled && Object.keys(latestSession.advancedVotes ?? {}).length > 0;
+      // 고급 투표 경로 진입 조건: advancedVotingEnabled(2차 투표 포함) 또는 1차 엔딩 투표의 custom-choices 모드.
+      // 둘 중 하나라도 활성화되면 question별 집계 → 선택지 기반 분기 해소로 가야 한다.
+      const useAdvancedPath = Boolean(game) && (game!.advancedVotingEnabled || hasCustomChoiceEnding(game!));
+      const isAdvanced = useAdvancedPath && Object.keys(latestSession.advancedVotes ?? {}).length > 0;
 
       // 고급 투표: 질문별 집계 후 primary 기반으로 엔딩 분기 결정
       if (isAdvanced && game) {
@@ -504,7 +508,8 @@ export async function POST(req: NextRequest, { params }: Params) {
           throw new Error("Game not found");
         }
 
-        const isAdvanced = game.advancedVotingEnabled && questionVotes && Object.keys(questionVotes).length > 0;
+        const useAdvancedPath = game.advancedVotingEnabled || hasCustomChoiceEnding(game);
+        const isAdvanced = useAdvancedPath && questionVotes && Object.keys(questionVotes).length > 0;
         const hasBasicVote = Boolean(targetPlayerId);
         const hasPersonalVotes = !isAdvanced && questionVotes && Object.keys(questionVotes).length > 0;
 

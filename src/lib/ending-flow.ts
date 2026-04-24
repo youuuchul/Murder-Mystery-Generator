@@ -53,6 +53,26 @@ function hasSecondVoteRound(game: GamePackage): boolean {
     && game.voteQuestions.some((q) => q.voteRound === 2);
 }
 
+/**
+ * 1차 엔딩 투표가 커스텀 선택지 모드인지 판단한다.
+ * custom-choices일 때는 `advancedVotingEnabled` 플래그와 무관하게
+ * 선택지 기반 분기 엔딩(custom-choice-matched / fallback)을 사용해야 한다.
+ */
+export function hasCustomChoiceEnding(game: GamePackage): boolean {
+  const primaryEndingQuestion = game.voteQuestions.find(
+    (q) => q.purpose === "ending" && q.voteRound === 1
+  );
+  return primaryEndingQuestion?.targetMode === "custom-choices";
+}
+
+/**
+ * 메이커·플레이·API 모든 경로에서 "선택지 기반 고급 엔딩 UI/로직"을 사용해야 하는지 판단.
+ * advancedVotingEnabled(2차 투표 포함) 또는 1차 엔딩 투표의 custom-choices 모드면 true.
+ */
+export function shouldUseAdvancedEndingPath(game: GamePackage): boolean {
+  return Boolean(game.advancedVotingEnabled) || hasCustomChoiceEnding(game);
+}
+
 /** 현재 게임 설정에서 가능한 엔딩 단계 순서를 계산한다. */
 export function getEndingStageOrder(game: GamePackage, reveal?: VoteReveal): EndingStage[] {
   const stages: EndingStage[] = ["vote-result", "branch"];

@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-24 (공개 라이브러리 카드 버튼 높이 어긋남 수정 — `PublicGameCard` flex 컬럼 + `mt-auto`로 버튼 바닥 고정, 제목/설명 `line-clamp`로 길이 편차 방어)
+> 마지막 업데이트: 2026-04-24 (투표 targetMode가 custom-choices일 때 엔딩 분기를 "범인 검거/미검거"가 아닌 선택지별 분기로 라우팅 — `advancedVotingEnabled` 플래그와 무관하게 메이커 ChoiceMapper UI·플레이어 고급 투표 UI·vote API advanced resolver 자동 활성화. 공개 라이브러리 카드 버튼 높이 어긋남도 함께 수정)
 
 ---
 
@@ -40,6 +40,7 @@
 - [x] 플레이어 참여용 세션 목록 화면
 - [x] 공개 카드 제작자 display name 노출
 - [x] 카드 이미지 표시 통일 (라이브러리/관리 화면)
+- [x] **투표 targetMode=custom-choices 엔딩 분기 라우팅 수정** — 메이커에서 투표 대상을 "커스텀 선택지"로 골라도 엔딩이 `advancedVotingEnabled=false` 경로로 떨어져 항상 "범인 검거/미검거" 2박스로 고정되던 문제. DB 스키마·`EndingBranchTriggerType(custom-choice-matched/fallback)`·`targetChoiceIds`·`resolveAdvancedEndingBranchId`는 이미 존재하는데, 진입 게이트 3곳이 `advancedVotingEnabled` 단일 플래그로만 묶여 있어 custom-choices 단독 모드가 막혀 있었음. `src/lib/ending-flow.ts`에 `hasCustomChoiceEnding()` / `shouldUseAdvancedEndingPath()` 파생 헬퍼 추가. `EndingEditor.tsx` 기본 2박스 분기 조건에 `!useCustomChoiceEnding` 추가, ChoiceMapper UI 조건은 `advancedVotingEnabled || useCustomChoiceEnding`으로 확장. `api/sessions/[sessionId]/vote/route.ts`의 `isAdvanced` 판정 2곳에도 동일 OR 조건. `PlayerView.tsx`의 `isAdvanced`도 확장해 플레이어가 선택지 UI로 투표하고 `advancedVotes`에 정상 저장되도록. 2차 투표 섹션은 `round2Questions.length > 0` 가드로 이미 분리돼 있어 custom-choices 단독 모드에선 자연스럽게 숨김. DB 마이그레이션·기존 데이터 변경 없음. ✅ 완료 (2026-04-24)
 - [x] **공개 라이브러리 카드 버튼 높이 정렬 수정** — `PublicGameCard`가 단순 `space-y-4`로 쌓이면서 설명 줄 수·태그 wrap 여부에 따라 GM/플레이어 버튼 y좌표가 어긋남. 카드 루트를 `flex h-full flex-col`로 바꾸고 콘텐츠 래퍼를 `flex-1 flex-col`, 버튼 그리드에 `mt-auto`를 걸어 바닥 고정. 제목 `line-clamp-2 min-h-[2.75rem]`, 설명 `line-clamp-3 min-h-[4.5rem]`, 태그 영역 `min-h-[1.75rem]`로 섹션별 최소/최대 높이 격리해 반응형(lg:2, xl:3 grid)은 유지. ✅ 완료 (2026-04-24)
 - [x] **관리 라이브러리 "플레이" 버튼에 GM 세션 / 플레이어 참여 선택 팝업** — 기존엔 `/play/[id]` GM 대시보드로 직행해서 플레이어 참여 입장이 막혀 있었음. GameCard에 `PlayActionButton` 모달 추가, 두 경로(`/play/[id]`, `/play/[id]/join`) 동시 접근 가능. ✅ 완료 (2026-04-17)
 - [x] **`/api/join/[code]` Supabase 쿼리 Next.js fetch 캐시 고착 버그** — App Router가 쿠키/헤더 미사용 라우트의 내부 fetch를 기본 force-cache 처리해서, join 엔드포인트가 콜드 스타트 당시의 게임 스냅샷(이미 삭제된 NPC, 구버전 플레이어 필드 등)을 계속 돌려줌. `createSupabasePersistenceClient`의 global fetch를 `cache: "no-store"`로 덮어써 전 persistence 경로에서 캐시 레이어 우회. ✅ 완료 (2026-04-17)

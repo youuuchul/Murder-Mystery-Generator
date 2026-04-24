@@ -11,6 +11,7 @@ import PlayLoadingSkeleton from "./PlayLoadingSkeleton";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
 import {
   ENDING_STAGE_LABELS,
+  hasCustomChoiceEnding,
   normalizeEndingStage,
   resolveActiveEndingBranch,
   resolveBranchPersonalEndings,
@@ -813,7 +814,11 @@ function VoteScreen({
   sessionId: string;
   token: string;
 }) {
-  const isAdvanced = game.advancedVotingEnabled && game.voteQuestions.length > 0;
+  // 고급 투표 UI 진입: advancedVotingEnabled(2차 투표 포함) 또는 1차 엔딩 투표의 custom-choices.
+  // custom-choices일 때 플레이어가 선택지를 보고 고르지 못하면 엔딩 분기가 동작할 수 없음.
+  const isAdvanced =
+    (game.advancedVotingEnabled || hasCustomChoiceEnding(game))
+    && game.voteQuestions.length > 0;
   const currentVoteRound = sharedState.currentVoteRound ?? 1;
   const activeQuestions = isAdvanced
     ? game.voteQuestions.filter((q) => q.voteRound === currentVoteRound)

@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-23 (일부공개 게임 표지 버튼 "플레이어 참여" → "게임 시작"으로 바꾸고 세션 목록 경유 없이 방 바로 생성 후 입장, 표지 커버 이미지 wide screen 가운데 정렬 틀어지던 문제 수정 — 뷰포트 기준 높이를 컨테이너 비율 기준(`aspect-[8/5]`)으로 교체하고 히어로/카드를 동일 max-w-2xl 컨테이너에 묶음)
+> 마지막 업데이트: 2026-04-24 (공개 라이브러리 카드 버튼 높이 어긋남 수정 — `PublicGameCard` flex 컬럼 + `mt-auto`로 버튼 바닥 고정, 제목/설명 `line-clamp`로 길이 편차 방어)
 
 ---
 
@@ -40,6 +40,7 @@
 - [x] 플레이어 참여용 세션 목록 화면
 - [x] 공개 카드 제작자 display name 노출
 - [x] 카드 이미지 표시 통일 (라이브러리/관리 화면)
+- [x] **공개 라이브러리 카드 버튼 높이 정렬 수정** — `PublicGameCard`가 단순 `space-y-4`로 쌓이면서 설명 줄 수·태그 wrap 여부에 따라 GM/플레이어 버튼 y좌표가 어긋남. 카드 루트를 `flex h-full flex-col`로 바꾸고 콘텐츠 래퍼를 `flex-1 flex-col`, 버튼 그리드에 `mt-auto`를 걸어 바닥 고정. 제목 `line-clamp-2 min-h-[2.75rem]`, 설명 `line-clamp-3 min-h-[4.5rem]`, 태그 영역 `min-h-[1.75rem]`로 섹션별 최소/최대 높이 격리해 반응형(lg:2, xl:3 grid)은 유지. ✅ 완료 (2026-04-24)
 - [x] **관리 라이브러리 "플레이" 버튼에 GM 세션 / 플레이어 참여 선택 팝업** — 기존엔 `/play/[id]` GM 대시보드로 직행해서 플레이어 참여 입장이 막혀 있었음. GameCard에 `PlayActionButton` 모달 추가, 두 경로(`/play/[id]`, `/play/[id]/join`) 동시 접근 가능. ✅ 완료 (2026-04-17)
 - [x] **`/api/join/[code]` Supabase 쿼리 Next.js fetch 캐시 고착 버그** — App Router가 쿠키/헤더 미사용 라우트의 내부 fetch를 기본 force-cache 처리해서, join 엔드포인트가 콜드 스타트 당시의 게임 스냅샷(이미 삭제된 NPC, 구버전 플레이어 필드 등)을 계속 돌려줌. `createSupabasePersistenceClient`의 global fetch를 `cache: "no-store"`로 덮어써 전 persistence 경로에서 캐시 레이어 우회. ✅ 완료 (2026-04-17)
 

@@ -26,35 +26,37 @@ export default function PublicGameCard({ game, ownerDisplayName }: PublicGameCar
   const tags = game.settings.tags ?? [];
 
   return (
-    <div className="group overflow-hidden rounded-[24px] border border-dark-800 bg-[linear-gradient(180deg,rgba(18,18,22,0.96),rgba(12,12,16,0.98))] transition-all duration-200 hover:-translate-y-0.5 hover:border-mystery-700 hover:shadow-[0_18px_48px_rgba(52,24,44,0.32)]">
+    <div className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-dark-800 bg-[linear-gradient(180deg,rgba(18,18,22,0.96),rgba(12,12,16,0.98))] transition-all duration-200 hover:-translate-y-0.5 hover:border-mystery-700 hover:shadow-[0_18px_48px_rgba(52,24,44,0.32)]">
       <LibraryCover
         title={game.title}
         imageUrl={game.settings.coverImageUrl}
         imagePosition={game.settings.coverImagePosition}
       />
 
-      <div className="space-y-4 p-5">
+      <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold leading-tight text-dark-50 transition-colors group-hover:text-mystery-300">
+          <h3 className="line-clamp-2 min-h-[2.75rem] text-lg font-semibold leading-tight text-dark-50 transition-colors group-hover:text-mystery-300">
             {game.title}
           </h3>
-          <p className="min-h-[3.75rem] text-sm leading-6 text-dark-300">
+          <p className="line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-dark-300">
             {game.settings.summary?.trim() || "공개 소개글이 아직 없습니다."}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs text-dark-400">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-dark-400">
           <span>인원 {game.settings.playerCount}인</span>
           <span>시간 {game.settings.estimatedDuration}분</span>
           <span>난이도 {difficultyLabel[diff] ?? diff}</span>
           {ownerDisplayName ? <span>제작자 {ownerDisplayName}</span> : null}
         </div>
 
-        {tags.length > 0 && (
-          <TagBadges tags={tags} max={10} visibleMax={5} />
-        )}
+        <div className="min-h-[1.75rem]">
+          {tags.length > 0 && (
+            <TagBadges tags={tags} max={10} visibleMax={5} />
+          )}
+        </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="mt-auto grid gap-2 pt-1 sm:grid-cols-2">
           <Link
             href={`/play/${game.id}`}
             className="inline-flex items-center justify-center rounded-xl border border-mystery-600 bg-mystery-700 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-mystery-600"

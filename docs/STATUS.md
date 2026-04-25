@@ -95,7 +95,7 @@
 | **Vercel Cold Start 지연** | Library 페이지 Cold Start 5~15s, Warm 1.8s. DB는 정상(세션 20개, 최대 11KB). 1차 대응: listUsers 전체 스캔 제거 + owner id 병렬 조회 전환. 2차 대응: Suspense 스트리밍으로 쉘/nav/counts/grid 분리, React.cache로 DB 쿼리 dedupe (2026-04-13). 추가 대응 필요 시: Vercel Pro keep-warm 검토 |
 | **엔딩 후 서버 무응답** | 원인: GM 탭 폴링 종료 가드 없음 + 세션 GET이 매번 정규화 15테이블 조인 실행 + SSE 무한 유지. 수정: GM shouldStopPolling 가드, getGame 30s in-memory 캐시, SSE maxDuration=60s로 슬롯 회수 (2026-04-13) |
 | 동점 재투표 시스템 | 혼자 테스트 불가 — 2명 이상 참여 세션에서 실동작 검증 필요 |
-| 이미지 서버 파생본 | 썸네일 전략 검토 |
+| 이미지 서버 파생본 | 1차 대응: 자산 응답 `Cache-Control` 에 `s-maxage=31536000` 추가해 Vercel CDN edge 캐싱 활성화 (`game-asset-storage.ts:22`, 2026-04-25). 추가 검토: 썸네일 별도 생성 전략 |
 | 비밀번호 찾기 | 운영 도메인 기준 메일 발송 최종 검증 |
 | admin 운영 UI | 미세조정 가능 |
 | Langfuse Vercel 환경변수 | Vercel에 설정된 LANGFUSE_PUBLIC_KEY/SECRET_KEY가 MurdermysteryGenerator 프로젝트 키와 일치하는지 검증. 현재 my-first-test-org로 trace가 간 적 있음. 로컬 .env 키는 정상 확인됨 |

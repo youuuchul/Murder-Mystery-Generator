@@ -19,7 +19,8 @@ export const GAME_ASSET_ALLOWED_MIME_TYPES = [
   "image/webp",
   "image/gif",
 ] as const;
-export const GAME_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+export const GAME_ASSET_CACHE_CONTROL =
+  "public, max-age=31536000, s-maxage=31536000, immutable";
 
 const DEFAULT_GAME_ASSETS_BUCKET = "game-assets";
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {

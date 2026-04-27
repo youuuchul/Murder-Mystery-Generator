@@ -39,6 +39,16 @@ supabase/.temp/
 portfolio/
 study-notes/
 
+# 채용공고 JD · 개인정보 · 대외 비공개 자료 (어느 경로에 있든 제외)
+**/_private/
+**/JD_*
+**/jd_*
+**/채용공고*
+**/공고*.pdf
+*.resume.pdf
+이력서*.pdf
+포트폴리오*.pdf
+
 # Historical records (personal — not published)
 ai_history/
 

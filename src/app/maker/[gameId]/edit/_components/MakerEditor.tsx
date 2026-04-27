@@ -615,6 +615,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                   timeline,
                 },
               })}
+              onChangeVoteQuestions={(voteQuestions) => updateGame({ voteQuestions })}
               onChangeCulprit={(culpritPlayerId) => updateGame({
                 story: {
                   ...game.story,

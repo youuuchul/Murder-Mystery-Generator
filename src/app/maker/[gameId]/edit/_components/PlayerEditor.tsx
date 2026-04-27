@@ -34,6 +34,7 @@ interface PlayerEditorProps {
   voteQuestions: VoteQuestion[];
   onChange: (players: Player[]) => void;
   onChangeTimeline: (timeline: StoryTimeline) => void;
+  onChangeVoteQuestions: (next: VoteQuestion[]) => void;
   onChangeCulprit: (playerId: string) => void;
   /**
    * 범인 후보군 모드 변경 콜백.
@@ -479,6 +480,7 @@ function PlayerForm({
   locations,
   relationTargets,
   voteQuestions,
+  onChangeVoteQuestions,
   players,
   npcs,
   victim,
@@ -492,6 +494,7 @@ function PlayerForm({
   locations: Location[];
   relationTargets: RelationTargetOption[];
   voteQuestions: VoteQuestion[];
+  onChangeVoteQuestions: (next: VoteQuestion[]) => void;
   players: Player[];
   npcs: Story["npcs"];
   victim: Story["victim"] | undefined;
@@ -748,6 +751,8 @@ function PlayerForm({
               scoreConditions={player.scoreConditions}
               clues={clues}
               voteQuestions={voteQuestions}
+              onChangeVoteQuestions={onChangeVoteQuestions}
+              currentPlayerId={player.id}
               players={players}
               npcs={npcs}
               victim={victim}
@@ -884,6 +889,7 @@ export default function PlayerEditor({
   voteQuestions,
   onChange,
   onChangeTimeline,
+  onChangeVoteQuestions,
   onChangeCulprit,
   onChangeCulpritScope,
   focusTarget,
@@ -1011,6 +1017,7 @@ export default function PlayerEditor({
               locations={locations}
               relationTargets={relationTargets}
               voteQuestions={voteQuestions}
+              onChangeVoteQuestions={onChangeVoteQuestions}
               players={syncedPlayers}
               npcs={story.npcs}
               victim={story.victim}
@@ -1038,6 +1045,8 @@ function ScoreConditionsEditor({
   scoreConditions,
   clues,
   voteQuestions,
+  onChangeVoteQuestions,
+  currentPlayerId,
   players,
   npcs,
   victim,
@@ -1048,6 +1057,8 @@ function ScoreConditionsEditor({
   scoreConditions: ScoreCondition[];
   clues: Clue[];
   voteQuestions: VoteQuestion[];
+  onChangeVoteQuestions: (next: VoteQuestion[]) => void;
+  currentPlayerId: string;
   players: Player[];
   npcs: Story["npcs"];
   victim: Story["victim"] | undefined;
@@ -1056,6 +1067,32 @@ function ScoreConditionsEditor({
   onDelete: (idx: number) => void;
 }) {
   const personalQuestions = voteQuestions.filter((q) => q.purpose === "personal");
+
+  function findPlayerName(id: string): string {
+    return players.find((p) => p.id === id)?.name?.trim() || "(이름 없음)";
+  }
+
+  function patchVoteQuestion(questionId: string, patch: Partial<VoteQuestion>) {
+    onChangeVoteQuestions(
+      voteQuestions.map((q) => (q.id === questionId ? { ...q, ...patch } : q))
+    );
+  }
+
+  function createPersonalQuestionForCurrentPlayer(): string {
+    const newId = crypto.randomUUID();
+    const next: VoteQuestion = {
+      id: newId,
+      voteRound: 1,
+      label: "",
+      targetMode: "custom-choices",
+      purpose: "personal",
+      personalTargetPlayerId: currentPlayerId,
+      sortOrder: voteQuestions.length,
+      choices: [],
+    };
+    onChangeVoteQuestions([...voteQuestions, next]);
+    return newId;
+  }
 
   return (
     <div className="space-y-3">
@@ -1162,59 +1199,221 @@ function ScoreConditionsEditor({
               </div>
             )}
 
-            {type === "vote-answer" && (
-              <div className="space-y-2">
-                {personalQuestions.length === 0 ? (
-                  <p className="text-[11px] text-yellow-400/70 border border-yellow-900/30 bg-yellow-950/10 rounded-lg px-2 py-1.5">
-                    투표 탭에서 추가 투표(개인 목표) 질문을 먼저 추가하세요.
+            {type === "vote-answer" && (() => {
+              const linkedQuestion = sc.config?.questionId
+                ? personalQuestions.find((pq) => pq.id === sc.config?.questionId)
+                : undefined;
+              const isOwnedByThisPlayer = linkedQuestion?.personalTargetPlayerId === currentPlayerId;
+              const linkedToOther = linkedQuestion && linkedQuestion.personalTargetPlayerId
+                && linkedQuestion.personalTargetPlayerId !== currentPlayerId;
+              const otherOwnerName = linkedToOther
+                ? findPlayerName(linkedQuestion!.personalTargetPlayerId!)
+                : null;
+              const hasReusableQuestions = personalQuestions.length > 0;
+
+              return (
+                <div className="space-y-2 rounded-md border border-purple-900/40 bg-purple-950/10 p-2.5">
+                  <p className="text-[11px] text-purple-300/90">
+                    이 캐릭터에게만 보일 개인 투표를 같은 화면에서 만듭니다. 투표 탭으로 이동할 필요가 없습니다.
                   </p>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] text-dark-500 shrink-0">질문</label>
-                      <select
-                        value={sc.config?.questionId ?? ""}
-                        onChange={(e) => onUpdate(idx, {
-                          config: { ...sc.config, questionId: e.target.value || undefined, expectedAnswerId: undefined },
-                        })}
-                        className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+
+                  {!sc.config?.questionId && (
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newId = createPersonalQuestionForCurrentPlayer();
+                          onUpdate(idx, {
+                            config: { ...sc.config, questionId: newId, expectedAnswerId: undefined },
+                          });
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 rounded-md border border-purple-700/60 bg-purple-900/30 text-purple-100 hover:bg-purple-900/50 transition-colors"
                       >
-                        <option value="">— 질문 선택 —</option>
-                        {personalQuestions.map((q) => (
-                          <option key={q.id} value={q.id}>{q.label || "(질문 없음)"}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {sc.config?.questionId && (() => {
-                      const q = personalQuestions.find((pq) => pq.id === sc.config?.questionId);
-                      if (!q) return null;
-                      const answers: { id: string; label: string }[] = q.targetMode === "custom-choices"
-                        ? q.choices.map((c) => ({ id: c.id, label: c.label || "(선택지)" }))
-                        : q.targetMode === "players-and-npcs"
-                          ? buildPlayersNpcsVictimTargets(players, npcs, victim)
-                          : players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
-                      return (
+                        + 이 캐릭터의 새 개인 투표 만들기
+                      </button>
+
+                      {hasReusableQuestions && (
                         <div className="flex items-center gap-2">
-                          <label className="text-[11px] text-dark-500 shrink-0">정답</label>
+                          <label className="text-[11px] text-dark-500 shrink-0">기존 연결</label>
                           <select
-                            value={sc.config?.expectedAnswerId ?? ""}
-                            onChange={(e) => onUpdate(idx, {
-                              config: { ...sc.config, expectedAnswerId: e.target.value || undefined },
-                            })}
+                            value=""
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              if (next) {
+                                onUpdate(idx, {
+                                  config: { ...sc.config, questionId: next, expectedAnswerId: undefined },
+                                });
+                              }
+                            }}
                             className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
                           >
-                            <option value="">— 정답 선택 —</option>
-                            {answers.map((a) => (
-                              <option key={a.id} value={a.id}>{a.label}</option>
-                            ))}
+                            <option value="">— 기존 질문 선택 —</option>
+                            {personalQuestions.map((q) => {
+                              const ownerLabel = q.personalTargetPlayerId
+                                ? `[${findPlayerName(q.personalTargetPlayerId)}]`
+                                : "[전원]";
+                              return (
+                                <option key={q.id} value={q.id}>
+                                  {ownerLabel} {q.label || "(질문 없음)"}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
-                      );
-                    })()}
-                  </>
-                )}
-              </div>
-            )}
+                      )}
+                    </div>
+                  )}
+
+                  {sc.config?.questionId && !linkedQuestion && (
+                    <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
+                      연결된 질문이 삭제됐습니다.
+                      <button
+                        type="button"
+                        onClick={() => onUpdate(idx, { config: {} })}
+                        className="ml-1 underline"
+                      >
+                        연결 해제
+                      </button>
+                    </p>
+                  )}
+
+                  {linkedQuestion && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-purple-300/80">
+                          {isOwnedByThisPlayer
+                            ? "이 캐릭터 전용"
+                            : linkedToOther
+                              ? `다른 캐릭터(${otherOwnerName})와 공유`
+                              : "전체 플레이어 공통"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdate(idx, { config: {} })}
+                          className="text-[11px] text-dark-500 hover:text-red-400 transition-colors"
+                        >
+                          연결 해제
+                        </button>
+                      </div>
+
+                      {linkedToOther && (
+                        <p className="text-[11px] text-yellow-400/80 border border-yellow-900/40 bg-yellow-950/10 rounded-lg px-2 py-1.5">
+                          {otherOwnerName}의 질문에 연결돼 있습니다. 정답만 이 캐릭터 기준으로 지정할 수 있고, 질문 내용은 해당 캐릭터에서 편집해 주세요.
+                        </p>
+                      )}
+
+                      {!linkedToOther && (
+                        <>
+                          <div className="space-y-1">
+                            <label className="text-[11px] text-dark-500">질문</label>
+                            <input
+                              type="text"
+                              value={linkedQuestion.label}
+                              onChange={(e) => patchVoteQuestion(linkedQuestion.id, { label: e.target.value })}
+                              placeholder="이 캐릭터에게 던질 개인 질문"
+                              className="w-full bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label className="text-[11px] text-dark-500 shrink-0">선택지 모드</label>
+                            <select
+                              value={linkedQuestion.targetMode}
+                              onChange={(e) => {
+                                const nextMode = e.target.value as VoteQuestion["targetMode"];
+                                patchVoteQuestion(linkedQuestion.id, {
+                                  targetMode: nextMode,
+                                  choices: nextMode === "custom-choices" ? linkedQuestion.choices : [],
+                                });
+                                onUpdate(idx, { config: { ...sc.config, expectedAnswerId: undefined } });
+                              }}
+                              className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                            >
+                              <option value="custom-choices">직접 작성한 선택지</option>
+                              <option value="players-only">플레이어 중에서</option>
+                              <option value="players-and-npcs">플레이어 + NPC + 피해자</option>
+                            </select>
+                          </div>
+
+                          {linkedQuestion.targetMode === "custom-choices" && (
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] text-dark-500">선택지</label>
+                              {linkedQuestion.choices.map((c, ci) => (
+                                <div key={c.id} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={c.label}
+                                    onChange={(e) => {
+                                      const nextChoices = linkedQuestion.choices.map((x, i) =>
+                                        i === ci ? { ...x, label: e.target.value } : x
+                                      );
+                                      patchVoteQuestion(linkedQuestion.id, { choices: nextChoices });
+                                    }}
+                                    placeholder={`선택지 ${ci + 1}`}
+                                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextChoices = linkedQuestion.choices.filter((_, i) => i !== ci);
+                                      patchVoteQuestion(linkedQuestion.id, { choices: nextChoices });
+                                      if (sc.config?.expectedAnswerId === c.id) {
+                                        onUpdate(idx, { config: { ...sc.config, expectedAnswerId: undefined } });
+                                      }
+                                    }}
+                                    className="text-dark-500 hover:text-red-400 text-xs transition-colors"
+                                  >
+                                    삭제
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextChoices = [...linkedQuestion.choices, {
+                                    id: crypto.randomUUID(),
+                                    label: "",
+                                  }];
+                                  patchVoteQuestion(linkedQuestion.id, { choices: nextChoices });
+                                }}
+                                className="text-[11px] text-mystery-400 hover:text-mystery-300 transition-colors"
+                              >
+                                + 선택지 추가
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(() => {
+                        const answers: { id: string; label: string }[] = linkedQuestion.targetMode === "custom-choices"
+                          ? linkedQuestion.choices.map((c) => ({ id: c.id, label: c.label || "(빈 선택지)" }))
+                          : linkedQuestion.targetMode === "players-and-npcs"
+                            ? buildPlayersNpcsVictimTargets(players, npcs, victim)
+                            : players.map((p) => ({ id: p.id, label: p.name || "(이름 없음)" }));
+                        return (
+                          <div className="flex items-center gap-2">
+                            <label className="text-[11px] text-dark-500 shrink-0">정답</label>
+                            <select
+                              value={sc.config?.expectedAnswerId ?? ""}
+                              onChange={(e) => onUpdate(idx, {
+                                config: { ...sc.config, expectedAnswerId: e.target.value || undefined },
+                              })}
+                              className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                            >
+                              <option value="">— 정답 선택 —</option>
+                              {answers.map((a) => (
+                                <option key={a.id} value={a.id}>{a.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })}

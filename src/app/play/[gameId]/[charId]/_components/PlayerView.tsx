@@ -936,11 +936,11 @@ function VoteScreen({
             : q.targetMode === "players-and-npcs"
             ? [
                 ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
-                ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+                ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
                 ...(game.story.victim?.name?.trim()
                   ? [{
                       id: CULPRIT_VICTIM_ID,
-                      name: `${game.story.victim.name} (피해자)`,
+                      name: game.story.victim.name,
                       image: game.story.victim.imageUrl,
                     }]
                   : []),
@@ -1002,11 +1002,11 @@ function VoteScreen({
   const baseTargets: VoteTarget[] = primaryTargetMode === "players-and-npcs"
     ? [
         ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
-        ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+        ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
         ...(game.story.victim?.name?.trim()
           ? [{
               id: CULPRIT_VICTIM_ID,
-              name: `${game.story.victim.name} (피해자)`,
+              name: game.story.victim.name,
               image: game.story.victim.imageUrl,
             }]
           : []),
@@ -1086,11 +1086,11 @@ function VoteScreen({
               : q.targetMode === "players-and-npcs"
               ? [
                   ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
-                  ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+                  ...game.story.npcs.map((n) => ({ id: n.id, name: n.name, image: n.imageUrl })),
                   ...(game.story.victim?.name?.trim()
                     ? [{
                         id: CULPRIT_VICTIM_ID,
-                        name: `${game.story.victim.name} (피해자)`,
+                        name: game.story.victim.name,
                         image: game.story.victim.imageUrl,
                       }]
                     : []),

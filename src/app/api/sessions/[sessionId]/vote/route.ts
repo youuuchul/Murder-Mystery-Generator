@@ -535,6 +535,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
           const alreadyVoted = token in latestSession.votes;
           if (hasBasicVote) {
+            const primaryQ = game.voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
+            const basicTargetMode = primaryQ?.targetMode ?? "players-only";
+            if (!validateVoteTarget(game, basicTargetMode, targetPlayerId!)) {
+              throw new Error("Invalid basic vote target");
+            }
             latestSession.votes[token] = targetPlayerId!;
           }
 

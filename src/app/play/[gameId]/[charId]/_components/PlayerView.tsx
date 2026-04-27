@@ -993,13 +993,29 @@ function VoteScreen({
   }
 
   // 기본 투표 모드
-  const votablePlayers = isRevote
-    ? game.players.filter((p) => revoteCandidateIds!.includes(p.id))
-    : game.players;
-
-  // 1차 투표의 질문 텍스트 (메이커가 설정한 경우)
+  // 1차 투표의 질문 텍스트 + targetMode (메이커가 설정한 경우)
   const primaryQuestion = game.voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
   const questionLabel = primaryQuestion?.label?.trim() || "범인이라 생각하는 사람은?";
+  const primaryTargetMode = primaryQuestion?.targetMode ?? "players-only";
+
+  type VoteTarget = { id: string; name: string; image?: string };
+  const baseTargets: VoteTarget[] = primaryTargetMode === "players-and-npcs"
+    ? [
+        ...game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage })),
+        ...game.story.npcs.map((n) => ({ id: n.id, name: `${n.name} (NPC)`, image: n.imageUrl })),
+        ...(game.story.victim?.name?.trim()
+          ? [{
+              id: CULPRIT_VICTIM_ID,
+              name: `${game.story.victim.name} (피해자)`,
+              image: game.story.victim.imageUrl,
+            }]
+          : []),
+      ]
+    : game.players.map((p) => ({ id: p.id, name: p.name, image: p.cardImage }));
+
+  const votableTargets: VoteTarget[] = isRevote
+    ? baseTargets.filter((t) => revoteCandidateIds!.includes(t.id))
+    : baseTargets;
 
   return (
     <div className="space-y-4">
@@ -1016,7 +1032,7 @@ function VoteScreen({
         <div className="bg-dark-900 border border-yellow-800 rounded-xl p-4 space-y-2">
           <p className="text-xs text-yellow-500 font-medium">재투표</p>
           <p className="text-sm text-dark-200">
-            동점 후보 {votablePlayers.length}명에 대해 재투표를 진행합니다.
+            동점 후보 {votableTargets.length}명에 대해 재투표를 진행합니다.
           </p>
           <p className="text-xs text-dark-500">
             재투표에서도 동점이면 무작위로 결과가 확정됩니다.
@@ -1032,25 +1048,25 @@ function VoteScreen({
       </div>
 
       <div className="space-y-2">
-        {votablePlayers.map((p) => (
+        {votableTargets.map((t) => (
           <button
-            key={p.id}
+            key={t.id}
             type="button"
-            onClick={() => setSelectedId(p.id)}
+            onClick={() => setSelectedId(t.id)}
             className={[
               "w-full rounded-xl border px-4 py-3.5 text-left transition-all",
-              selectedId === p.id
+              selectedId === t.id
                 ? "border-mystery-600 bg-mystery-950/30 ring-1 ring-mystery-600"
                 : "border-dark-700 bg-dark-900 hover:border-dark-500",
             ].join(" ")}
           >
             <div className="flex items-center gap-3">
-              {p.cardImage ? (
+              {t.image ? (
                 <div className="w-14 shrink-0">
-                  <ImageFrame src={p.cardImage} alt={p.name} compact={false} variant="portrait" />
+                  <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
                 </div>
               ) : null}
-              <p className="font-semibold text-dark-100">{p.name}</p>
+              <p className="font-semibold text-dark-100">{t.name}</p>
             </div>
           </button>
         ))}

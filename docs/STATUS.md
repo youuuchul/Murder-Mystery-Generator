@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-27 (cron `cleanup-sessions` 운영 검증 완료 — 24h 초과 잔존 0건. timeout/관측 보강: `maxDuration=300`, console.log로 결과 추적, 응답 body에 failed/elapsedMs 동봉. 백업 retention 정책은 백로그로 분리)
+> 마지막 업데이트: 2026-04-27 (긴급 fix: personal 투표 질문이 모든 캐릭터에게 노출되던 버그 — DB `game_vote_questions.personal_target_player_id` 컬럼 누락이 원인. 마이그레이션 추가 + INSERT/Hydrate 보강 + 기본 투표 UI에서 `players-and-npcs` 모드일 때 NPC/피해자 후보 노출 + vote API basic 경로 validateVoteTarget 호출 추가)
 
 ---
 

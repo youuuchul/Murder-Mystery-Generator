@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-27 (긴급 fix 2차: 메이커 캐릭터 탭 ScoreConditionsEditor에 인라인 개인 투표 폼 — 캐릭터 탭에서 질문 라벨/선택지/정답까지 한 화면에서 작성, 투표 탭으로 이동 불필요. PlayerView 투표 라벨에서 `(NPC)`/`(피해자)` suffix 제거(메이커 culprit selector는 유지). 1차 fix: personal_target_player_id DB 컬럼 누락 수정 + INSERT/Hydrate 보강 + 기본 투표 UI players-and-npcs 분기 + vote API basic 경로 validateVoteTarget)
+> 마지막 업데이트: 2026-04-27 (캐릭터 탭 인라인 개인 투표 폼의 메타 안내 카피 제거 — "투표 탭으로 이동할 필요가 없습니다"·"이 캐릭터 전용" 등 작업자가 자기 작업을 자랑하는 라벨 삭제. 직전 수정: ScoreConditionsEditor 인라인 폼, 투표 라벨 suffix 제거, personal_target_player_id DB 컬럼 추가)
 
 ---
 

@@ -1213,10 +1213,6 @@ function ScoreConditionsEditor({
 
               return (
                 <div className="space-y-2 rounded-md border border-purple-900/40 bg-purple-950/10 p-2.5">
-                  <p className="text-[11px] text-purple-300/90">
-                    이 캐릭터에게만 보일 개인 투표를 같은 화면에서 만듭니다. 투표 탭으로 이동할 필요가 없습니다.
-                  </p>
-
                   {!sc.config?.questionId && (
                     <div className="space-y-1.5">
                       <button
@@ -1229,7 +1225,7 @@ function ScoreConditionsEditor({
                         }}
                         className="w-full text-left text-xs px-3 py-2 rounded-md border border-purple-700/60 bg-purple-900/30 text-purple-100 hover:bg-purple-900/50 transition-colors"
                       >
-                        + 이 캐릭터의 새 개인 투표 만들기
+                        + 새 개인 투표 만들기
                       </button>
 
                       {hasReusableQuestions && (
@@ -1281,11 +1277,11 @@ function ScoreConditionsEditor({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-purple-300/80">
-                          {isOwnedByThisPlayer
-                            ? "이 캐릭터 전용"
-                            : linkedToOther
-                              ? `다른 캐릭터(${otherOwnerName})와 공유`
-                              : "전체 플레이어 공통"}
+                          {linkedToOther
+                            ? `${otherOwnerName}의 질문에 연결됨`
+                            : !isOwnedByThisPlayer
+                              ? "전체 플레이어 공통"
+                              : ""}
                         </span>
                         <button
                           type="button"
@@ -1298,7 +1294,7 @@ function ScoreConditionsEditor({
 
                       {linkedToOther && (
                         <p className="text-[11px] text-yellow-400/80 border border-yellow-900/40 bg-yellow-950/10 rounded-lg px-2 py-1.5">
-                          {otherOwnerName}의 질문에 연결돼 있습니다. 정답만 이 캐릭터 기준으로 지정할 수 있고, 질문 내용은 해당 캐릭터에서 편집해 주세요.
+                          정답만 이 캐릭터 기준으로 지정할 수 있습니다. 질문 내용은 {otherOwnerName} 카드에서 편집하세요.
                         </p>
                       )}
 

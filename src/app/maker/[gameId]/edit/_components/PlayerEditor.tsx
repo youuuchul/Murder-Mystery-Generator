@@ -122,6 +122,13 @@ function parseRelationTargetValue(value?: string): Pick<Relationship, "targetTyp
   };
 }
 
+/** 관계 대상 비교용 select value를 만든다. legacy playerId 데이터도 같은 기준으로 정규화한다. */
+function getRelationshipTargetValue(relationship: Relationship): string {
+  const targetType = relationship.targetType ?? "player";
+  const targetId = relationship.targetId || relationship.playerId || "";
+  return targetId ? `${targetType}:${targetId}` : "";
+}
+
 /**
  * 현재 타임라인 슬롯 목록에 맞춰 플레이어 행동 타임라인을 정렬한다.
  * 슬롯이 추가/삭제돼도 중앙 타임라인 편집기와 플레이어 화면이 같은 순서를 유지한다.
@@ -555,7 +562,7 @@ function PlayerForm({
 
   /** 관계 1개를 현재 캐릭터 카드에 추가한다. */
   function addRelationship() {
-    const defaultTarget = filteredRelationTargets[0]?.value;
+    const defaultTarget = getRelationTargetsForRow(-1)[0]?.value;
     update("relationships", [
       ...player.relationships,
       {
@@ -567,6 +574,20 @@ function PlayerForm({
 
   const conditionInfo = VICTORY_OPTIONS.find((v) => v.value === player.victoryCondition);
   const filteredRelationTargets = relationTargets.filter((target) => target.value !== `player:${player.id}`);
+  const selectedRelationshipTargets = new Set(
+    player.relationships
+      .map(getRelationshipTargetValue)
+      .filter(Boolean)
+  );
+  function getRelationTargetsForRow(rowIndex: number) {
+    const currentValue = rowIndex >= 0
+      ? getRelationshipTargetValue(player.relationships[rowIndex])
+      : "";
+    return filteredRelationTargets.filter((target) => (
+      target.value === currentValue || !selectedRelationshipTargets.has(target.value)
+    ));
+  }
+  const availableRelationTargetsToAdd = getRelationTargetsForRow(-1);
   const clueOptions = clues.map((clue) => {
     const locationName = locations.find((location) => location.id === clue.locationId)?.name?.trim() || "위치 미지정";
     return {
@@ -822,51 +843,51 @@ function PlayerForm({
                   <p className="text-xs text-dark-600">등록된 관계가 없습니다. 아래 버튼으로 첫 관계를 추가하세요.</p>
                 </div>
               ) : (
-                player.relationships.map((rel, idx) => (
-                  <div key={idx} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-dark-300">관계 {idx + 1}</p>
-                      <button
-                        type="button"
-                        onClick={() => update("relationships", player.relationships.filter((_, i) => i !== idx))}
-                        className="text-xs text-dark-500 hover:text-red-400 transition-colors"
-                      >
-                        삭제
-                      </button>
-                    </div>
+                player.relationships.map((rel, idx) => {
+                  const currentRelationValue = getRelationshipTargetValue(rel);
+                  const targetsForRow = getRelationTargetsForRow(idx);
+                  return (
+                    <div key={idx} className="rounded-xl border border-dark-700/70 bg-dark-900/40 p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-medium text-dark-300">관계 {idx + 1}</p>
+                        <button
+                          type="button"
+                          onClick={() => update("relationships", player.relationships.filter((_, i) => i !== idx))}
+                          className="text-xs text-dark-500 hover:text-red-400 transition-colors"
+                        >
+                          삭제
+                        </button>
+                      </div>
 
-                    <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
-                      <select
-                        value={
-                          rel.targetType && rel.targetId
-                            ? `${rel.targetType}:${rel.targetId}`
-                            : rel.playerId
-                              ? `player:${rel.playerId}`
-                              : ""
-                        }
-                        onChange={(e) => updateRel(idx, parseRelationTargetValue(e.target.value))}
-                        className="w-full bg-dark-700 border border-dark-600 rounded px-2 py-2 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
-                      >
-                        <option value="">대상 선택</option>
-                        {filteredRelationTargets.map((target) => (
-                          <option key={target.value} value={target.value}>{target.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={rel.description}
-                        onChange={(e) => updateRel(idx, { description: e.target.value })}
-                        placeholder="예: 오래된 동업자였지만 최근 크게 다퉜다."
-                        className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-1 focus:ring-mystery-500 transition"
-                      />
+                      <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
+                        <select
+                          value={currentRelationValue}
+                          onChange={(e) => updateRel(idx, parseRelationTargetValue(e.target.value))}
+                          className="w-full bg-dark-700 border border-dark-600 rounded px-2 py-2 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
+                        >
+                          <option value="">대상 선택</option>
+                          {targetsForRow.map((target) => (
+                            <option key={target.value} value={target.value}>{target.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={rel.description}
+                          onChange={(e) => updateRel(idx, { description: e.target.value })}
+                          placeholder="예: 오래된 동업자였지만 최근 크게 다퉜다."
+                          className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-1 focus:ring-mystery-500 transition"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
               <button
                 type="button"
                 onClick={addRelationship}
-                className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                disabled={availableRelationTargetsToAdd.length === 0}
+                title={availableRelationTargetsToAdd.length === 0 ? "모든 대상이 추가되었습니다." : undefined}
+                className="text-xs text-mystery-400 transition-colors hover:text-mystery-300 disabled:cursor-not-allowed disabled:text-dark-600"
               >
                 + 관계 추가
               </button>

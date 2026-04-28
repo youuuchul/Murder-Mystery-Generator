@@ -20,12 +20,12 @@ const CLUE_TYPES: { value: Clue["type"]; label: string; hint: string }[] = [
   {
     value: "owned",
     label: "획득",
-    hint: "획득자 인벤토리로 이동 · 카드 건네주기 가능",
+    hint: "인벤토리 보관 · 건네주기 가능",
   },
   {
     value: "shared",
     label: "공개",
-    hint: "첫 발견자만 조사회수 1회 · 발견 이후 모두에게 공개 · 재조사 무료",
+    hint: "첫 발견 후 전원 공개 · 재조사 무료",
   },
 ];
 
@@ -64,8 +64,8 @@ function createClue(locationId: string): Clue {
 }
 
 const CONDITION_TYPE_LABELS: Record<ClueConditionType, string> = {
-  has_items: "내 아이템 보유 — 내가 지정 단서를 현재 인벤토리에 보유",
-  character_has_item: "특정 캐릭터 보유 — 특정 캐릭터가 지정 단서를 현재 보유",
+  has_items: "내 아이템 보유",
+  character_has_item: "특정 캐릭터 보유",
 };
 
 /** 조건 설정 폼 — 단서/장소에서 공용 */
@@ -126,7 +126,7 @@ function ConditionForm({
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-dark-400">
-            {label}: {enabled ? "조건 설정됨" : "조건 없음 (자유 접근)"}
+            {enabled ? `${label} 설정됨` : "조건 없음"}
           </span>
         </div>
         <span className="text-xs text-mystery-500 hover:text-mystery-300 shrink-0 ml-2">
@@ -160,8 +160,7 @@ function ConditionForm({
           {/* 필요 아이템 */}
           <div>
             <label className="block text-xs text-dark-500 mb-1">
-              필요 단서/아이템
-              <span className="text-dark-600 ml-1">(복수 선택 가능)</span>
+              필요 단서
             </label>
             {selectableClues.length === 0 ? (
               <p className="text-xs text-dark-700 py-2 px-2">
@@ -222,7 +221,6 @@ function ConditionForm({
           <div>
             <label className="block text-xs text-dark-500 mb-1">
               플레이어 힌트
-              <span className="text-dark-600 ml-1">(잠금 상태일 때 표시)</span>
             </label>
             <input
               type="text"
@@ -274,17 +272,18 @@ function LocationBlock({
 }) {
   const [expanded, setExpanded] = useState(!location.name && clues.length === 0);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const ownerName = allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "지정 캐릭터";
   const visibleSummaryBadges = [
     `${clues.length}개 단서`,
     location.unlocksAtRound !== null ? `Round ${location.unlocksAtRound} 해제` : "처음부터 접근",
     location.ownerPlayerId
-      ? `${allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "소유자"} 접근 불가`
+      ? `${ownerName} 제한`
       : null,
     location.imageUrl ? "이미지 연결" : null,
     location.accessCondition ? "입장 조건" : null,
     location.previewCluesEnabled ? "단서 미리보기" : null,
   ].filter(Boolean) as string[];
-  const summaryText = location.description.trim() || "장소 설명이 아직 없습니다.";
+  const summaryText = location.description.trim();
 
   function update<K extends keyof Location>(key: K, value: Location[K]) {
     onChangeLocation({ ...location, [key]: value });
@@ -330,18 +329,14 @@ function LocationBlock({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <span className="rounded-full border border-mystery-800/70 bg-mystery-950/30 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-mystery-300/80">
-                장소
-              </span>
-              <span className="text-xs text-dark-600">{location.id.slice(0, 8)}</span>
-            </div>
             <p className="mt-3 text-base font-semibold text-dark-50">
               {location.name || <span className="italic text-dark-500">장소 이름 없음</span>}
             </p>
-            <p className="mt-1 max-w-3xl line-clamp-2 text-sm leading-relaxed text-dark-500">
-              {summaryText}
-            </p>
+            {summaryText ? (
+              <p className="mt-1 max-w-3xl line-clamp-2 text-sm leading-relaxed text-dark-500">
+                {summaryText}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {visibleSummaryBadges.map((badge) => (
                 <span
@@ -393,15 +388,7 @@ function LocationBlock({
         <div className="space-y-5 border-t border-dark-700/80 bg-dark-950/25 p-4">
           {/* 장소 기본 정보 */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-dark-100">장소 설정</p>
-                <p className="mt-1 text-xs text-dark-500">이 장소의 이름, 공개 설명, 개방 시점을 정합니다.</p>
-              </div>
-              <span className="rounded-full border border-dark-700 bg-dark-950/60 px-2.5 py-1 text-[11px] text-dark-400">
-                장소 카드
-              </span>
-            </div>
+            <p className="text-sm font-semibold text-dark-100">장소 설정</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
@@ -417,7 +404,6 @@ function LocationBlock({
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
                   잠금 해제 라운드
-                  <span className="text-dark-600 font-normal ml-1">(비우면 처음부터)</span>
                 </label>
                 <input
                   type="number"
@@ -436,26 +422,20 @@ function LocationBlock({
             {/* 소유자 캐릭터 */}
             <div>
               <label className="block text-xs font-medium text-dark-400 mb-1">
-                접근 불가 캐릭터 <span className="text-dark-600 font-normal">(소유자 — 자기 공간에는 들어갈 수 없음)</span>
+                접근 제한 캐릭터
               </label>
               <select
                 value={location.ownerPlayerId ?? ""}
                 onChange={(e) => update("ownerPlayerId", e.target.value || undefined)}
                 className={inputClass}
               >
-                <option value="">— 없음 (모든 캐릭터 접근 가능) —</option>
+                <option value="">— 없음 —</option>
                 {allCharacters.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name || `(이름 없음)`}
                   </option>
                 ))}
               </select>
-              {location.ownerPlayerId && (
-                <p className="text-xs text-orange-400 mt-1">
-                  {allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "해당 캐릭터"}
-                  은(는) 이 장소에서 단서를 획득할 수 없습니다.
-                </p>
-              )}
             </div>
 
             <div>
@@ -473,7 +453,7 @@ function LocationBlock({
           <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <ImageAssetField
               title="장소 대표 이미지"
-              description="플레이어 장소 카드에 함께 노출됩니다."
+              description="장소 카드 이미지"
               value={location.imageUrl}
               alt={location.name || "장소 이미지 미리보기"}
               profile="location"
@@ -490,10 +470,6 @@ function LocationBlock({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">획득 전 단서 미리보기</p>
-                <p className="mt-1 text-xs text-dark-500">
-                  활성화하면 미획득 단서에 제작자가 입력한 텍스트를 미리 표시합니다.
-                  조사 포인트 힌트나 NPC 대화 선택지 등으로 활용할 수 있습니다.
-                </p>
               </div>
               <button
                 type="button"
@@ -515,7 +491,6 @@ function LocationBlock({
           <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <label className="block text-xs font-medium text-dark-400 mb-2">
               장소 입장 조건
-              <span className="text-dark-600 font-normal ml-1">— 조건 미충족 시 이 장소의 모든 단서 획득 불가</span>
             </label>
             <ConditionForm
               label="입장 조건"
@@ -532,7 +507,6 @@ function LocationBlock({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <label className="text-xs font-medium uppercase tracking-[0.18em] text-mystery-300/80">단서 카드</label>
-                <p className="mt-1 text-xs text-dark-500">이 장소에서 발견할 단서를 관리합니다.</p>
               </div>
               <button
                 type="button"
@@ -545,7 +519,7 @@ function LocationBlock({
 
             {clues.length === 0 ? (
               <div className="rounded-xl border border-dashed border-dark-700 bg-dark-950/35 py-6 text-center">
-                <p className="text-xs text-dark-600">이 장소에 배치된 단서가 없습니다.</p>
+                <p className="text-xs text-dark-600">단서 없음</p>
               </div>
             ) : (
               <div className="space-y-3 rounded-2xl border border-dark-800/80 bg-black/10 p-3">
@@ -737,17 +711,15 @@ function ClueForm({
           </div>
 
           {isSharedClue && (
-            <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-3 text-xs text-sky-300 space-y-1">
-              <p>발견 전에는 다른 단서와 동일하게 비공개 상태로 표시됩니다.</p>
-              <p className="opacity-80">첫 발견자가 조사회수 1회를 소모하면 모든 플레이어에게 제목·내용이 공개됩니다.</p>
-              <p className="opacity-80">이후 본인·타인의 재조사는 조사회수를 소모하지 않고, 인벤토리에는 들어가지 않습니다.</p>
+            <div className="rounded-lg border border-sky-900/60 bg-sky-950/10 px-3 py-2 text-xs text-sky-300">
+              첫 발견 후 전원 공개 · 재조사 무료 · 인벤토리 미보관
             </div>
           )}
 
           <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
             <ImageAssetField
               title="단서 이미지"
-              description="인벤토리 카드와 상세 모달에 함께 표시됩니다. 문서형 단서는 잘리지 않도록 여백 포함 이미지를 권장합니다."
+              description="카드 상세 이미지"
               value={clue.imageUrl}
               alt={clue.title || "단서 이미지 미리보기"}
               profile="clue"
@@ -755,7 +727,7 @@ function ClueForm({
               onUpload={handleClueImageUpload}
               uploading={uploadingImage}
               uploadLabel="단서 이미지 업로드"
-              emptyStateLabel="이미지가 없으면 플레이어 화면에서는 텍스트 중심 단서 카드로 표시됩니다."
+              emptyStateLabel="이미지 없음"
             />
           </div>
 
@@ -764,7 +736,6 @@ function ClueForm({
             <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-3 space-y-2">
               <label className="block text-xs font-medium text-amber-300/80">
                 획득 전 표시 텍스트
-                <span className="text-dark-600 font-normal ml-1">— 비워두면 기본 "? 카드 #N" 표시</span>
               </label>
               <input
                 type="text"
@@ -787,9 +758,9 @@ function ClueForm({
           <div className="rounded-xl border border-dark-800 bg-dark-900/40 p-3">
             <label className="block text-xs text-dark-500 mb-2">
               단서 획득 조건
-              <span className="text-dark-600 font-normal ml-1">
-                — {isSharedClue ? "첫 발견 시에만 조건 체크" : "조건 충족 시에만 획득 가능"}
-              </span>
+              {isSharedClue ? (
+                <span className="text-dark-600 font-normal ml-1">첫 발견 기준</span>
+              ) : null}
             </label>
             <ConditionForm
               label="획득 조건"
@@ -946,15 +917,14 @@ export default function LocationEditor({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: "장소", value: `${locations.length}개`, hint: "현재 배치된 탐색 장소" },
-          { label: "단서", value: `${totalClues}개`, hint: "플레이어가 획득하거나 확인할 카드" },
-          { label: "이미지", value: `${locationsWithImages}개`, hint: "대표 이미지 연결된 장소" },
-          { label: "잠금/조건", value: `${lockedLocations + conditionalClues}개`, hint: "라운드 잠금 + 조건형 단서" },
+          { label: "장소", value: `${locations.length}개` },
+          { label: "단서", value: `${totalClues}개` },
+          { label: "이미지", value: `${locationsWithImages}개` },
+          { label: "잠금/조건", value: `${lockedLocations + conditionalClues}개` },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-dark-800 bg-dark-900/45 px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.18em] text-dark-600">{item.label}</p>
             <p className="mt-2 text-lg font-semibold text-dark-100">{item.value}</p>
-            <p className="mt-1 text-xs text-dark-500">{item.hint}</p>
           </div>
         ))}
       </div>

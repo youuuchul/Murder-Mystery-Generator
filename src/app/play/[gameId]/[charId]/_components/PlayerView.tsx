@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import { getRealtimeClient } from "@/lib/supabase/realtime-client";
-import { withGameAssetVariant } from "@/lib/game-asset-variant";
+import { withGameAssetVariant, type GameAssetVariant } from "@/lib/game-asset-variant";
 import AiChatPanel from "./AiChatPanel";
 import PlayLoadingSkeleton from "./PlayLoadingSkeleton";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
@@ -236,13 +236,15 @@ function ImageFrame({
   alt,
   compact = false,
   variant = "default",
+  assetVariant,
 }: {
   src: string;
   alt: string;
   compact?: boolean;
   variant?: "default" | "portrait" | "document";
+  assetVariant?: GameAssetVariant;
 }) {
-  const assetVariant = compact ? "thumb" : variant === "document" ? "large" : "display";
+  const resolvedAssetVariant = assetVariant ?? (compact ? "thumb" : variant === "document" ? "large" : "display");
 
   return (
     <div
@@ -258,7 +260,7 @@ function ImageFrame({
       ].join(" ")}
     >
       <Image
-        src={withGameAssetVariant(src, assetVariant) ?? src}
+        src={withGameAssetVariant(src, resolvedAssetVariant) ?? src}
         alt={alt}
         fill
         sizes={
@@ -972,7 +974,7 @@ function VoteScreen({
                     <div className="flex items-center gap-3">
                       {t.image ? (
                         <div className="w-14 shrink-0">
-                          <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
+                          <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" assetVariant="thumb" />
                         </div>
                       ) : null}
                       <p className="font-semibold text-dark-100">{t.name}</p>
@@ -1066,7 +1068,7 @@ function VoteScreen({
             <div className="flex items-center gap-3">
               {t.image ? (
                 <div className="w-14 shrink-0">
-                  <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
+                  <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" assetVariant="thumb" />
                 </div>
               ) : null}
               <p className="font-semibold text-dark-100">{t.name}</p>
@@ -1120,7 +1122,7 @@ function VoteScreen({
                       <div className="flex items-center gap-3">
                         {t.image ? (
                           <div className="w-12 shrink-0">
-                            <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" />
+                            <ImageFrame src={t.image} alt={t.name} compact={false} variant="portrait" assetVariant="thumb" />
                           </div>
                         ) : null}
                         <p className="text-sm font-medium text-dark-100">{t.name}</p>
@@ -1624,7 +1626,7 @@ function SharedBoardPanel({
           {content.imageUrl ? (
             <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
               <p className="text-xs text-dark-500">공통 이미지 / 지도</p>
-              <ImageFrame src={content.imageUrl} alt={`${content.title} 공통 이미지`} />
+              <ImageFrame src={content.imageUrl} alt={`${content.title} 공통 이미지`} assetVariant="display" />
             </div>
           ) : null}
 

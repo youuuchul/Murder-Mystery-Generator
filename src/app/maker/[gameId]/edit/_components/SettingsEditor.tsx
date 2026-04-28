@@ -132,6 +132,14 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
   const roundTotalMin = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
   const totalMin = rules.openingDurationMinutes + roundTotalMin * rules.roundCount;
+  const roundBlockMin = roundTotalMin * rules.roundCount;
+  const estimateDeltaMin = settings.estimatedDuration - totalMin;
+  const estimateDeltaAbs = Math.abs(estimateDeltaMin);
+  const estimateDeltaLabel = estimateDeltaMin > 0
+    ? `표기 여유 ${estimateDeltaMin}분`
+    : estimateDeltaMin === 0
+      ? "타이머와 동일"
+      : `타이머 초과 ${estimateDeltaAbs}분`;
   const playerCountMismatch = characterCount > 0 && characterCount !== settings.playerCount;
 
   function formatDuration(minutes: number): string {
@@ -385,18 +393,37 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-dark-200 mb-2">예상 소요 시간 (분)</label>
-        <div className="flex items-center gap-4 max-w-xs">
-          <input
-            type="range"
-            min={30}
-            max={300}
-            step={15}
-            value={settings.estimatedDuration}
-            onChange={(e) => updateSettings("estimatedDuration", Number(e.target.value))}
-            className="flex-1 accent-mystery-500"
-          />
-          <span className="text-dark-100 font-medium w-16 text-right">{settings.estimatedDuration}분</span>
+        <label className="block text-sm font-medium text-dark-200 mb-2">예상 소요 시간</label>
+        <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-4 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-2xl font-bold text-dark-50">{settings.estimatedDuration}분</p>
+              <p className="mt-1 text-xs text-dark-500">
+                타이머 합계 {totalMin}분 · 투표/엔딩은 별도
+              </p>
+            </div>
+            <span
+              className={[
+                "rounded-full border px-3 py-1 text-xs",
+                estimateDeltaMin >= 0
+                  ? "border-dark-700 bg-dark-950/60 text-dark-300"
+                  : "border-yellow-900/70 bg-yellow-950/20 text-yellow-300",
+              ].join(" ")}
+            >
+              {estimateDeltaLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min={30}
+              max={300}
+              step={15}
+              value={settings.estimatedDuration}
+              onChange={(e) => updateSettings("estimatedDuration", Number(e.target.value))}
+              className="flex-1 accent-mystery-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -434,24 +461,26 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
           <div className="flex items-center">
             <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 w-full text-sm text-dark-400 space-y-1">
-              <p className="font-medium text-dark-200 mb-2">라운드 타임라인 요약</p>
-              {rules.phases.map((phase) => (
-                <div key={phase.type} className="flex justify-between">
-                  <span>{phase.label}</span>
-                  <span className="text-dark-300">{formatDuration(phase.durationMinutes)}</span>
-                </div>
-              ))}
+              <p className="font-medium text-dark-200 mb-2">진행 타이머 합계</p>
               <div className="flex justify-between">
                 <span>오프닝</span>
                 <span className="text-dark-300">{rules.openingDurationMinutes}분</span>
               </div>
-              <div className="border-t border-dark-700 pt-1 mt-1 flex justify-between font-medium text-dark-200">
+              <div className="flex justify-between">
                 <span>1라운드 합계</span>
-                <span>{roundTotalMin}분</span>
+                <span className="text-dark-300">{roundTotalMin}분</span>
               </div>
-              <div className="flex justify-between text-mystery-400 font-semibold">
-                <span>전체 (오프닝 + {rules.roundCount}라운드)</span>
-                <span>≈ {totalMin}분</span>
+              <div className="flex justify-between">
+                <span>라운드 전체</span>
+                <span className="text-dark-300">{roundBlockMin}분</span>
+              </div>
+              <div className="flex justify-between">
+                <span>투표/엔딩</span>
+                <span className="text-dark-500">별도</span>
+              </div>
+              <div className="border-t border-dark-700 pt-1 mt-1 flex justify-between text-mystery-400 font-semibold">
+                <span>타이머 합계</span>
+                <span>{totalMin}분</span>
               </div>
             </div>
           </div>

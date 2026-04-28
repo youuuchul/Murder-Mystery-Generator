@@ -26,6 +26,10 @@
 - [20260407_ADMIN_ROLE_OPERATION.md](operations/20260407_ADMIN_ROLE_OPERATION.md) — admin role 운영 가이드
 - [20260407_ADMIN_DATA_OPERATION.md](operations/20260407_ADMIN_DATA_OPERATION.md) — admin 데이터 운영 가이드
 
+## Product Control
+
+- [product-control/](product-control/) — 화면·컴포넌트·DB 스키마 연결 상태 통제 워크북/Sheets 동기화 자료
+
 ## Archive (완료된 문서)
 
 `docs/archive/` — 완료된 백로그, 핸드오프, 계획서, 리서치 보존

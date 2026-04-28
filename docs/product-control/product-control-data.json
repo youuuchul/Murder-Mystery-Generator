@@ -1,0 +1,2890 @@
+{
+  "generatedAt": "2026-04-28T00:43:40.907Z",
+  "date": "2026-04-28",
+  "title": "Murder Mystery Generator Product Control Inventory",
+  "sourceFiles": [
+    "docs/STATUS.md",
+    "docs/README.md",
+    "docs/screens.json",
+    "src/types/game.ts",
+    "src/types/session.ts",
+    "src/lib/game-repository.ts",
+    "src/lib/game-normalizer.ts",
+    "src/lib/maker-validation.ts",
+    "src/lib/game-publish.ts",
+    "supabase/migrations/20260411_000006_normalize_game_content.sql",
+    "supabase/migrations/20260411_000007_advanced_gameplay.sql",
+    "supabase/migrations/20260411_000008_vote_ending_restructure.sql",
+    "supabase/migrations/20260427_000001_vote_question_personal_target.sql",
+    "scripts/sync-screens.mjs"
+  ],
+  "summary": {
+    "screensInDocs": 34,
+    "pageRoutes": 17,
+    "apiRoutes": 23,
+    "components": 42,
+    "largeComponents": 10,
+    "dbControlRows": 11,
+    "gaps": 7,
+    "screenshots": 0,
+    "googleSheetsConfigured": true,
+    "supabaseConfigured": true
+  },
+  "sheets": {
+    "spreadsheetEnvKey": "GOOGLE_SHEETS_SPREADSHEET_ID",
+    "existingScreenSyncScript": "scripts/sync-screens.mjs",
+    "productControlSyncScript": "scripts/sync-product-control-sheets.mjs",
+    "configured": true,
+    "lastScreenSyncCommand": "npm run sync:screens"
+  },
+  "screens": [
+    {
+      "id": "P-001",
+      "category": "홈·공용",
+      "route": "/",
+      "file": "src/app/page.tsx",
+      "purpose": "루트 진입. 현재는 /library로 즉시 리다이렉트.",
+      "components": [],
+      "dependencies": [],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "랜딩 페이지 별도 기획 전까진 리다이렉트 유지.",
+      "ownerSurface": "공용",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-002",
+      "category": "홈·공용",
+      "route": "/guide",
+      "file": "src/app/guide/page.tsx",
+      "purpose": "가이드 허브. 제작자/플레이어 가이드 분기.",
+      "components": [],
+      "dependencies": [],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "가이드",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-003",
+      "category": "홈·공용",
+      "route": "/guide/create",
+      "file": "src/app/guide/create/page.tsx",
+      "purpose": "메이커(제작) 사용 가이드. 저장/AI/테스트 팁.",
+      "components": [],
+      "dependencies": [],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "가이드",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-004",
+      "category": "홈·공용",
+      "route": "/guide/play",
+      "file": "src/app/guide/play/page.tsx",
+      "purpose": "플레이어 진행 가이드. 참가/복귀/화면 흐름.",
+      "components": [],
+      "dependencies": [],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "가이드",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-005",
+      "category": "인증",
+      "route": "/maker-access",
+      "file": "src/app/maker-access/page.tsx",
+      "purpose": "메이커 인증 통합 진입. mode 쿼리로 로그인/가입/복구/재설정 분기.",
+      "components": [
+        "MakerAccessForm"
+      ],
+      "dependencies": [
+        "Supabase Auth",
+        "public.profiles",
+        "Resend(재설정 메일)"
+      ],
+      "auth": "비로그인 전용",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "서브 모드 P-005.1~P-005.4 참조.",
+      "ownerSurface": "인증",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-005.1",
+      "category": "인증",
+      "route": "/maker-access?mode=login",
+      "file": "src/app/maker-access/page.tsx (login mode)",
+      "purpose": "이메일/비밀번호 로그인.",
+      "components": [],
+      "dependencies": [
+        "Supabase Auth signInWithPassword"
+      ],
+      "auth": "비로그인",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "인증",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-005.2",
+      "category": "인증",
+      "route": "/maker-access?mode=signup",
+      "file": "src/app/maker-access/page.tsx (signup mode)",
+      "purpose": "회원가입. 이메일/display name/비밀번호 입력.",
+      "components": [],
+      "dependencies": [
+        "Supabase Auth signUp"
+      ],
+      "auth": "비로그인",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "인증",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-005.3",
+      "category": "인증",
+      "route": "/maker-access?mode=recover",
+      "file": "src/app/maker-access/page.tsx (recover mode)",
+      "purpose": "비밀번호 재설정 메일 요청.",
+      "components": [],
+      "dependencies": [
+        "Resend API"
+      ],
+      "auth": "비로그인",
+      "backlog": [
+        "운영 도메인 메일 발송 검증"
+      ],
+      "reviewedAt": "2026-04-14",
+      "notes": "STATUS 95번 참조.",
+      "ownerSurface": "인증",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-005.4",
+      "category": "인증",
+      "route": "/maker-access?mode=reset&token=...",
+      "file": "src/app/maker-access/page.tsx (reset mode)",
+      "purpose": "재설정 토큰으로 새 비밀번호 입력.",
+      "components": [],
+      "dependencies": [
+        "Supabase Auth updateUser"
+      ],
+      "auth": "일회성 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "인증",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-006",
+      "category": "메이커",
+      "route": "/maker/new",
+      "file": "src/app/maker/new/page.tsx",
+      "purpose": "신규 게임 생성 진입. 기본 정보 입력 후 edit로 이동.",
+      "components": [
+        "SettingsForm"
+      ],
+      "dependencies": [
+        "Supabase games"
+      ],
+      "auth": "로그인 필수 (maker)",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-007",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit",
+      "file": "src/app/maker/[gameId]/edit/page.tsx",
+      "purpose": "6-step 시나리오 편집 래퍼.",
+      "components": [
+        "MakerEditorLoader"
+      ],
+      "dependencies": [
+        "Supabase game_content 정규화 테이블",
+        "Supabase Storage (assets)"
+      ],
+      "auth": "소유자 또는 admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "서브 스텝 P-007.1~P-007.6 참조.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-007.1",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=1",
+      "file": "src/app/maker/[gameId]/edit/_components/SettingsForm.tsx",
+      "purpose": "Step1 기본 설정. 제목/요약/난이도/인원/태그.",
+      "components": [
+        "SettingsForm"
+      ],
+      "dependencies": [],
+      "auth": "소유자/admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "파일 없음",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "파일 확인 필요, DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-007.2",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=2",
+      "file": "src/app/maker/[gameId]/edit/_components/StoryEditor.tsx",
+      "purpose": "Step2 사건 개요/오프닝 타임라인/피해자/범인.",
+      "components": [
+        "StoryEditor",
+        "VictimForm"
+      ],
+      "dependencies": [],
+      "auth": "소유자/admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "오프닝 타임라인 탭 중앙 통합 완료.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-007.3",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=3",
+      "file": "src/app/maker/[gameId]/edit/_components/PlayerEditor.tsx",
+      "purpose": "Step3 캐릭터/관계/카드 이미지.",
+      "components": [
+        "PlayerEditor",
+        "RelationshipTab"
+      ],
+      "dependencies": [],
+      "auth": "소유자/admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "관계 탭 복구 완료.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-007.4",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=4",
+      "file": "src/app/maker/[gameId]/edit/_components/LocationEditor.tsx",
+      "purpose": "Step4 장소/단서 계층 편집. 단서 추가 버튼(상단+하단) 개선 완료.",
+      "components": [
+        "LocationEditor",
+        "ClueForm",
+        "ConditionField"
+      ],
+      "dependencies": [],
+      "auth": "소유자/admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "단서 유형 owned/shared 리워크 완료.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-007.5",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=5",
+      "file": "src/app/maker/[gameId]/edit/_components/ScriptEditor.tsx",
+      "purpose": "Step5 라운드 스크립트/대표 이미지/미디어 링크.",
+      "components": [
+        "ScriptEditor",
+        "ImageAssetField"
+      ],
+      "dependencies": [
+        "POST /api/games/[id]/assets?scope=rounds"
+      ],
+      "auth": "소유자/admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "라운드 대표 이미지 업로드 완료.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-007.6",
+      "category": "메이커",
+      "route": "/maker/[gameId]/edit?step=6",
+      "file": "src/app/maker/[gameId]/edit/_components/EndingEditor.tsx",
+      "purpose": "Step6 엔딩 분기/투표 질문/개인 엔딩.",
+      "components": [
+        "EndingEditor",
+        "VoteQuestionEditor",
+        "BranchMapper"
+      ],
+      "dependencies": [],
+      "auth": "소유자/admin",
+      "backlog": [
+        "투표 대상 캐릭터별 분리(후속)"
+      ],
+      "reviewedAt": "2026-04-14",
+      "notes": "고급 투표/2차 투표/승점 자동 판정 완료.",
+      "ownerSurface": "메이커",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "DB 의존 보강 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-008",
+      "category": "라이브러리",
+      "route": "/library",
+      "file": "src/app/library/page.tsx",
+      "purpose": "공개 게임 카탈로그 + 상단 코드 참여.",
+      "components": [
+        "LibraryQuickJoin",
+        "GameGrid"
+      ],
+      "dependencies": [
+        "Supabase games (visibility=public)"
+      ],
+      "auth": "공개",
+      "backlog": [
+        "Cold Start 지연 대응 진행 중"
+      ],
+      "reviewedAt": "2026-04-14",
+      "notes": "Suspense 스트리밍 + React.cache 적용.",
+      "ownerSurface": "라이브러리",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-009",
+      "category": "라이브러리",
+      "route": "/library/manage",
+      "file": "src/app/library/manage/page.tsx",
+      "purpose": "내가 만든 게임 관리. 편집 진입/삭제/공개 전환.",
+      "components": [
+        "MyGamesGrid"
+      ],
+      "dependencies": [
+        "Supabase games owner_id 필터"
+      ],
+      "auth": "로그인 필수",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "관리",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-009.1",
+      "category": "관리자",
+      "route": "/library/manage?scope=all",
+      "file": "src/app/library/manage/page.tsx (admin scope)",
+      "purpose": "admin의 전체 게임 조회 + 소유권 이관/귀속.",
+      "components": [],
+      "dependencies": [],
+      "auth": "admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "관리",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-010",
+      "category": "라이브러리",
+      "route": "/library/manage/my-sessions",
+      "file": "src/app/library/manage/my-sessions/page.tsx",
+      "purpose": "내 활성 세션 목록 + 삭제 (세션 수 한도 관리).",
+      "components": [],
+      "dependencies": [
+        "Supabase sessions host_user_id"
+      ],
+      "auth": "로그인 필수",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "로그인 3개/비로그인 1개 한도.",
+      "ownerSurface": "관리",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-011",
+      "category": "관리자",
+      "route": "/library/manage/sessions",
+      "file": "src/app/library/manage/sessions/page.tsx",
+      "purpose": "전체 세션 관리. admin이 타 호스트 세션 강제 삭제/이관.",
+      "components": [
+        "AdminSessionManager"
+      ],
+      "dependencies": [
+        "DELETE /api/sessions/[id]"
+      ],
+      "auth": "admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "24h 자동 정리 cron과 독립.",
+      "ownerSurface": "관리",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-012",
+      "category": "게임 상세",
+      "route": "/game/[gameId]",
+      "file": "src/app/game/[gameId]/page.tsx",
+      "purpose": "게임 커버. 공개는 GM/플레이어 2-버튼, 일부공개는 링크 공유 대상을 플레이어로 한정해 '플레이어 참여'만 노출.",
+      "components": [
+        "CoverHero"
+      ],
+      "dependencies": [
+        "Supabase games"
+      ],
+      "auth": "공개/일부공개(비공개는 소유자만)",
+      "backlog": [],
+      "reviewedAt": "2026-04-15",
+      "notes": "일부공개는 플레이어 전용 진입점. 이후 세션 진입 퍼널(/play/[gameId]/join)은 공개 경로와 동일.",
+      "ownerSurface": "공개 커버",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-013",
+      "category": "플레이어 진입",
+      "route": "/join",
+      "file": "src/app/join/page.tsx",
+      "purpose": "6자리 세션 코드 입력.",
+      "components": [
+        "JoinCodeEntryForm"
+      ],
+      "dependencies": [
+        "GET /api/join/[code]"
+      ],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "플레이어 진입",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-014",
+      "category": "플레이어 진입",
+      "route": "/join/[sessionCode]",
+      "file": "src/app/join/[sessionCode]/page.tsx",
+      "purpose": "캐릭터 슬롯 선택 + 이름 입력 → join/rejoin API.",
+      "components": [
+        "슬롯 리스트",
+        "참가/복귀 폼"
+      ],
+      "dependencies": [
+        "POST /api/sessions/[id]/join | rejoin",
+        "JoinSessionPreview"
+      ],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "이어받기 가능 슬롯 녹색 배지, AI 슬롯 disabled.",
+      "ownerSurface": "플레이어 진입",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-015",
+      "category": "플레이어 진입",
+      "route": "/play/[gameId]/join",
+      "file": "src/app/play/[gameId]/join/page.tsx",
+      "purpose": "특정 게임의 공개 세션 목록에서 참여.",
+      "components": [
+        "PlayerSessionEntry"
+      ],
+      "dependencies": [
+        "Supabase sessions (public/unlisted)"
+      ],
+      "auth": "공개",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "플레이어 진입",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-016",
+      "category": "플레이",
+      "route": "/play/[gameId]",
+      "file": "src/app/play/[gameId]/page.tsx",
+      "purpose": "GM 대시보드 진입. 세션 목록/생성/이어하기.",
+      "components": [
+        "GMDashboard(서버 부트스트랩)"
+      ],
+      "dependencies": [
+        "Supabase sessions"
+      ],
+      "auth": "GM 호스트 또는 admin",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId]",
+      "file": "src/app/play/[gameId]/[charId]/page.tsx",
+      "purpose": "플레이어 메인 화면. 탭 구조로 공통/캐릭터/인벤토리/장소탐색/투표/엔딩 분기.",
+      "components": [
+        "PlayerView",
+        "SSR 초기 상태 부트스트랩"
+      ],
+      "dependencies": [
+        "Supabase sessions",
+        "Supabase Realtime Broadcast(알림)",
+        "SSE (session_update/inventory)"
+      ],
+      "auth": "세션 토큰 (슬롯 점유자)",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "SSR에서 isSessionHost 확정. 서브 탭 P-017.1~P-017.6 참조.",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017.1",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (탭: 공통화면)",
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx (shared tab)",
+      "purpose": "GM 공통 알림/페이즈 상황/타이머/라운드 스크립트.",
+      "components": [
+        "PhaseHeader",
+        "TimerCard",
+        "RoundScriptViewer"
+      ],
+      "dependencies": [],
+      "auth": "세션 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "공용 타이머 서버 기반 통합 완료.",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017.2",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (탭: 캐릭터 카드)",
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx (character tab)",
+      "purpose": "캐릭터 배경/관계/비밀/승리 조건.",
+      "components": [
+        "PersonInfoPanel",
+        "PrivateTextToggle"
+      ],
+      "dependencies": [],
+      "auth": "세션 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "승리 조건 토글 기본 접힘 — 스포일러 방지.",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017.3",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (탭: 인벤토리)",
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx (inventory tab)",
+      "purpose": "획득 단서 카드 목록. 건네주기 액션.",
+      "components": [
+        "CardList",
+        "CardDetailModal",
+        "TransferModal"
+      ],
+      "dependencies": [
+        "POST /api/sessions/[id]/cards (transfer)"
+      ],
+      "auth": "세션 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017.4",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (탭: 장소 탐색/밀담)",
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx (locations tab)",
+      "purpose": "장소별 단서 획득 + AI 밀담 서브탭.",
+      "components": [
+        "LocationCard",
+        "ClueRow",
+        "AiChatPanel"
+      ],
+      "dependencies": [
+        "POST /api/sessions/[id]/cards (acquire)",
+        "POST /api/sessions/[id]/chat"
+      ],
+      "auth": "세션 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "실시간 알림 Supabase Realtime. 응답 지연 개선 완료.",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    },
+    {
+      "id": "P-017.5",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (탭: 투표)",
+      "file": "src/app/play/[gameId]/[charId]/_components/VoteScreen.tsx",
+      "purpose": "범인 추리 투표 + 2차 투표 질문들.",
+      "components": [
+        "VoteScreen",
+        "VoteQuestionList"
+      ],
+      "dependencies": [
+        "POST /api/sessions/[id]/vote"
+      ],
+      "auth": "세션 토큰",
+      "backlog": [
+        "동점 재투표 실동작 검증"
+      ],
+      "reviewedAt": "2026-04-14",
+      "notes": "",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "파일 없음",
+      "liveRouteStatus": "서브모드",
+      "riskFlags": "파일 확인 필요",
+      "nextReview": "상세 화면 정의 보강"
+    },
+    {
+      "id": "P-017.6",
+      "category": "플레이",
+      "route": "/play/[gameId]/[charId] (엔딩 단계별)",
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx (ending stages)",
+      "purpose": "투표 결과 → 분기 엔딩 → 개인 엔딩+점수 → 작가 후기 퍼널.",
+      "components": [
+        "VoteResultPanel",
+        "BranchEndingPanel",
+        "PersonalEndingPanel"
+      ],
+      "dependencies": [],
+      "auth": "세션 토큰",
+      "backlog": [],
+      "reviewedAt": "2026-04-14",
+      "notes": "4단계 퍼널 + 게임 종료 액션 완료.",
+      "ownerSurface": "플레이",
+      "liveFileStatus": "OK",
+      "liveRouteStatus": "연결됨",
+      "riskFlags": "",
+      "nextReview": "정기 리뷰"
+    }
+  ],
+  "routes": [
+    {
+      "kind": "API",
+      "route": "/api/cron/cleanup-sessions",
+      "file": "src/app/api/cron/cleanup-sessions/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games",
+      "file": "src/app/api/games/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET, POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games/[gameId]",
+      "file": "src/app/api/games/[gameId]/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET, PUT, DELETE"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games/[gameId]/assets",
+      "file": "src/app/api/games/[gameId]/assets/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games/[gameId]/assets/[...assetPath]",
+      "file": "src/app/api/games/[gameId]/assets/[...assetPath]/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games/[gameId]/owner",
+      "file": "src/app/api/games/[gameId]/owner/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "PATCH"
+    },
+    {
+      "kind": "API",
+      "route": "/api/games/[gameId]/visibility",
+      "file": "src/app/api/games/[gameId]/visibility/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "PATCH"
+    },
+    {
+      "kind": "API",
+      "route": "/api/join/[sessionCode]",
+      "file": "src/app/api/join/[sessionCode]/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/maker-access",
+      "file": "src/app/api/maker-access/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST, DELETE"
+    },
+    {
+      "kind": "API",
+      "route": "/api/maker-assistant",
+      "file": "src/app/api/maker-assistant/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/server-info",
+      "file": "src/app/api/server-info/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions",
+      "file": "src/app/api/sessions/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST, GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]",
+      "file": "src/app/api/sessions/[sessionId]/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET, PATCH, DELETE"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/access",
+      "file": "src/app/api/sessions/[sessionId]/access/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/cards",
+      "file": "src/app/api/sessions/[sessionId]/cards/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/chat",
+      "file": "src/app/api/sessions/[sessionId]/chat/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/events",
+      "file": "src/app/api/sessions/[sessionId]/events/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "GET"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/join",
+      "file": "src/app/api/sessions/[sessionId]/join/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/leave",
+      "file": "src/app/api/sessions/[sessionId]/leave/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/locations/[locationId]/unlock",
+      "file": "src/app/api/sessions/[sessionId]/locations/[locationId]/unlock/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/phase-request",
+      "file": "src/app/api/sessions/[sessionId]/phase-request/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/rejoin",
+      "file": "src/app/api/sessions/[sessionId]/rejoin/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST"
+    },
+    {
+      "kind": "API",
+      "route": "/api/sessions/[sessionId]/vote",
+      "file": "src/app/api/sessions/[sessionId]/vote/route.ts",
+      "screenIds": "",
+      "docsId": "",
+      "docsStatus": "API",
+      "category": "API",
+      "ownerSurface": "서버",
+      "imports": "POST, PATCH"
+    },
+    {
+      "kind": "Page",
+      "route": "/",
+      "file": "src/app/page.tsx",
+      "screenIds": "P-001",
+      "docsId": "P-001",
+      "docsStatus": "문서화",
+      "category": "홈·공용",
+      "ownerSurface": "공용",
+      "imports": "next/navigation"
+    },
+    {
+      "kind": "Page",
+      "route": "/game/[gameId]",
+      "file": "src/app/game/[gameId]/page.tsx",
+      "screenIds": "P-012",
+      "docsId": "P-012",
+      "docsStatus": "문서화",
+      "category": "게임 상세",
+      "ownerSurface": "공개 커버",
+      "imports": "next/image, next/link, next/navigation, @/lib/game-access, @/lib/game-repository, @/lib/maker-auth-gateway, @/lib/maker-user.server, @/lib/maker-role, @/types/game, ./_components/StartPlayerSessionButton"
+    },
+    {
+      "kind": "Page",
+      "route": "/guide",
+      "file": "src/app/guide/page.tsx",
+      "screenIds": "P-002",
+      "docsId": "P-002",
+      "docsStatus": "문서화",
+      "category": "홈·공용",
+      "ownerSurface": "가이드",
+      "imports": "next/link, ./_components/GuidePolicySection"
+    },
+    {
+      "kind": "Page",
+      "route": "/guide/create",
+      "file": "src/app/guide/create/page.tsx",
+      "screenIds": "P-003",
+      "docsId": "P-003",
+      "docsStatus": "문서화",
+      "category": "홈·공용",
+      "ownerSurface": "가이드",
+      "imports": "next/link, ../_components/GuidePolicySection"
+    },
+    {
+      "kind": "Page",
+      "route": "/guide/play",
+      "file": "src/app/guide/play/page.tsx",
+      "screenIds": "P-004",
+      "docsId": "P-004",
+      "docsStatus": "문서화",
+      "category": "홈·공용",
+      "ownerSurface": "가이드",
+      "imports": "next/link, ../_components/GuidePolicySection"
+    },
+    {
+      "kind": "Page",
+      "route": "/join",
+      "file": "src/app/join/page.tsx",
+      "screenIds": "P-013",
+      "docsId": "P-013",
+      "docsStatus": "문서화",
+      "category": "플레이어 진입",
+      "ownerSurface": "플레이어 진입",
+      "imports": "./_components/JoinCodeEntryForm"
+    },
+    {
+      "kind": "Page",
+      "route": "/join/[sessionCode]",
+      "file": "src/app/join/[sessionCode]/page.tsx",
+      "screenIds": "P-014",
+      "docsId": "P-014",
+      "docsStatus": "문서화",
+      "category": "플레이어 진입",
+      "ownerSurface": "플레이어 진입",
+      "imports": "react, next/image, next/navigation, @/lib/ai/player-agent/core/player-agent-state, @/lib/player-session-cookie, @/lib/session-sanitizer, @/types/game"
+    },
+    {
+      "kind": "Page",
+      "route": "/library",
+      "file": "src/app/library/page.tsx",
+      "screenIds": "P-008",
+      "docsId": "P-008",
+      "docsStatus": "문서화",
+      "category": "라이브러리",
+      "ownerSurface": "라이브러리",
+      "imports": "react, ./_components/LibraryCountsBadges, ./_components/LibraryGameSection, ./_components/LibraryNavSection, ./_components/LibraryQuickJoin, ./_components/maker-account-feedback"
+    },
+    {
+      "kind": "Page",
+      "route": "/library/manage",
+      "file": "src/app/library/manage/page.tsx",
+      "screenIds": "P-009, P-009.1",
+      "docsId": "P-009",
+      "docsStatus": "문서화",
+      "category": "라이브러리",
+      "ownerSurface": "관리",
+      "imports": "next/link, @/lib/game-access, @/lib/game-repository, @/lib/maker-access, @/lib/maker-auth-gateway, @/lib/maker-role, @/lib/maker-user.server, ../_components/GuideMenu, ../_components/GameGrid, ../_components/MakerAccountMenu, ../_components/MobileNavMenu, ../_components/maker-account-feedback"
+    },
+    {
+      "kind": "Page",
+      "route": "/library/manage/my-sessions",
+      "file": "src/app/library/manage/my-sessions/page.tsx",
+      "screenIds": "P-010",
+      "docsId": "P-010",
+      "docsStatus": "문서화",
+      "category": "라이브러리",
+      "ownerSurface": "관리",
+      "imports": "next/link, @/lib/game-repository, @/lib/maker-auth-gateway, @/lib/maker-user.server, @/lib/session-repository, ../../_components/GuideMenu, ../../_components/MakerAccountMenu, ../../_components/MobileNavMenu, ../../_components/maker-account-feedback, ./_components/MySessionManager"
+    },
+    {
+      "kind": "Page",
+      "route": "/library/manage/sessions",
+      "file": "src/app/library/manage/sessions/page.tsx",
+      "screenIds": "P-011",
+      "docsId": "P-011",
+      "docsStatus": "문서화",
+      "category": "관리자",
+      "ownerSurface": "관리",
+      "imports": "next/link, next/navigation, @/lib/game-repository, @/lib/maker-access, @/lib/maker-auth-gateway, @/lib/maker-role, @/lib/maker-user.server, @/lib/session-repository, ../../_components/GuideMenu, ../../_components/MakerAccountMenu, ../../_components/MobileNavMenu, ../../_components/maker-account-feedback, ./_components/AdminSessionManager"
+    },
+    {
+      "kind": "Page",
+      "route": "/maker-access",
+      "file": "src/app/maker-access/page.tsx",
+      "screenIds": "P-005, P-005.1, P-005.4",
+      "docsId": "P-005",
+      "docsStatus": "문서화",
+      "category": "인증",
+      "ownerSurface": "인증",
+      "imports": "next/headers, next/navigation, @/lib/maker-access, @/lib/maker-account-recovery, @/lib/maker-user, @/lib/maker-auth-gateway, @/lib/maker-user.server"
+    },
+    {
+      "kind": "Page",
+      "route": "/maker/[gameId]/edit",
+      "file": "src/app/maker/[gameId]/edit/page.tsx",
+      "screenIds": "P-007, P-007.1, P-007.6",
+      "docsId": "P-007",
+      "docsStatus": "문서화",
+      "category": "메이커",
+      "ownerSurface": "메이커",
+      "imports": "react, next/link, ./_components/MakerEditorLoader"
+    },
+    {
+      "kind": "Page",
+      "route": "/maker/new",
+      "file": "src/app/maker/new/page.tsx",
+      "screenIds": "P-006",
+      "docsId": "P-006",
+      "docsStatus": "문서화",
+      "category": "메이커",
+      "ownerSurface": "메이커",
+      "imports": "next/link, @/lib/maker-user.server, ./_components/SettingsForm"
+    },
+    {
+      "kind": "Page",
+      "route": "/play/[gameId]",
+      "file": "src/app/play/[gameId]/page.tsx",
+      "screenIds": "P-016",
+      "docsId": "P-016",
+      "docsStatus": "문서화",
+      "category": "플레이",
+      "ownerSurface": "플레이",
+      "imports": "next/headers, next/navigation, next/link, @/lib/game-access, @/lib/gm-session-access, @/lib/game-repository, @/lib/maker-role, @/lib/maker-user.server, @/lib/session-repository, @/types/session, ./_components/GMDashboard"
+    },
+    {
+      "kind": "Page",
+      "route": "/play/[gameId]/[charId]",
+      "file": "src/app/play/[gameId]/[charId]/page.tsx",
+      "screenIds": "P-017, P-017.1, P-017.6",
+      "docsId": "P-017",
+      "docsStatus": "문서화",
+      "category": "플레이",
+      "ownerSurface": "플레이",
+      "imports": "next/headers, react, @/lib/game-sanitizer, @/lib/game-repository-cache, @/lib/gm-session-access, @/lib/maker-user.server, @/lib/player-shared-board, @/lib/player-session-cookie, @/lib/session-repository, ./_components/PlayerView, ./_components/PlayLoadingSkeleton"
+    },
+    {
+      "kind": "Page",
+      "route": "/play/[gameId]/join",
+      "file": "src/app/play/[gameId]/join/page.tsx",
+      "screenIds": "P-015",
+      "docsId": "P-015",
+      "docsStatus": "문서화",
+      "category": "플레이어 진입",
+      "ownerSurface": "플레이어 진입",
+      "imports": "next/link, next/navigation, @/lib/game-repository, @/lib/session-repository, @/types/session, ./_components/PlayerSessionEntry"
+    }
+  ],
+  "components": [
+    {
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx",
+      "component": "PlayerView",
+      "type": "route-private component",
+      "lineCount": 3253,
+      "importCount": 1,
+      "risk": "P1 과대 컴포넌트",
+      "owningRoute": "/play/[gameId]/[charId]"
+    },
+    {
+      "file": "src/app/play/[gameId]/_components/GMDashboard.tsx",
+      "component": "GMDashboard",
+      "type": "route-private component",
+      "lineCount": 2160,
+      "importCount": 1,
+      "risk": "P1 과대 컴포넌트",
+      "owningRoute": "/play/[gameId]"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/PlayerEditor.tsx",
+      "component": "PlayerEditor",
+      "type": "route-private component",
+      "lineCount": 1620,
+      "importCount": 1,
+      "risk": "P1 과대 컴포넌트",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/LocationEditor.tsx",
+      "component": "LocationEditor",
+      "type": "route-private component",
+      "lineCount": 1007,
+      "importCount": 1,
+      "risk": "P1 과대 컴포넌트",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/EndingEditor.tsx",
+      "component": "EndingEditor",
+      "type": "route-private component",
+      "lineCount": 923,
+      "importCount": 2,
+      "risk": "P1 과대 컴포넌트",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerEditor.tsx",
+      "component": "MakerEditor",
+      "type": "route-private component",
+      "lineCount": 784,
+      "importCount": 1,
+      "risk": "P2 분리 검토",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/VoteEndingEditor.tsx",
+      "component": "VoteEndingEditor",
+      "type": "route-private component",
+      "lineCount": 696,
+      "importCount": 1,
+      "risk": "P2 분리 검토",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/ScriptEditor.tsx",
+      "component": "ScriptEditor",
+      "type": "route-private component",
+      "lineCount": 602,
+      "importCount": 1,
+      "risk": "P2 분리 검토",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/library/_components/GameCard.tsx",
+      "component": "GameCard",
+      "type": "route-private component",
+      "lineCount": 601,
+      "importCount": 2,
+      "risk": "P2 분리 검토",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
+      "component": "SettingsEditor",
+      "type": "route-private component",
+      "lineCount": 599,
+      "importCount": 1,
+      "risk": "P2 분리 검토",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerAssistantMessageList.tsx",
+      "component": "MakerAssistantMessageList",
+      "type": "route-private component",
+      "lineCount": 465,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerAssistantDrawer.tsx",
+      "component": "MakerAssistantDrawer",
+      "type": "route-private component",
+      "lineCount": 413,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/play/[gameId]/join/_components/PlayerSessionEntry.tsx",
+      "component": "PlayerSessionEntry",
+      "type": "route-private component",
+      "lineCount": 412,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/play/[gameId]/join"
+    },
+    {
+      "file": "src/app/library/manage/sessions/_components/AdminSessionManager.tsx",
+      "component": "AdminSessionManager",
+      "type": "route-private component",
+      "lineCount": 346,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library/manage/sessions"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/StoryEditor.tsx",
+      "component": "StoryEditor",
+      "type": "route-private component",
+      "lineCount": 330,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/play/[gameId]/[charId]/_components/AiChatPanel.tsx",
+      "component": "AiChatPanel",
+      "type": "route-private component",
+      "lineCount": 284,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/play/[gameId]/[charId]"
+    },
+    {
+      "file": "src/app/library/_components/MakerAccountMenu.tsx",
+      "component": "MakerAccountMenu",
+      "type": "route-private component",
+      "lineCount": 232,
+      "importCount": 4,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/ImageAssetField.tsx",
+      "component": "ImageAssetField",
+      "type": "route-private component",
+      "lineCount": 224,
+      "importCount": 5,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/new/_components/StepWizard.tsx",
+      "component": "StepWizard",
+      "type": "route-private component",
+      "lineCount": 209,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/new"
+    },
+    {
+      "file": "src/app/library/manage/my-sessions/_components/MySessionManager.tsx",
+      "component": "MySessionManager",
+      "type": "route-private component",
+      "lineCount": 171,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library/manage/my-sessions"
+    },
+    {
+      "file": "src/app/game/[gameId]/_components/StartPlayerSessionButton.tsx",
+      "component": "StartPlayerSessionButton",
+      "type": "route-private component",
+      "lineCount": 170,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/game/[gameId]"
+    },
+    {
+      "file": "src/app/library/_components/MobileNavMenu.tsx",
+      "component": "MobileNavMenu",
+      "type": "route-private component",
+      "lineCount": 148,
+      "importCount": 4,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/maker/new/_components/SettingsForm.tsx",
+      "component": "SettingsForm",
+      "type": "route-private component",
+      "lineCount": 138,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/new"
+    },
+    {
+      "file": "src/app/library/_components/PublicGameCard.tsx",
+      "component": "PublicGameCard",
+      "type": "route-private component",
+      "lineCount": 107,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/library/_components/LibraryNavSection.tsx",
+      "component": "LibraryNavSectionSkeleton",
+      "type": "route-private component",
+      "lineCount": 87,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/join/_components/JoinCodeEntryForm.tsx",
+      "component": "JoinCodeEntryForm",
+      "type": "route-private component",
+      "lineCount": 81,
+      "importCount": 2,
+      "risk": "정상",
+      "owningRoute": "/join"
+    },
+    {
+      "file": "src/components/ui/Button.tsx",
+      "component": "Button",
+      "type": "공용 UI primitive",
+      "lineCount": 80,
+      "importCount": 7,
+      "risk": "정상",
+      "owningRoute": ""
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerEditorLoader.tsx",
+      "component": "MakerEditorLoaderSkeleton",
+      "type": "route-private component",
+      "lineCount": 67,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerAssistantDock.tsx",
+      "component": "MakerAssistantDock",
+      "type": "route-private component",
+      "lineCount": 59,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/library/_components/GameGrid.tsx",
+      "component": "GameGrid",
+      "type": "route-private component",
+      "lineCount": 50,
+      "importCount": 2,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/library/_components/GuideMenu.tsx",
+      "component": "GuideMenu",
+      "type": "route-private component",
+      "lineCount": 49,
+      "importCount": 4,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/maker/[gameId]/edit/_components/MakerAssistantLauncher.tsx",
+      "component": "MakerAssistantLauncher",
+      "type": "route-private component",
+      "lineCount": 45,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
+      "file": "src/app/library/_components/LibraryCover.tsx",
+      "component": "LibraryCover",
+      "type": "route-private component",
+      "lineCount": 39,
+      "importCount": 2,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/library/_components/LibraryGameSection.tsx",
+      "component": "LibraryGameSectionSkeleton",
+      "type": "route-private component",
+      "lineCount": 38,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/library/_components/LibraryQuickJoin.tsx",
+      "component": "LibraryQuickJoin",
+      "type": "route-private component",
+      "lineCount": 38,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/guide/_components/GuidePolicySection.tsx",
+      "component": "GuidePolicySection",
+      "type": "route-private component",
+      "lineCount": 37,
+      "importCount": 3,
+      "risk": "정상",
+      "owningRoute": "/guide"
+    },
+    {
+      "file": "src/app/library/_components/PublicGameGrid.tsx",
+      "component": "PublicGameGrid",
+      "type": "route-private component",
+      "lineCount": 35,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/library/_components/LibraryCountsBadges.tsx",
+      "component": "LibraryCountsBadgesSkeleton",
+      "type": "route-private component",
+      "lineCount": 34,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/app/_components/AppAnalytics.tsx",
+      "component": "AppAnalytics",
+      "type": "route-private component",
+      "lineCount": 29,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/"
+    },
+    {
+      "file": "src/app/play/[gameId]/[charId]/_components/PlayLoadingSkeleton.tsx",
+      "component": "PlayLoadingSkeleton",
+      "type": "route-private component",
+      "lineCount": 25,
+      "importCount": 3,
+      "risk": "정상",
+      "owningRoute": "/play/[gameId]/[charId]"
+    },
+    {
+      "file": "src/app/library/_components/DetailsCloseButton.tsx",
+      "component": "DetailsCloseButton",
+      "type": "route-private component",
+      "lineCount": 24,
+      "importCount": 1,
+      "risk": "정상",
+      "owningRoute": "/library"
+    },
+    {
+      "file": "src/components/ui/Card.tsx",
+      "component": "Card",
+      "type": "공용 UI primitive",
+      "lineCount": 23,
+      "importCount": 2,
+      "risk": "정상",
+      "owningRoute": ""
+    }
+  ],
+  "dbControl": [
+    {
+      "area": "게임 메타",
+      "table": "games",
+      "field": "cover_asset_id",
+      "type": "uuid",
+      "tsField": "GameSettings.coverImageUrl",
+      "codeRefs": "src/lib/game-repository.ts:29, src/lib/game-repository.ts:127",
+      "status": "DB-only legacy",
+      "risk": "앱은 cover_image_url을 사용하고 cover_asset_id는 항상 null로 저장된다.",
+      "decision": "drop 후보 또는 assets 정규화 재도입 시 FK로 재설계",
+      "priority": "P2"
+    },
+    {
+      "area": "게임 원본 백업",
+      "table": "game_content",
+      "field": "content_json / content_json_backup",
+      "type": "jsonb",
+      "tsField": "GamePackage",
+      "codeRefs": "scripts/lib/admin-operations.mjs:163, scripts/transfer-game-owner.mjs:110",
+      "status": "legacy backup",
+      "risk": "정규화 이후 런타임은 읽지 않지만 운영/이관 스크립트 일부가 아직 content_json을 만진다.",
+      "decision": "운영 백업 전용으로 명명하거나 normalized snapshot으로 전환",
+      "priority": "P1"
+    },
+    {
+      "area": "투표 질문",
+      "table": "game_vote_questions",
+      "field": "is_primary",
+      "type": "boolean",
+      "tsField": "-",
+      "codeRefs": "supabase/migrations/20260411_000007_advanced_gameplay.sql:35",
+      "status": "DB-only",
+      "risk": "엔딩 질문의 대표 여부를 앱이 sortOrder/round로만 판단한다.",
+      "decision": "삭제하거나 primary ending question 규칙에 실제 연결",
+      "priority": "P2"
+    },
+    {
+      "area": "엔딩 분기",
+      "table": "game_ending_branches",
+      "field": "trigger_choice_id",
+      "type": "text",
+      "tsField": "EndingBranch.targetChoiceId (deprecated)",
+      "codeRefs": "src/lib/game-repository.ts:450, src/lib/game-repository.ts:700",
+      "status": "legacy connected",
+      "risk": "단수/배열 매핑이 함께 저장되어 분기 매핑의 진실 원천이 둘로 보인다.",
+      "decision": "trigger_choice_ids로 완전 이관 후 제거",
+      "priority": "P1"
+    },
+    {
+      "area": "장소 잠금",
+      "table": "game_locations",
+      "field": "access_condition",
+      "type": "jsonb",
+      "tsField": "Location.accessCondition",
+      "codeRefs": "src/types/game.ts:249, src/app/api/sessions/[sessionId]/locations/[locationId]/unlock/route.ts:39",
+      "status": "connected but underspecified",
+      "risk": "현재 단일 조건만 표현 가능하다. STATUS의 OR 조건 다중 지원 백로그와 충돌한다.",
+      "decision": "access_conditions 배열 또는 child table로 확장",
+      "priority": "P1"
+    },
+    {
+      "area": "단서 잠금",
+      "table": "game_clues",
+      "field": "condition",
+      "type": "jsonb",
+      "tsField": "Clue.condition",
+      "codeRefs": "src/types/game.ts:261, src/app/api/sessions/[sessionId]/cards/route.ts:60",
+      "status": "connected",
+      "risk": "조건 타입과 대상 ID가 DB에서 제약되지 않아 stale id 검증이 앱에만 있다.",
+      "decision": "검증 리포트 우선, 필요 시 condition child table 검토",
+      "priority": "P2"
+    },
+    {
+      "area": "승점 조건",
+      "table": "game_players",
+      "field": "score_conditions",
+      "type": "jsonb",
+      "tsField": "Player.scoreConditions",
+      "codeRefs": "src/types/game.ts:177, src/lib/score-evaluator.ts:28",
+      "status": "connected",
+      "risk": "vote-answer가 voteQuestions/choices를 text id로 참조해 삭제/변경 시 깨질 수 있다.",
+      "decision": "메이커 검증과 삭제 cascade UX를 먼저 통일",
+      "priority": "P1"
+    },
+    {
+      "area": "세션 상태",
+      "table": "sessions",
+      "field": "session_json",
+      "type": "jsonb",
+      "tsField": "GameSession",
+      "codeRefs": "src/lib/session-repository.ts:46, docs/STATUS.md:96",
+      "status": "intentional aggregate",
+      "risk": "세션 GET이 큰 JSON과 정규화된 게임 로딩을 함께 건드리면 응답 지연/서버리스 슬롯 이슈가 난다.",
+      "decision": "요약 컬럼 추가 기준과 retention 정책 분리",
+      "priority": "P1"
+    },
+    {
+      "area": "타임라인",
+      "table": "player_timeline_entries",
+      "field": "inactive",
+      "type": "boolean",
+      "tsField": "PlayerTimelineEntry.inactive",
+      "codeRefs": "src/types/game.ts:201, docs/STATUS.md:157",
+      "status": "connected with UX bug",
+      "risk": "비활성 토글이 action 텍스트를 삭제하는 현재 UX가 데이터 보존 기대와 충돌한다.",
+      "decision": "inactive와 action을 독립 상태로 유지",
+      "priority": "P1"
+    },
+    {
+      "area": "투표 질문",
+      "table": "game_vote_questions",
+      "field": "personal_target_player_id",
+      "type": "text",
+      "tsField": "VoteQuestion.personalTargetPlayerId",
+      "codeRefs": "src/types/game.ts:404, src/lib/game-repository.ts:475",
+      "status": "newly connected",
+      "risk": "최근 누락 버그의 원인 컬럼. 운영 DB 적용 여부와 기존 데이터 보정 확인 필요.",
+      "decision": "검증 쿼리와 메이커 삭제/이름변경 가드 추가",
+      "priority": "P1"
+    },
+    {
+      "area": "설정",
+      "table": "games",
+      "field": "phases / private_chat_config",
+      "type": "jsonb",
+      "tsField": "GameRules.phases / GameRules.privateChat",
+      "codeRefs": "src/types/game.ts:59, src/lib/game-repository.ts:37",
+      "status": "connected",
+      "risk": "오프닝 자동 안내와 라운드 페이즈 표시가 이 설정을 기준으로 동작해야 한다.",
+      "decision": "화면별 안내 텍스트 자동 생성의 입력 계약으로 고정",
+      "priority": "P2"
+    }
+  ],
+  "dbTables": [
+    {
+      "table": "branch_personal_endings",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "branch_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "player_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "title",
+          "definition": "text"
+        },
+        {
+          "name": "body_text",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, branch_id, player_id)"
+        }
+      ]
+    },
+    {
+      "table": "game_author_notes",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "title",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "content",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_cards",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "card_type",
+          "definition": "text NOT NULL CHECK (card_type IN ('character', 'clue', 'event'))"
+        },
+        {
+          "name": "player_id",
+          "definition": "text"
+        },
+        {
+          "name": "front_text",
+          "definition": "text"
+        },
+        {
+          "name": "back_text",
+          "definition": "text"
+        },
+        {
+          "name": "clue_id",
+          "definition": "text"
+        },
+        {
+          "name": "clue_title",
+          "definition": "text"
+        },
+        {
+          "name": "clue_description",
+          "definition": "text"
+        },
+        {
+          "name": "clue_type",
+          "definition": "text"
+        },
+        {
+          "name": "clue_image_url",
+          "definition": "text"
+        },
+        {
+          "name": "round_number",
+          "definition": "smallint"
+        },
+        {
+          "name": "event_title",
+          "definition": "text"
+        },
+        {
+          "name": "event_description",
+          "definition": "text"
+        },
+        {
+          "name": "unlocked_location_ids",
+          "definition": "text[] DEFAULT '{}'"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        }
+      ]
+    },
+    {
+      "table": "game_clues",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "title",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "description",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "type",
+          "definition": "text NOT NULL DEFAULT 'physical'"
+        },
+        {
+          "name": "CHECK",
+          "definition": "(type IN ('physical', 'testimony', 'scene'))"
+        },
+        {
+          "name": "image_url",
+          "definition": "text"
+        },
+        {
+          "name": "location_id",
+          "definition": "text"
+        },
+        {
+          "name": "condition",
+          "definition": "jsonb"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_content",
+      "source": "supabase/migrations/20260330_000002_create_games_and_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid primary key references public.games (id) on delete cascade"
+        },
+        {
+          "name": "content_json",
+          "definition": "jsonb not null"
+        },
+        {
+          "name": "schema_version",
+          "definition": "integer not null default 1"
+        },
+        {
+          "name": "migrated_from_local",
+          "definition": "boolean not null default false"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz not null default now()"
+        }
+      ]
+    },
+    {
+      "table": "game_ending_branches",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "label",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "trigger_type",
+          "definition": "text NOT NULL DEFAULT 'wrong-arrest-fallback'"
+        },
+        {
+          "name": "CHECK",
+          "definition": "(trigger_type IN ('culprit-captured', 'specific-player-arrested', 'wrong-arrest-fallback'))"
+        },
+        {
+          "name": "target_player_id",
+          "definition": "text"
+        },
+        {
+          "name": "story_text",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "personal_endings_enabled",
+          "definition": "boolean NOT NULL DEFAULT false"
+        },
+        {
+          "name": "video_url",
+          "definition": "text"
+        },
+        {
+          "name": "background_music",
+          "definition": "text"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_ending_config",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid PRIMARY KEY REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "author_notes_enabled",
+          "definition": "boolean NOT NULL DEFAULT false"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        }
+      ]
+    },
+    {
+      "table": "game_locations",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "name",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "description",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "image_url",
+          "definition": "text"
+        },
+        {
+          "name": "unlocks_at_round",
+          "definition": "smallint"
+        },
+        {
+          "name": "owner_player_id",
+          "definition": "text"
+        },
+        {
+          "name": "access_condition",
+          "definition": "jsonb"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_npcs",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "name",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "background",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "image_url",
+          "definition": "text"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_players",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "name",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "background",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "story",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "secret",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "victory_condition",
+          "definition": "text NOT NULL DEFAULT 'arrest-culprit'"
+        },
+        {
+          "name": "CHECK",
+          "definition": "(victory_condition IN ('avoid-arrest', 'uncertain', 'arrest-culprit', 'personal-goal'))"
+        },
+        {
+          "name": "personal_goal",
+          "definition": "text"
+        },
+        {
+          "name": "score_conditions",
+          "definition": "jsonb NOT NULL DEFAULT '[]'"
+        },
+        {
+          "name": "card_image",
+          "definition": "text"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_scripts",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "phase",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "round_number",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "narration",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "image_url",
+          "definition": "text"
+        },
+        {
+          "name": "video_url",
+          "definition": "text"
+        },
+        {
+          "name": "background_music",
+          "definition": "text"
+        },
+        {
+          "name": "gm_note",
+          "definition": "text"
+        },
+        {
+          "name": "unlocked_location_ids",
+          "definition": "text[] DEFAULT '{}'"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, phase, round_number)"
+        }
+      ]
+    },
+    {
+      "table": "game_stories",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid PRIMARY KEY REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "synopsis",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "incident",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "gm_overview",
+          "definition": "text"
+        },
+        {
+          "name": "map_image_url",
+          "definition": "text"
+        },
+        {
+          "name": "victim_name",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "victim_background",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "victim_image_url",
+          "definition": "text"
+        },
+        {
+          "name": "culprit_player_id",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "motive",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "method",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "timeline_enabled",
+          "definition": "boolean NOT NULL DEFAULT false"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        }
+      ]
+    },
+    {
+      "table": "game_timeline_slots",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "slot_label",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "game_vote_question_choices",
+      "source": "supabase/migrations/20260411_000007_advanced_gameplay.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL"
+        },
+        {
+          "name": "question_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "label",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "description",
+          "definition": "text"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, question_id, id)"
+        },
+        {
+          "name": "FOREIGN",
+          "definition": "KEY (game_id, question_id)"
+        },
+        {
+          "name": "REFERENCES",
+          "definition": "public.game_vote_questions (game_id, id) ON DELETE CASCADE"
+        }
+      ]
+    },
+    {
+      "table": "game_vote_questions",
+      "source": "supabase/migrations/20260411_000007_advanced_gameplay.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "vote_round",
+          "definition": "smallint NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "label",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "description",
+          "definition": "text"
+        },
+        {
+          "name": "target_mode",
+          "definition": "text NOT NULL DEFAULT 'players-only'"
+        },
+        {
+          "name": "CHECK",
+          "definition": "(target_mode IN ('players-only', 'players-and-npcs', 'custom-choices'))"
+        },
+        {
+          "name": "is_primary",
+          "definition": "boolean NOT NULL DEFAULT false"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "trigger_condition",
+          "definition": "jsonb"
+        },
+        {
+          "name": "pre_story_text",
+          "definition": "text"
+        },
+        {
+          "name": "pre_story_video_url",
+          "definition": "text"
+        },
+        {
+          "name": "pre_story_background_music",
+          "definition": "text"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz NOT NULL DEFAULT now()"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, id)"
+        }
+      ]
+    },
+    {
+      "table": "games",
+      "source": "supabase/migrations/20260330_000002_create_games_and_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid primary key"
+        },
+        {
+          "name": "owner_id",
+          "definition": "uuid not null references public.profiles (id) on delete restrict"
+        },
+        {
+          "name": "title",
+          "definition": "text not null"
+        },
+        {
+          "name": "summary",
+          "definition": "text"
+        },
+        {
+          "name": "difficulty",
+          "definition": "text not null"
+        },
+        {
+          "name": "player_count",
+          "definition": "integer not null"
+        },
+        {
+          "name": "estimated_duration",
+          "definition": "integer not null"
+        },
+        {
+          "name": "cover_asset_id",
+          "definition": "uuid"
+        },
+        {
+          "name": "visibility",
+          "definition": "text not null default 'private' check (visibility in ('draft', 'private', 'public'))"
+        },
+        {
+          "name": "lifecycle_status",
+          "definition": "text not null default 'draft' check (lifecycle_status in ('draft', 'ready', 'archived'))"
+        },
+        {
+          "name": "tags",
+          "definition": "text[] not null default '{}'"
+        },
+        {
+          "name": "clue_count",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "location_count",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "round_count",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "published_at",
+          "definition": "timestamptz"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "last_editor_id",
+          "definition": "uuid references public.profiles (id) on delete set null"
+        }
+      ]
+    },
+    {
+      "table": "maker_password_reset_tokens",
+      "source": "supabase/migrations/20260406_000004_add_recovery_email_and_password_reset_tokens.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid primary key default gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "definition": "uuid not null references public.profiles (id) on delete cascade"
+        },
+        {
+          "name": "token_hash",
+          "definition": "text not null unique"
+        },
+        {
+          "name": "requested_email",
+          "definition": "text not null default ''"
+        },
+        {
+          "name": "expires_at",
+          "definition": "timestamptz not null"
+        },
+        {
+          "name": "used_at",
+          "definition": "timestamptz"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz not null default now()"
+        }
+      ]
+    },
+    {
+      "table": "player_related_clues",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "player_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "clue_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "note",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, player_id, clue_id)"
+        }
+      ]
+    },
+    {
+      "table": "player_relationships",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "player_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "target_type",
+          "definition": "text NOT NULL DEFAULT 'player'"
+        },
+        {
+          "name": "CHECK",
+          "definition": "(target_type IN ('player', 'victim', 'npc'))"
+        },
+        {
+          "name": "target_id",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "description",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "sort_order",
+          "definition": "smallint NOT NULL DEFAULT 0"
+        }
+      ]
+    },
+    {
+      "table": "player_timeline_entries",
+      "source": "supabase/migrations/20260411_000006_normalize_game_content.sql",
+      "columns": [
+        {
+          "name": "game_id",
+          "definition": "uuid NOT NULL REFERENCES public.games (id) ON DELETE CASCADE"
+        },
+        {
+          "name": "player_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "slot_id",
+          "definition": "text NOT NULL"
+        },
+        {
+          "name": "action",
+          "definition": "text NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "PRIMARY",
+          "definition": "KEY (game_id, player_id, slot_id)"
+        }
+      ]
+    },
+    {
+      "table": "profiles",
+      "source": "supabase/migrations/20260330_000001_create_profiles.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid primary key references auth.users (id) on delete cascade"
+        },
+        {
+          "name": "display_name",
+          "definition": "text not null"
+        },
+        {
+          "name": "login_id",
+          "definition": "text not null unique"
+        },
+        {
+          "name": "avatar_url",
+          "definition": "text"
+        },
+        {
+          "name": "role",
+          "definition": "text not null default 'creator'"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz not null default now()"
+        }
+      ]
+    },
+    {
+      "table": "sessions",
+      "source": "supabase/migrations/20260330_000003_create_sessions.sql",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "uuid primary key"
+        },
+        {
+          "name": "game_id",
+          "definition": "uuid not null references public.games (id) on delete cascade"
+        },
+        {
+          "name": "session_code",
+          "definition": "text not null unique"
+        },
+        {
+          "name": "host_user_id",
+          "definition": "uuid references public.profiles (id) on delete set null"
+        },
+        {
+          "name": "phase",
+          "definition": "text not null"
+        },
+        {
+          "name": "current_round",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "current_sub_phase",
+          "definition": "text"
+        },
+        {
+          "name": "locked_player_count",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "total_player_count",
+          "definition": "integer not null default 0"
+        },
+        {
+          "name": "started_at",
+          "definition": "timestamptz"
+        },
+        {
+          "name": "ended_at",
+          "definition": "timestamptz"
+        },
+        {
+          "name": "created_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "updated_at",
+          "definition": "timestamptz not null default now()"
+        },
+        {
+          "name": "session_json",
+          "definition": "jsonb not null"
+        }
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "id": "GAP-001",
+      "priority": "P1",
+      "type": "검증/카운트",
+      "title": "메이커 제작 상태/카운트 규칙 통일 필요",
+      "symptom": "신규 필드와 구형 검증 규칙이 섞여 완성도 표시가 믿기 어렵다.",
+      "evidence": "docs/STATUS.md:156",
+      "ownerSurface": "메이커 편집",
+      "nextAction": "maker-validation.ts, game-publish.ts, MakerEditor 표시 규칙을 한 표로 맞춘다."
+    },
+    {
+      "id": "GAP-002",
+      "priority": "P1",
+      "type": "DB 모델",
+      "title": "장소 입장 조건이 단일 JSONB라 OR 조건을 표현하지 못함",
+      "symptom": "한 장소를 여는 방법을 여러 개 등록할 수 없다.",
+      "evidence": "src/types/game.ts:249, docs/STATUS.md:169",
+      "ownerSurface": "메이커 장소/플레이어 조사",
+      "nextAction": "Location.accessConditions 스펙 확정 후 API/UI/DB migration 동시 진행"
+    },
+    {
+      "id": "GAP-003",
+      "priority": "P1",
+      "type": "DB 잔해",
+      "title": "정규화 후 legacy 컬럼/테이블이 운영 스크립트에 남아 있음",
+      "symptom": "game_content, cover_asset_id, trigger_choice_id, is_primary 같은 진실 원천 불명 항목이 남아 있다.",
+      "evidence": "src/lib/game-repository.ts:29, scripts/transfer-game-owner.mjs:110",
+      "ownerSurface": "운영/저장소",
+      "nextAction": "drop/keep/migrate 판단을 컬럼 단위로 잠그고 migration backlog 생성"
+    },
+    {
+      "id": "GAP-004",
+      "priority": "P1",
+      "type": "컴포넌트 통제",
+      "title": "메이커/플레이 핵심 컴포넌트가 과대화됨",
+      "symptom": "PlayerEditor, PlayerView, LocationEditor, EndingEditor가 화면·상태·검증을 함께 들고 있다.",
+      "evidence": "src/app/maker/[gameId]/edit/_components/PlayerEditor.tsx, src/app/play/[gameId]/[charId]/_components/PlayerView.tsx",
+      "ownerSurface": "메이커/플레이",
+      "nextAction": "도메인 섹션별 subcomponent + pure helper 분리 기준 수립"
+    },
+    {
+      "id": "GAP-005",
+      "priority": "P2",
+      "type": "설계 자산",
+      "title": "스크린샷/시각 검증 자산이 비어 있음",
+      "symptom": "docs/screenshots에 실제 캡처가 없어 PM/디자인 리뷰가 텍스트 중심이다.",
+      "evidence": "docs/screenshots/README.md",
+      "ownerSurface": "문서/디자인",
+      "nextAction": "P-XXX 캡처 규칙으로 핵심 10개 화면부터 채우고 Sheet 이미지 컬럼 자동화"
+    },
+    {
+      "id": "GAP-006",
+      "priority": "P2",
+      "type": "문서 정합성",
+      "title": "SPEC와 STATUS의 현재 DB 구조 설명이 다름",
+      "symptom": "SPEC에는 과거 DB 전환 고려 문맥이 남고 STATUS는 Supabase 정규화 완료 상태다.",
+      "evidence": "docs/SPEC.md:163, docs/STATUS.md:146",
+      "ownerSurface": "문서",
+      "nextAction": "SPEC의 DB/구조 섹션을 현재 Supabase 정규화 기준으로 재작성"
+    },
+    {
+      "id": "GAP-007",
+      "priority": "P2",
+      "type": "투표/승점",
+      "title": "vote-answer 승점 조건과 personal vote 질문의 참조 무결성 약함",
+      "symptom": "질문/선택지 삭제 시 승점 조건이 stale id를 가질 수 있다.",
+      "evidence": "src/types/game.ts:163, src/types/game.ts:404",
+      "ownerSurface": "메이커 캐릭터/투표",
+      "nextAction": "삭제 확인, 자동 정리, 검증 패널 경고를 같은 규칙으로 연결"
+    }
+  ],
+  "documents": [
+    {
+      "path": "docs/STATUS.md",
+      "role": "단일 현황 기준",
+      "overlap": "모든 완료/진행/미착수 판단의 우선 문서",
+      "action": "유지. 통제 워크북 생성 사실만 추가",
+      "exists": true
+    },
+    {
+      "path": "docs/screens.json",
+      "role": "화면 설계서 원본",
+      "overlap": "Google Sheets 기존 `화면 설계서` 탭의 소스",
+      "action": "유지. PM 통제 워크북은 이를 확장해 읽음",
+      "exists": true
+    },
+    {
+      "path": "docs/screenshots/README.md",
+      "role": "스크린샷 네이밍 규칙",
+      "overlap": "화면 설계서의 시각 자산 컬럼과 연결 예정",
+      "action": "유지. 핵심 화면 캡처 추가 필요",
+      "exists": true
+    },
+    {
+      "path": "docs/SPEC.md",
+      "role": "전체 명세",
+      "overlap": "현재 구현과 일부 오래된 DB/구조 설명이 공존",
+      "action": "정규화 DB 기준으로 별도 업데이트 필요",
+      "exists": true
+    },
+    {
+      "path": "docs/archive/plans/20260319_SUPABASE_SCHEMA_DRAFT.md",
+      "role": "과거 스키마 초안",
+      "overlap": "현재 DB와 혼동 가능",
+      "action": "archive 유지. 현재 판단에는 참조 금지",
+      "exists": true
+    },
+    {
+      "path": "docs/archive/plans/20260410_AI_DB_IMPROVEMENT_PLAN.md",
+      "role": "정규화 전환 계획",
+      "overlap": "현재 정규화 구조의 배경",
+      "action": "archive 유지. DB 정리 시 이력 참조",
+      "exists": true
+    },
+    {
+      "path": "docs/plans/20260413_CLUE_TYPE_REWORK_PLAN.md",
+      "role": "완료된 단서 타입 리워크 계획",
+      "overlap": "STATUS에서 완료 처리됨",
+      "action": "archive 이동 후보",
+      "exists": true
+    },
+    {
+      "path": "docs/plans/20260415_CLUE_REVIEW_SYSTEM_PLAN.md",
+      "role": "진행/미착수 기능 계획",
+      "overlap": "AI 단서 검토 신규 기능",
+      "action": "유지",
+      "exists": true
+    },
+    {
+      "path": "docs/product-control/",
+      "role": "신규 통제 폴더",
+      "overlap": "화면/컴포넌트/DB 연결 현황판",
+      "action": "본 워크북과 JSON 원본 보관",
+      "exists": true
+    }
+  ]
+}

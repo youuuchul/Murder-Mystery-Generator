@@ -12,6 +12,7 @@ node_modules/
 # Build output
 .next/
 out/
+outputs/
 dist/
 build/
 
@@ -57,6 +58,11 @@ docs/*
 !docs/STATUS.md
 !docs/SPEC.md
 !docs/README.md
+!docs/product-control/
+!docs/product-control/README.md
+!docs/product-control/product-control-data.json
+!docs/product-control/*.xlsx
+docs/product-control/build-workbook.mjs
 
 # Agent/project guidance (personal — not published)
 CLAUDE.md

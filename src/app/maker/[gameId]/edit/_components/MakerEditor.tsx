@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { startTransition, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isCulpritIdValid } from "@/lib/culprit";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
@@ -458,19 +458,14 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     }
   }
 
-  async function moveToStep(step: number) {
-    if (step === currentStep || saving) {
+  function moveToStep(step: number) {
+    if (step === currentStep) {
       return;
     }
 
-    if (hasUnsavedChanges) {
-      const saved = await save();
-      if (!saved) {
-        return;
-      }
-    }
-
-    setCurrentStep(step);
+    startTransition(() => {
+      setCurrentStep(step);
+    });
   }
 
   const saveHeadline = saving
@@ -484,11 +479,11 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           : "편집 준비 완료";
 
   const saveHint = saving
-    ? "현재 스텝 변경사항을 서버에 기록하고 있습니다."
+    ? "변경사항을 서버에 저장하고 있습니다."
     : saveError
       ? saveError
       : hasUnsavedChanges
-        ? "스텝 이동 시 현재 내용부터 먼저 저장합니다."
+        ? "탭 이동은 자유롭게 할 수 있습니다. 페이지를 떠나기 전 저장하세요."
         : "현재 화면의 변경사항이 모두 저장된 상태입니다.";
 
   const saveButtonLabel = hasUnsavedChanges ? "지금 저장" : "저장 완료";
@@ -744,7 +739,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               variant="ghost"
               size="sm"
               onClick={() => { void moveToStep(Math.max(1, currentStep - 1)); }}
-              disabled={currentStep <= 1 || saving}
+              disabled={currentStep <= 1}
             >
               ← 이전
             </Button>
@@ -762,7 +757,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                 <Button
                   size="sm"
                   onClick={() => { void moveToStep(currentStep + 1); }}
-                  disabled={saving}
                 >
                   다음 →
                 </Button>

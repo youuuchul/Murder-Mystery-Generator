@@ -230,7 +230,7 @@ function VoteQuestionForm({
             </select>
             {question.targetMode !== "custom-choices" && (
               <p className="text-xs text-dark-600 mt-1">
-                선택지: {buildAutoTargets(question.targetMode, players, npcs, victim).map((t) => t.label).join(", ") || "없음"}
+                자동 선택지 {buildAutoTargets(question.targetMode, players, npcs, victim).length}개
               </p>
             )}
           </div>
@@ -406,9 +406,6 @@ export default function VoteEndingEditor({
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-dark-50">투표 & 엔딩</h2>
-        <p className="mt-1 text-sm text-dark-500">
-          투표 설정, 분기 엔딩, 개인 엔딩, 작가 후기를 관리합니다.
-        </p>
       </div>
 
       {/* 탭 네비게이션 */}
@@ -438,9 +435,6 @@ export default function VoteEndingEditor({
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-dark-100">기본 투표</p>
-              <p className="text-xs text-dark-500 mt-0.5">
-                모든 게임에 적용되는 기본 투표 설정입니다.
-              </p>
             </div>
 
             {/* 질문 텍스트 */}
@@ -455,9 +449,6 @@ export default function VoteEndingEditor({
                     placeholder="범인은 누구인가요?"
                     className={inp}
                   />
-                  <p className="text-xs text-dark-600 mt-1">
-                    미입력 시 기본값: &quot;범인이라 생각하는 사람은?&quot;
-                  </p>
                 </div>
 
                 {/* 선택지 옵션 */}
@@ -480,7 +471,7 @@ export default function VoteEndingEditor({
                   </select>
                   {currentPrimary.targetMode !== "custom-choices" && (
                     <p className="text-xs text-dark-600 mt-1">
-                      선택지: {buildAutoTargets(currentPrimary.targetMode, players, npcs, victim).map((t) => t.label).join(", ") || "플레이어를 먼저 추가하세요"}
+                      자동 선택지 {buildAutoTargets(currentPrimary.targetMode, players, npcs, victim).length}개
                     </p>
                   )}
                 </div>
@@ -537,7 +528,6 @@ export default function VoteEndingEditor({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">투표 전 안내</p>
-                <p className="text-xs text-dark-500 mt-0.5">투표 시작 전 플레이어에게 표시할 안내 텍스트입니다.</p>
               </div>
               <ToggleSwitch
                 enabled={showPreStory}
@@ -573,9 +563,6 @@ export default function VoteEndingEditor({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">추가 투표 (개인 목표)</p>
-                <p className="mt-1 text-xs text-dark-500">
-                  엔딩 분기와 무관한 질문입니다. 승점/비밀 임무 확인용으로 활용됩니다.
-                </p>
               </div>
               <ToggleSwitch
                 enabled={showPersonalQuestions}
@@ -593,7 +580,7 @@ export default function VoteEndingEditor({
                 </div>
                 {personalQuestions.length === 0 ? (
                   <p className="text-xs text-dark-600 text-center py-3 border border-dashed border-dark-700 rounded-xl">
-                    질문을 추가하면 투표 시 개인 목표 질문이 함께 표시됩니다.
+                    질문 없음
                   </p>
                 ) : (
                   personalQuestions.map((q) => (
@@ -618,9 +605,6 @@ export default function VoteEndingEditor({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">2차 투표</p>
-                <p className="mt-1 text-xs text-dark-500">
-                  1차 투표의 특정 결과에서 추가 투표를 진행할 수 있습니다.
-                </p>
               </div>
               <ToggleSwitch
                 enabled={advancedVotingEnabled}
@@ -631,7 +615,7 @@ export default function VoteEndingEditor({
             {advancedVotingEnabled && (
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-dark-600">1차 투표 특정 결과일 때 추가 투표를 진행합니다.</p>
+                  <p className="text-xs text-dark-600">1차 결과 조건 사용</p>
                   <button type="button" onClick={() => addQuestion(2, "ending")}
                     className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors">
                     + 질문 추가
@@ -639,7 +623,7 @@ export default function VoteEndingEditor({
                 </div>
                 {round2Questions.length === 0 ? (
                   <p className="text-xs text-dark-600 text-center py-3 border border-dashed border-dark-700 rounded-xl">
-                    질문을 추가하면 1차 투표 후 조건에 따라 2차 투표가 진행됩니다.
+                    질문 없음
                   </p>
                 ) : (
                   round2Questions.map((q) => (

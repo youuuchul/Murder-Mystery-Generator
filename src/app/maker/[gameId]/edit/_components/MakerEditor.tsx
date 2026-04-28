@@ -514,7 +514,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             <p className="text-xs text-dark-500">
               필수 {validationErrorCount}개
               {validationWarningCount > 0 ? ` · 권장 ${validationWarningCount}개` : ""}
-              {" · "}단계 네비게이터에서 위치를 확인할 수 있습니다.
             </p>
           </div>
         )}
@@ -532,9 +531,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
               <div>
                 <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
                 <p className="mt-1 text-xs text-dark-400">
-                  에러 {currentStepErrorIssues.length}개
-                  {currentStepWarningIssues.length > 0 ? ` · 경고 ${currentStepWarningIssues.length}개` : ""}
-                  {" · "}에러는 우선 수정이 필요한 항목이고, 경고는 보완 권장 항목입니다.
+                  필수 {currentStepErrorIssues.length}개
+                  {currentStepWarningIssues.length > 0 ? ` · 권장 ${currentStepWarningIssues.length}개` : ""}
                 </p>
               </div>
             </div>

@@ -185,9 +185,6 @@ function TimelineUsageToggle({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-dark-100">행동 타임라인 사용</p>
-          <p className="mt-1 text-xs text-dark-500">
-            시간대 슬롯 관리와 캐릭터별 행동 입력은 이 중앙 타임라인 탭에서 함께 진행합니다.
-          </p>
         </div>
         <div className="flex gap-2 shrink-0">
           <button
@@ -218,8 +215,8 @@ function TimelineUsageToggle({
       </div>
       <p className="text-xs text-dark-600">
         {timeline.enabled
-          ? `현재 사용 중 · 시간대 슬롯 ${timeline.slots.length}개`
-          : "현재 사용하지 않습니다. 켜면 기본 시간대 슬롯을 만들고 캐릭터별 행동 입력을 활성화합니다."}
+          ? `슬롯 ${timeline.slots.length}개`
+          : "끄면 플레이어별 행동 입력을 숨깁니다."}
       </p>
     </div>
   );
@@ -547,9 +544,6 @@ function TimelineSlotManager({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-dark-100">시간대 슬롯 관리</p>
-          <p className="mt-1 text-xs text-dark-500">
-            추가, 삭제, 순서 변경을 여기서 바로 처리합니다. 순서를 바꾸면 아래 행동 입력 순서도 같이 바뀝니다.
-          </p>
         </div>
         <button
           type="button"
@@ -878,7 +872,7 @@ function PlayerForm({
             <div className="space-y-3">
               <ImageAssetField
                 title="캐릭터 대표 이미지"
-                description="참가 선택, 인물 정보, 투표 화면에 쓸 인물 사진입니다."
+                description="선택·투표 화면에 표시됩니다."
                 value={player.cardImage}
                 alt={player.name || "플레이어 캐릭터 이미지"}
                 profile="portrait"
@@ -886,7 +880,7 @@ function PlayerForm({
                 onUpload={handleCardImageUpload}
                 uploading={uploadingImage}
                 uploadLabel="인물 이미지 업로드"
-                emptyStateLabel="선택/투표 화면에 쓸 캐릭터 대표 이미지가 아직 없습니다."
+                emptyStateLabel="이미지 없음"
               />
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">배경 (전원 공개)</label>
@@ -919,9 +913,6 @@ function PlayerForm({
                   placeholder="이 캐릭터가 알고 있는 사건 전후 맥락, 감정선, 의심하는 대상, 숨기고 싶은 사정을 자세히 적으세요."
                   className={`${ta} ${storyExpanded ? "min-h-[33vh]" : ""}`}
                 />
-                <p className="mt-1 text-[11px] text-dark-500">
-                  시간대별 행동과 알리바이는 위쪽 중앙 타임라인 탭에서 따로 입력합니다.
-                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
@@ -934,9 +925,7 @@ function PlayerForm({
                   placeholder={"한 줄마다 ‘-’로 시작하는 간단한 사실 단위로 적으세요.\n예)\n- 피해자와 3주 전 금전 관계로 크게 다툼\n- 사건 당일 03:10 뒷문으로 몰래 진입\n- 진범은 아님. 다만 흉기를 숨겨줬음"}
                   className={ta}
                 />
-                <p className="mt-1 text-[11px] text-dark-500">
-                  서술형 문단보다 ‘-’ 불릿형 사실 리스트가 GM/플레이어가 빠르게 훑기 좋고, AI 도우미가 문안을 뽑을 때도 구조를 재활용하기 쉽습니다.
-                </p>
+                <p className="mt-1 text-[11px] text-dark-500">한 줄에 하나씩 적으면 진행 중 확인하기 쉽습니다.</p>
               </div>
             </div>
           )}
@@ -959,9 +948,6 @@ function PlayerForm({
 
           {tab === "clues" && (
             <div className="space-y-2">
-              <p className="text-xs text-dark-500">
-                이 캐릭터와 관련된 단서를 선택하고 설명을 작성하세요. 게임 시작 시 본인에게 공개됩니다.
-              </p>
               {player.relatedClues.map((rc, idx) => {
                 const groupsForRow = getRelatedClueGroupsForRow(idx);
                 return (
@@ -1002,7 +988,7 @@ function PlayerForm({
                 );
               })}
               {clues.length === 0 ? (
-                <p className="text-xs text-dark-600 py-2">Step 4(장소 & 단서)에서 단서를 먼저 추가하세요.</p>
+                <p className="text-xs text-dark-600 py-2">단서가 없습니다.</p>
               ) : (
                 <button
                   type="button"
@@ -1019,12 +1005,9 @@ function PlayerForm({
 
           {tab === "rel" && (
             <div className="space-y-2">
-              <p className="text-xs text-dark-500">
-                피해자, 다른 캐릭터, NPC와의 관계를 적습니다. 새로 추가한 항목이 바로 보이도록 카드 형태로 표시합니다.
-              </p>
               {player.relationships.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
-                  <p className="text-xs text-dark-600">등록된 관계가 없습니다. 아래 버튼으로 첫 관계를 추가하세요.</p>
+                  <p className="text-xs text-dark-600">등록된 관계가 없습니다.</p>
                 </div>
               ) : (
                 player.relationships.map((rel, idx) => {
@@ -1137,12 +1120,11 @@ export default function PlayerEditor({
         <div>
           <h2 className="text-xl font-bold text-dark-50">플레이어</h2>
           <p className="text-sm text-dark-500 mt-1">
-            {players.length}명 등록 · 피해자는 사건 개요 탭에서 작성합니다.
-          </p>
-          <p className="text-xs text-dark-600 mt-1">
+            {players.length}명 등록
+            {" · "}
             {timeline.enabled
-              ? `행동 타임라인 사용 중 · 시간대 슬롯 ${timeline.slots.length}개`
-              : "행동 타임라인 사용 안 함 · 중앙 타임라인 탭에서 설정할 수 있습니다."}
+              ? `타임라인 슬롯 ${timeline.slots.length}개`
+              : "타임라인 꺼짐"}
           </p>
         </div>
         <Button size="sm" onClick={() => onChange([...players, createPlayer()])}>+ 플레이어 추가</Button>
@@ -1300,10 +1282,6 @@ function ScoreConditionsEditor({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-dark-500">
-        승점 조건을 설정하세요. 자동 판정 타입을 지정하면 엔딩 시 달성 여부가 자동으로 표시됩니다.
-      </p>
-
       {scoreConditions.map((sc, idx) => {
         const type = sc.type ?? "manual";
         return (
@@ -1384,7 +1362,7 @@ function ScoreConditionsEditor({
                 </div>
                 {!sc.config?.clueId && (
                   <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
-                    대상 단서를 선택해야 엔딩 시 자동 판정이 됩니다. 미선택 시 결과 화면에서 조건 미완성으로 표시됩니다.
+                    대상 단서를 선택해야 자동 판정됩니다.
                   </p>
                 )}
                 <div className="flex items-center gap-2">
@@ -1498,7 +1476,7 @@ function ScoreConditionsEditor({
 
                       {linkedToOther && (
                         <p className="text-[11px] text-yellow-400/80 border border-yellow-900/40 bg-yellow-950/10 rounded-lg px-2 py-1.5">
-                          정답만 이 캐릭터 기준으로 지정할 수 있습니다. 질문 내용은 {otherOwnerName} 카드에서 편집하세요.
+                          질문은 {otherOwnerName} 카드에서 편집합니다.
                         </p>
                       )}
 
@@ -1701,15 +1679,12 @@ function CulpritSelectorBox({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-dark-100">범인 지정</p>
-          <p className="mt-1 text-xs text-dark-500">
-            엔딩 분기·투표 결과 판정에 쓰는 범인입니다.
-          </p>
         </div>
       </div>
 
       {/* 후보군 모드 토글 — 투표 탭 주 질문 targetMode 와 동기화됨. */}
       <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-dark-400">범인 후보군 (투표 탭과 동기화)</p>
+        <p className="text-[11px] font-medium text-dark-400">범인 후보군</p>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -1742,7 +1717,7 @@ function CulpritSelectorBox({
         </div>
         {primaryMode === "custom-choices" && (
           <p className="text-[11px] text-dark-500">
-            투표 탭의 주 질문이 "커스텀 선택지" 모드입니다. 범인 후보군은 전체 인물에서 선택할 수 있습니다.
+            커스텀 선택지 모드에서는 전체 인물을 표시합니다.
           </p>
         )}
       </div>
@@ -1805,7 +1780,7 @@ function CulpritSelectorBox({
 
       {noCandidates ? (
         <p className="text-xs text-dark-600">
-          플레이어를 한 명 이상 추가하면 범인을 선택할 수 있습니다.
+          선택 가능한 인물이 없습니다.
         </p>
       ) : culpritIdentity ? (
         <p className="text-xs text-mystery-400">

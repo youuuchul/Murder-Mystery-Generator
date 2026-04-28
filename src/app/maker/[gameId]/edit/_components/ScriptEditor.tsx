@@ -23,9 +23,7 @@ type Tab = "lobby" | "rounds";
 type EditorStatus = "empty" | "partial" | "complete";
 
 interface SegmentGuidance {
-  intro: string;
   narrationPrompt: string;
-  narrationExample: string;
 }
 
 const textareaClass =
@@ -36,29 +34,19 @@ const inputClass =
 
 const SEGMENT_GUIDANCE: Record<"lobby" | "opening" | "ending" | "endingSuccess" | "endingFail", SegmentGuidance> = {
   lobby: {
-    intro: "대기실은 입장 확인과 시작 직전 안내에 집중하면 됩니다.",
     narrationPrompt: "참가자들이 준비를 마칠 때 공통 화면에 띄울 짧은 안내 문구를 적어주세요.",
-    narrationExample: "모든 참가자 입장을 확인합니다.\n캐릭터 선택과 이름 입력이 끝나면 곧 오프닝을 시작합니다.",
   },
   opening: {
-    intro: "오프닝은 사건 분위기와 현재 상황을 한 번에 잡아주는 구간입니다.",
     narrationPrompt: "사건 발생 시점, 장소 분위기, 플레이어가 처음 받아야 할 인상을 중심으로 작성하세요.",
-    narrationExample: "밤이 깊어질 무렵, 저택의 거실에 모두가 다시 모였습니다.\n잠시 후 한 비명이 울리고, 평온하던 저녁은 사건의 시작으로 바뀝니다.",
   },
   ending: {
-    intro: "공통 엔딩은 결과와 무관하게 모든 플레이어가 같이 듣는 마무리 문장입니다.",
     narrationPrompt: "결과 공개 직전 분위기를 정리하는 문장이나 사건을 닫는 공통 문장을 작성하세요.",
-    narrationExample: "모든 선택이 끝났습니다.\n이제 사건의 결말과 각자의 선택이 어떤 결과를 만들었는지 확인합니다.",
   },
   endingSuccess: {
-    intro: "검거 성공 엔딩은 단서가 어떻게 맞물렸는지 보여주는 구간입니다.",
     narrationPrompt: "범인이 특정된 이유와 사건이 정리되는 느낌을 중심으로 써주세요.",
-    narrationExample: "흩어져 있던 단서들이 하나로 이어지며 범인의 동선이 드러났습니다.\n마침내 방 안의 침묵은 진실을 인정하는 순간으로 바뀝니다.",
   },
   endingFail: {
-    intro: "도주 성공 엔딩은 왜 수사가 실패했는지와 남는 여운을 정리하는 편이 좋습니다.",
     narrationPrompt: "결정적 증거가 부족했던 이유와 범인이 빠져나간 뒤의 분위기를 써주세요.",
-    narrationExample: "결정적인 한 조각이 끝내 맞춰지지 않았고, 범인은 혼란 속에서 흔적을 지웠습니다.\n남겨진 사람들은 늦게 도착한 진실의 조각만 바라보게 됩니다.",
   },
 };
 
@@ -139,24 +127,6 @@ function FieldHeader({
   );
 }
 
-function ExamplePanel({
-  title,
-  description,
-  example,
-}: {
-  title: string;
-  description: string;
-  example: string;
-}) {
-  return (
-    <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
-      <p className="text-xs font-medium text-dark-300">{title}</p>
-      <p className="text-xs text-dark-500">{description}</p>
-      <p className="text-sm leading-relaxed text-dark-400 whitespace-pre-line">{example}</p>
-    </div>
-  );
-}
-
 function MediaLinkField({
   label,
   value,
@@ -166,7 +136,7 @@ function MediaLinkField({
   label: string;
   value?: string;
   onChange: (nextValue?: string) => void;
-  description: string;
+  description?: string;
 }) {
   return (
     <div>
@@ -178,7 +148,7 @@ function MediaLinkField({
         placeholder="https://..."
         className={inputClass}
       />
-      <p className="mt-1 text-xs text-dark-600">{description}</p>
+      {description && <p className="mt-1 text-xs text-dark-600">{description}</p>}
     </div>
   );
 }
@@ -189,7 +159,6 @@ function SegmentEditor({
   guidance,
   onChange,
   textLabel,
-  textBadgeLabel = "안내 텍스트",
   hideTextField = false,
 }: {
   label: string;
@@ -197,7 +166,6 @@ function SegmentEditor({
   guidance: SegmentGuidance;
   onChange: (segment: ScriptSegment) => void;
   textLabel?: string;
-  textBadgeLabel?: string;
   hideTextField?: boolean;
 }) {
   const status: EditorStatus = hideTextField ? "complete" : getSegmentStatus(segment);
@@ -207,27 +175,12 @@ function SegmentEditor({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
+      <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-dark-100">{label} 작성 가이드</p>
-            <p className="mt-1 text-xs text-dark-500">{guidance.intro}</p>
+            <p className="text-sm font-semibold text-dark-100">{label}</p>
           </div>
           <StatusBadge status={status} />
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-[11px]">
-          {!hideTextField && (
-            <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-              {textBadgeLabel} {hasNarration ? "작성됨" : "미작성"}
-            </span>
-          )}
-          <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-            배경 음악 {hasMusic ? "연결됨" : "비워 둠"}
-          </span>
-          <span className={`rounded-full border px-2 py-0.5 ${hasVideo ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-            영상 {hasVideo ? "연결됨" : "비워 둠"}
-          </span>
         </div>
       </div>
 
@@ -242,15 +195,6 @@ function SegmentEditor({
             className={textareaClass}
           />
           <p className="mt-1 text-xs text-dark-500">{segment.narration.length}자</p>
-          {!hasNarration && (
-            <div className="mt-3">
-              <ExamplePanel
-                title={`예시 ${textBadgeLabel}`}
-                description="아직 비어 있다면 아래 흐름을 참고해서 문장을 시작하면 됩니다."
-                example={guidance.narrationExample}
-              />
-            </div>
-          )}
         </div>
       )}
 
@@ -258,7 +202,6 @@ function SegmentEditor({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-dark-100">미디어 링크</p>
-            <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-[11px]">
             <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
@@ -275,13 +218,11 @@ function SegmentEditor({
             label="배경 음악 링크"
             value={segment.backgroundMusic}
             onChange={(nextValue) => onChange({ ...segment, backgroundMusic: nextValue })}
-            description="비워 두면 이 페이즈에서는 배경 음악 패널이 숨겨집니다."
           />
           <MediaLinkField
             label="영상 링크"
             value={segment.videoUrl}
             onChange={(nextValue) => onChange({ ...segment, videoUrl: nextValue })}
-            description="YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다."
           />
         </div>
       </div>
@@ -328,18 +269,11 @@ function RoundScriptForm({
 
       {expanded && (
         <div className="p-4 space-y-4">
-          <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+          <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-dark-100">Round {round.round} 작성 메모</p>
-              <div className="flex flex-wrap gap-2 text-[11px]">
-                <span className={`rounded-full border px-2 py-0.5 ${hasNarration ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
-                  라운드 이벤트 {hasNarration ? "작성됨" : "미작성"}
-                </span>
-              </div>
+              <p className="text-sm font-semibold text-dark-100">Round {round.round}</p>
+              <StatusBadge status={status} />
             </div>
-            <p className="text-xs text-dark-500">
-              라운드 이벤트는 시작 멘트, 열린 장소, 종료 직전 공지 순서로 적으면 읽기 편합니다.
-            </p>
           </div>
 
           <div>
@@ -348,24 +282,14 @@ function RoundScriptForm({
               rows={4}
               value={round.narration}
               onChange={(e) => onChange({ ...round, narration: e.target.value })}
-              placeholder={`Round ${round.round}에서 플레이어에게 바로 보여줄 이벤트 텍스트를 적어주세요.`}
+              placeholder={`Round ${round.round} 이벤트 텍스트`}
               className={textareaClass}
             />
-            {!hasNarration && (
-              <div className="mt-3">
-                <ExamplePanel
-                  title={`Round ${round.round} 라운드 이벤트 예시`}
-                  description="새로 열린 장소와 이번 라운드의 행동 목표를 먼저 알려주면 흐름이 깔끔합니다."
-                  example={`조사 시간이 다시 시작됩니다.\n이번 라운드에 새로 열린 공간을 확인하고 제한 시간 안에 단서를 확보해 주세요.`}
-                />
-              </div>
-            )}
           </div>
 
           <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-medium text-dark-300">이 라운드에서 열리는 장소</p>
-              <span className="text-[11px] text-dark-500">장소 탭 기준 자동 반영</span>
             </div>
             {unlockedLocations.length === 0 ? (
               <p className="text-sm text-dark-600">장소 탭에서 이 라운드에 열리는 장소를 지정하지 않았습니다.</p>
@@ -385,7 +309,7 @@ function RoundScriptForm({
 
           <ImageAssetField
             title="라운드 대표 이미지"
-            description="라운드 시작 시 GM 보드에 보일 대표 이미지입니다. 없으면 공통 이미지를 사용합니다."
+            description="GM 보드에 표시됩니다."
             value={round.imageUrl}
             alt={`Round ${round.round} 대표 이미지`}
             profile="round"
@@ -393,14 +317,13 @@ function RoundScriptForm({
             onUpload={onUploadImage}
             uploading={uploadingImage}
             uploadLabel="이미지 업로드"
-            emptyStateLabel="아직 연결된 라운드 대표 이미지가 없습니다."
+            emptyStateLabel="이미지 없음"
           />
 
           <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-dark-100">미디어 링크</p>
-                <p className="mt-1 text-xs text-dark-500">영상과 배경 음악은 URL만 연결합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px]">
                 <span className={`rounded-full border px-2 py-0.5 ${hasMusic ? "border-sage-700 bg-sage-900/25 text-sage-300" : "border-dark-700 bg-dark-900 text-dark-500"}`}>
@@ -417,13 +340,11 @@ function RoundScriptForm({
                 label="배경 음악 링크"
                 value={round.backgroundMusic}
                 onChange={(nextValue) => onChange({ ...round, backgroundMusic: nextValue })}
-                description="비워 두면 이 라운드에서는 배경 음악 패널이 숨겨집니다."
               />
               <MediaLinkField
                 label="영상 링크"
                 value={round.videoUrl}
                 onChange={(nextValue) => onChange({ ...round, videoUrl: nextValue })}
-                description="YouTube, Vimeo, mp4 링크를 그대로 넣으면 GM 보드에 반영됩니다."
               />
             </div>
           </div>
@@ -535,9 +456,6 @@ export default function ScriptEditor({
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-dark-50">스크립트</h2>
-        <p className="text-sm text-dark-500 mt-1">
-          라운드별 가이드, 미디어, 이벤트 텍스트와 투표 안내를 작성합니다. 오프닝은 Step 2, 엔딩은 Step 6에서 설정합니다.
-        </p>
       </div>
 
       <div className="flex gap-1 bg-dark-800 p-1 rounded-xl">
@@ -567,7 +485,6 @@ export default function ScriptEditor({
           onChange={(lobby) => onChange({ ...scripts, lobby })}
           hideTextField
           textLabel="대기실 텍스트"
-          textBadgeLabel="대기실 텍스트"
         />
       )}
 
@@ -576,8 +493,7 @@ export default function ScriptEditor({
           <div className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-2">
             <p className="text-sm font-semibold text-dark-100">라운드 작성 현황</p>
             <p className="text-xs text-dark-500">
-              라운드 수를 변경하려면 기본 설정에서 수정하세요. 현재 {normalizedRounds.length}개 라운드 중{" "}
-              {roundStatuses.filter((status) => status !== "complete").length}개가 아직 덜 작성되었습니다.
+              {normalizedRounds.length}개 중 {roundStatuses.filter((status) => status !== "complete").length}개 미작성
             </p>
           </div>
           {normalizedRounds.map((round, idx) => (

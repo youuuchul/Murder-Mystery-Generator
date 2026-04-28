@@ -21,6 +21,7 @@ import type {
   Relationship,
   StoryTimeline,
   TimelineSlot,
+  PlayerTimelineEntry,
   VoteQuestion,
 } from "@/types/game";
 
@@ -224,6 +225,161 @@ function TimelineUsageToggle({
   );
 }
 
+/** 중앙 타임라인 셀에서 쓰는 상태 라벨과 입력 컨트롤을 한 곳으로 모은다. */
+function TimelineEntryInput({
+  player,
+  slot,
+  entry,
+  showPlayerName = false,
+  compact = false,
+  onUpdateAction,
+  onUpdateInactive,
+}: {
+  player: Player;
+  slot: TimelineSlot;
+  entry?: PlayerTimelineEntry;
+  showPlayerName?: boolean;
+  compact?: boolean;
+  onUpdateAction: (playerId: string, slotId: string, action: string) => void;
+  onUpdateInactive: (playerId: string, slotId: string, inactive: boolean) => void;
+}) {
+  const isInactive = entry?.inactive === true;
+  const isFilled = (entry?.action ?? "").trim().length > 0;
+  const statusLabel = isInactive ? "비활성" : isFilled ? "입력됨" : "미입력";
+  const statusClass = isInactive
+    ? "text-dark-500"
+    : isFilled
+      ? "text-emerald-400/80"
+      : "text-amber-400/80";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        {showPlayerName ? (
+          <p className={[
+            "text-sm font-medium",
+            isInactive ? "text-dark-500 line-through" : "text-dark-100",
+          ].join(" ")}>
+            {player.name || "이름 없는 캐릭터"}
+          </p>
+        ) : (
+          <span className={`text-[11px] ${statusClass}`}>{statusLabel}</span>
+        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {showPlayerName && (
+            <span className={`text-[11px] ${statusClass}`}>{statusLabel}</span>
+          )}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isInactive}
+            onClick={() => onUpdateInactive(player.id, slot.id, !isInactive)}
+            title={isInactive
+              ? "비활성 해제 — 이 캐릭터가 이 시간대에 행동하게 설정"
+              : "비활성으로 설정 — 이 캐릭터는 이 시간대에 등장/행동 없음"}
+            className={[
+              "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+              isInactive
+                ? "border-dark-600 bg-dark-800 text-dark-300 hover:border-dark-500"
+                : "border-dark-700 bg-dark-900 text-dark-500 hover:border-dark-500 hover:text-dark-300",
+            ].join(" ")}
+          >
+            {isInactive ? "비활성 ◉" : "활성 ◯"}
+          </button>
+        </div>
+      </div>
+      <textarea
+        rows={compact ? 2 : 3}
+        value={entry?.action ?? ""}
+        onChange={(e) => onUpdateAction(player.id, slot.id, e.target.value)}
+        placeholder={isInactive
+          ? "비활성 상태: 입력한 내용은 보존됩니다."
+          : "예: 서재에서 유언장을 찾다가 복도로 이동했다."}
+        disabled={isInactive}
+        className={[
+          ta,
+          compact ? "min-h-[5.75rem]" : "",
+          isInactive ? "opacity-50 cursor-not-allowed" : "",
+        ].join(" ")}
+      />
+    </div>
+  );
+}
+
+/** 플레이어별/시간대별 행동을 한 화면에서 비교할 수 있는 상단 통합 표다. */
+function TimelineOverviewTable({
+  players,
+  timeline,
+  onUpdateAction,
+  onUpdateInactive,
+}: {
+  players: Player[];
+  timeline: StoryTimeline;
+  onUpdateAction: (playerId: string, slotId: string, action: string) => void;
+  onUpdateInactive: (playerId: string, slotId: string, inactive: boolean) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-dark-700 bg-dark-950/40 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-dark-100">전체 타임라인 표</p>
+          <p className="mt-1 text-xs text-dark-500">캐릭터와 시간대를 한 번에 비교합니다.</p>
+        </div>
+        <span className="rounded-full border border-dark-700 px-3 py-1 text-xs text-dark-400 shrink-0">
+          {players.length}명 · {timeline.slots.length}개
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-dark-800">
+        <table className="w-full min-w-[960px] border-separate border-spacing-0">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-20 w-44 bg-dark-950 px-3 py-3 text-left text-xs font-medium text-dark-500">
+                캐릭터
+              </th>
+              {timeline.slots.map((slot) => (
+                <th
+                  key={slot.id}
+                  className="min-w-[230px] border-l border-dark-800 bg-dark-950 px-3 py-3 text-left text-xs font-medium text-dark-400"
+                >
+                  {slot.label || "이름 없는 슬롯"}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((player) => (
+              <tr key={player.id} className="align-top">
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 border-t border-dark-800 bg-dark-950 px-3 py-3 text-left align-top"
+                >
+                  <p className="text-sm font-semibold text-dark-100">{player.name || "이름 없는 캐릭터"}</p>
+                </th>
+                {timeline.slots.map((slot) => (
+                  <td
+                    key={slot.id}
+                    className="border-l border-t border-dark-800 bg-dark-900/40 px-3 py-3 align-top"
+                  >
+                    <TimelineEntryInput
+                      player={player}
+                      slot={slot}
+                      entry={player.timelineEntries.find((item) => item.slotId === slot.id)}
+                      compact
+                      onUpdateAction={onUpdateAction}
+                      onUpdateInactive={onUpdateInactive}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 /**
  * 제작자가 시간대별로 모든 캐릭터 행동을 한 곳에서 입력하도록 돕는 중앙 타임라인 편집기다.
  * 슬롯마다 플레이어 전체를 나열해 알리바이 충돌을 한눈에 비교할 수 있게 한다.
@@ -299,18 +455,21 @@ function TimelineMatrixEditor({
   return (
     <div className="space-y-4">
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-        <p className="text-sm text-dark-300 font-medium">중앙 타임라인 편집</p>
-        <p className="text-xs text-dark-500 mt-1">
-          시간대별로 모든 캐릭터 행동을 모아 입력합니다. 서로의 위치와 행동을 비교하면서 모순을 줄이기 위한 입력 화면입니다.
-        </p>
+        <p className="text-sm text-dark-300 font-medium">중앙 타임라인</p>
       </div>
+
+      <TimelineOverviewTable
+        players={players}
+        timeline={timeline}
+        onUpdateAction={updateTimelineAction}
+        onUpdateInactive={updateTimelineInactive}
+      />
 
       {timeline.slots.map((slot) => (
         <section key={slot.id} className="border border-dark-700 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-mystery-300">{slot.label || "이름 없는 슬롯"}</p>
-              <p className="text-xs text-dark-500 mt-1">이 시간대에 각 캐릭터가 어디에 있었는지 적습니다.</p>
             </div>
             <span className="text-xs text-dark-600 shrink-0">{players.length}명</span>
           </div>
@@ -319,13 +478,6 @@ function TimelineMatrixEditor({
             {players.map((player) => {
               const entry = player.timelineEntries.find((item) => item.slotId === slot.id);
               const isInactive = entry?.inactive === true;
-              const isFilled = (entry?.action ?? "").trim().length > 0;
-              const statusLabel = isInactive ? "비활성" : isFilled ? "입력됨" : "미입력";
-              const statusClass = isInactive
-                ? "text-dark-500"
-                : isFilled
-                  ? "text-emerald-400/80"
-                  : "text-amber-400/80";
 
               return (
                 <div
@@ -337,43 +489,13 @@ function TimelineMatrixEditor({
                       : "border-dark-800 bg-dark-900/60",
                   ].join(" ")}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={[
-                      "text-sm font-medium",
-                      isInactive ? "text-dark-500 line-through" : "text-dark-100",
-                    ].join(" ")}>
-                      {player.name || "이름 없는 캐릭터"}
-                    </p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-[11px] ${statusClass}`}>{statusLabel}</span>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={isInactive}
-                        onClick={() => updateTimelineInactive(player.id, slot.id, !isInactive)}
-                        title={isInactive
-                          ? "비활성 해제 — 이 캐릭터가 이 시간대에 행동하게 설정"
-                          : "비활성으로 설정 — 이 캐릭터는 이 시간대에 등장/행동 없음"}
-                        className={[
-                          "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-                          isInactive
-                            ? "border-dark-600 bg-dark-800 text-dark-300 hover:border-dark-500"
-                            : "border-dark-700 bg-dark-900 text-dark-500 hover:border-dark-500 hover:text-dark-300",
-                        ].join(" ")}
-                      >
-                        {isInactive ? "비활성 ◉" : "활성 ◯"}
-                      </button>
-                    </div>
-                  </div>
-                  <textarea
-                    rows={3}
-                    value={entry?.action ?? ""}
-                    onChange={(e) => updateTimelineAction(player.id, slot.id, e.target.value)}
-                    placeholder={isInactive
-                      ? "비활성 상태: 입력한 내용은 보존됩니다."
-                      : "예: 서재에서 유언장을 찾다가 복도로 이동했다."}
-                    disabled={isInactive}
-                    className={[ta, isInactive ? "opacity-50 cursor-not-allowed" : ""].join(" ")}
+                  <TimelineEntryInput
+                    player={player}
+                    slot={slot}
+                    entry={entry}
+                    showPlayerName
+                    onUpdateAction={updateTimelineAction}
+                    onUpdateInactive={updateTimelineInactive}
                   />
                 </div>
               );

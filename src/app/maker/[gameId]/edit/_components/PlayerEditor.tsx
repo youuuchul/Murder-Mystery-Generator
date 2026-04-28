@@ -242,8 +242,7 @@ function TimelineMatrixEditor({
               ...player,
               timelineEntries: player.timelineEntries.map((entry) => (
                 entry.slotId === slotId
-                  // 비활성으로 바꾸면 의도적 N/A이므로 기존 action 텍스트는 정리해 혼선 제거.
-                  ? { ...entry, inactive, action: inactive ? "" : entry.action }
+                  ? { ...entry, inactive }
                   : entry
               )),
             }
@@ -353,7 +352,7 @@ function TimelineMatrixEditor({
                     value={entry?.action ?? ""}
                     onChange={(e) => updateTimelineAction(player.id, slot.id, e.target.value)}
                     placeholder={isInactive
-                      ? "비활성 상태: 이 시간대에 이 캐릭터는 등장/행동하지 않습니다."
+                      ? "비활성 상태: 입력한 내용은 보존됩니다."
                       : "예: 서재에서 유언장을 찾다가 복도로 이동했다."}
                     disabled={isInactive}
                     className={[ta, isInactive ? "opacity-50 cursor-not-allowed" : ""].join(" ")}

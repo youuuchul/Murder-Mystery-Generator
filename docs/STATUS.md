@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-28 (메이커 제작 상태/카운트 정리 — 메이커 필수 검증을 공개 readiness 단일 기준으로 사용, 이슈별 stable id/anchor 추가, 공개 체크리스트 fallback 오탐 제거, 투표 전 안내 optional 잔해 제거)
+> 마지막 업데이트: 2026-04-28 (타임라인 활성/비활성 토글 데이터 보존 — 메이커 타임라인 셀 비활성 전환 시 기존 action 텍스트를 지우지 않고 inactive 플래그만 변경)
 
 ---
 
@@ -155,7 +155,7 @@
 - [x] **라운드 대표 이미지 업로드** — 이미 구현돼 있음. 메이커 Step5(`ScriptEditor.tsx:448`) `ImageAssetField` + `POST /api/games/[gameId]/assets?scope=rounds` 업로드 파이프라인 완비. `game.scripts.rounds[].imageUrl` 로 저장. 플레이어 공통화면(`player-shared-board.ts:65`)과 GM 보드(`GMDashboard.tsx:174`) 모두 렌더링. ✅ 완료 (2026-04-14 검증)
 - [x] **개인 투표(vote-answer) 작성 흐름 통합 — 캐릭터 탭 인라인 폼** ✅ 완료 (2026-04-27) — 사용자 보고(2026-04-27): 현재 캐릭터의 `vote-answer` 승점 조건을 만들려면 (1) Step3 캐릭터에서 승점 조건 추가→`vote-answer` 선택해보면 "투표 탭에서 먼저 추가하세요" 안내에 막힘 → (2) Step6 투표 탭으로 이동해 `purpose:"personal"` 질문+선택지 생성 → (3) 다시 Step3로 돌아와 questionId 선택+정답(`expectedAnswerId`) 지정. 한 의미 단위(이 캐릭터의 개인 투표)에 화면 3번 왕복. 원인: `Player.scoreConditions[i].config.questionId` ↔ `VoteQuestion.personalTargetPlayerId` 양방향 ref 구조라 어느 쪽에서 시작해도 반대편이 선행돼야 닫힘. 추천 방안 A(인라인 모달): 캐릭터 탭의 `ScoreConditionsEditor`에서 `vote-answer` 분기를 "+ 이 캐릭터의 개인 투표 만들기" 버튼으로 바꾸고 모달 한 화면에서 질문 라벨/타깃 모드/선택지/정답까지 입력. 저장 시 `voteQuestions` 배열에 push + `personalTargetPlayerId=player.id` 자동 + `ScoreCondition.config.{questionId, expectedAnswerId}` 채움. 기존 personal 질문이 있으면 "기존 질문 연결" 드롭다운도 노출. Step6 투표 탭은 그대로 두되 personal 질문 카드에 "X 캐릭터 승점과 연결됨" 라벨 + 캐릭터 점프 버튼 추가(단일 진실 원천: `voteQuestions`). 무결성 가드: personal 질문 삭제 시 "X 캐릭터 승점 미완성" 경고, 캐릭터 삭제 시 전용 personal 질문 자동 정리. 진입점: `src/app/maker/[gameId]/edit/_components/PlayerEditor.tsx:1037 ScoreConditionsEditor`, `VoteEndingEditor.tsx`, `types/game.ts:155 ScoreConditionType` / `404 VoteQuestion`. DB 마이그레이션 불필요(스키마 변동 없음, UI 재배치만). 발견: 2026-04-27.
 - [x] **메이커 제작 상태/카운트 시스템 잔해 정리** — `maker-validation.ts`의 필수 검증(error)을 공개 readiness의 단일 기준으로 사용하도록 통일. 각 검증 이슈에 stable `id`/`anchor`를 부여해 이슈 패널 클릭 위치와 Step 6 투표/엔딩 탭 전환을 보강. `game-publish.ts`의 별도 공개 체크리스트와 `buildMetadataFromRow`의 본문 없는 추정 카운트를 제거해 라이브러리 카드 오탐을 줄임. UI에서 optional인 투표 전 안내 텍스트를 필수 에러에서 제거하고, 커스텀 투표 선택지/2차 투표 케이스만 검증. 메이커 도우미 completion summary도 타임라인 inactive/라운드 수 기준에 맞춰 조정. ✅ 완료 (2026-04-28)
-- [ ] **타임라인 활성/비활성 토글 시 action 텍스트 보존 버그** — 2026-04-15 도입한 `inactive` 플래그(STATUS.md 117번 항목) follow-up. 메이커 타임라인 매트릭스에서 셀을 비활성으로 토글하면 기존 `action` 텍스트가 의도적으로 클리어되는데(혼선 방지 설계), 다시 활성으로 되돌려도 텍스트가 복구되지 않음. 사용자 기대: 토글은 가시성/카운트 제외용이고 데이터는 보존돼야 함. 재현: `https://www.murdermysterygenerator.shop/maker/{gameId}/edit` 타임라인 탭 → 입력된 셀 비활성 → 다시 활성. 수정안: (1) 비활성 전환 시 텍스트 클리어 대신 `inactive=true`만 토글하고 textarea만 disabled 처리, (2) 활성 복귀 시 기존 action 그대로 노출, (3) 저장 경로(`PlayerTimelineEntry`)는 이미 inactive와 action을 독립 컬럼으로 들고 있어 DB 변경 불필요. 발견: 2026-04-27.
+- [x] **타임라인 활성/비활성 토글 시 action 텍스트 보존 버그** — 2026-04-15 도입한 `inactive` 플래그 follow-up. 메이커 타임라인 매트릭스에서 셀을 비활성으로 토글할 때 기존 `action` 텍스트를 지우지 않고 `inactive` 플래그만 변경하도록 수정. 저장 경로(`PlayerTimelineEntry`)는 이미 inactive와 action을 독립 컬럼으로 저장하므로 DB 변경 없음. ✅ 완료 (2026-04-28)
 - [ ] **세션 백업 retention 정책** — `session-backups` 버킷에 cron 삭제 시 만든 pre-delete 백업이 영구 보관 중. 현재 폴더 171개·평균 14KB로 누적 ~수MB(Supabase 1GB 한도 대비 매우 여유)지만 유저 인입 후 한 달 누적량 보고 30/90일 자동 삭제 정책 설계 필요. `cleanup-sessions` cron에 `purgeOldBackups(days)` 단계 추가하거나 별도 cron 분리. 우선순위 낮음(누적 100MB 도달 또는 인입 1개월 후 재검토).
 - [ ] **대상 작업자 찾기 UX** — 소유권 이관 시 이름/ID 검색
 - [ ] **GM 없는 세션 공통화면 범위 보강**

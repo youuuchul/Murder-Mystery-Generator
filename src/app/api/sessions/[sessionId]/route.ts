@@ -30,7 +30,7 @@ import {
   isSessionConflictError,
 } from "@/lib/session-repository";
 import { hasStoredGmSessionAccess, isSessionHost } from "@/lib/gm-session-access";
-import { getRemainingSeconds, getSubPhaseDurationSeconds } from "@/lib/session-timer";
+import { getSubPhaseDurationSeconds } from "@/lib/session-timer";
 import { broadcast } from "@/lib/sse/broadcaster";
 import type { EndingStage, GamePhase, GameSession, TimerState, VoteTally, VoteReveal } from "@/types/session";
 
@@ -313,7 +313,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   });
 }
 
-const TIMER_ACTIONS = new Set(["start_timer", "pause_timer", "resume_timer", "reset_timer"]);
+const TIMER_ACTIONS = new Set(["start_timer"]);
 
 /** PATCH /api/sessions/[sessionId] — GM 페이즈 제어 + 타이머 제어 */
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -324,6 +324,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     playerId?: string;
     sessionName?: string;
     fillMissingWithAi?: boolean;
+    token?: string;
   };
 
   const session = await getSession(sessionId);
@@ -337,7 +338,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const currentUser = await getRequestMakerUser(req);
       const hostById = isSessionHost(session, currentUser?.id);
       const hostByCookie = !hostById && hasStoredGmSessionAccess(session, req.cookies);
-      if (!hostById && !hostByCookie) {
+      const requesterPlayerState = body.token
+        ? session.playerStates.find((playerState) => playerState.token === body.token)
+        : undefined;
+      const hostByPlayerToken =
+        session.mode === "player-consensus"
+        && Boolean(session.hostPlayerId)
+        && requesterPlayerState?.playerId === session.hostPlayerId;
+      if (!hostById && !hostByCookie && !hostByPlayerToken) {
         return NextResponse.json({ error: "타이머를 조작할 권한이 없습니다." }, { status: 403 });
       }
     } else {
@@ -436,26 +444,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             startedAt: now,
             durationSeconds,
             label: getRoundSubPhaseLabel(subPhase as "investigation" | "discussion"),
-          };
-        } else if (body.action === "pause_timer") {
-          if (!sharedState.timerState || sharedState.timerState.pausedRemaining !== undefined) {
-            throw new Error("일시정지할 타이머가 없습니다.");
-          }
-          const remaining = getRemainingSeconds(sharedState.timerState.startedAt, sharedState.timerState.durationSeconds);
-          sharedState.timerState = {
-            ...sharedState.timerState,
-            pausedRemaining: remaining,
-          };
-        } else if (body.action === "resume_timer") {
-          if (!sharedState.timerState?.pausedRemaining) {
-            throw new Error("재개할 타이머가 없습니다.");
-          }
-          const remaining = sharedState.timerState.pausedRemaining;
-          const resumeStartedAt = new Date(Date.now() - (sharedState.timerState.durationSeconds - remaining) * 1000).toISOString();
-          sharedState.timerState = {
-            ...sharedState.timerState,
-            startedAt: resumeStartedAt,
-            pausedRemaining: undefined,
           };
         } else if (body.action === "reset_timer") {
           sharedState.timerState = undefined;
@@ -620,8 +608,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         || error.message === "방 제목을 입력해주세요."
         || error.message === "playerId가 필요합니다."
         || error.message === "라운드 페이즈에서만 타이머를 시작할 수 있습니다."
-        || error.message === "일시정지할 타이머가 없습니다."
-        || error.message === "재개할 타이머가 없습니다."
       )
     ) {
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -14,17 +14,11 @@ import {
 } from "@/lib/ending-flow";
 import {
   getAdvanceConfirmKind,
-  getCurrentRoundSubPhase,
-  getEnabledRoundSubPhases,
   getNextRoundSubPhase,
   getRoundSubPhaseLabel,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
-import {
-  formatTimerSeconds,
-  getRemainingSeconds,
-  getSessionTimerSnapshot,
-} from "@/lib/session-timer";
+import SessionPhaseTimerCard from "@/app/play/_components/SessionPhaseTimerCard";
 import type { GamePackage, GameRules } from "@/types/game";
 import type { EndingStage, GameSession, GameSessionSummary, SharedState, CharacterSlot } from "@/types/session";
 
@@ -440,279 +434,6 @@ function advanceLabel(phase: string, currentSubPhase: string | undefined, rules:
   }
   if (phase === "vote") return "결과 공개";
   return "";
-}
-
-/**
- * 오프닝 페이즈에서 모두가 같은 기준으로 보는 제한시간을 보여준다.
- * 오프닝은 별도 서브페이즈가 없으므로 시작 시각만 있으면 새로고침 후에도 이어서 계산된다.
- */
-function OpeningTimerCard({
-  sharedState,
-  rules,
-}: {
-  sharedState: SharedState;
-  rules: GameRules;
-}) {
-  const timerSnapshot = getSessionTimerSnapshot(sharedState, rules);
-  const [secondsLeft, setSecondsLeft] = useState(() => (
-    timerSnapshot
-      ? getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds)
-      : 0
-  ));
-
-  useEffect(() => {
-    if (!timerSnapshot) {
-      setSecondsLeft(0);
-      return;
-    }
-
-    setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
-    const intervalId = window.setInterval(() => {
-      setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [timerSnapshot?.durationSeconds, timerSnapshot?.startedAt]);
-
-  if (!timerSnapshot) {
-    return null;
-  }
-
-  const progress = timerSnapshot.durationSeconds > 0
-    ? (secondsLeft / timerSnapshot.durationSeconds) * 100
-    : 0;
-  const isExpired = secondsLeft === 0;
-
-  return (
-    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium text-dark-300">{timerSnapshot.label}</h3>
-          <p className="mt-1 text-xs text-dark-500">오프닝 안내와 공통 화면 확인 시간을 기준으로 잡습니다.</p>
-        </div>
-        <div className="text-right">
-          <p className={`text-xl font-semibold ${isExpired ? "text-red-300" : "text-mystery-300"}`}>
-            {formatTimerSeconds(secondsLeft)}
-          </p>
-          <p className="mt-1 text-[11px] text-dark-500">
-            {isExpired ? "시간 종료" : `${Math.ceil(secondsLeft / 60)}분 이내`}
-          </p>
-        </div>
-      </div>
-
-      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
-          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PhaseTimer({
-  phase,
-  currentSubPhase,
-  rules,
-  timerState,
-  sessionId,
-  onAdvanceRound,
-  onSubPhaseChange,
-  advancing,
-}: {
-  phase: string;
-  currentSubPhase?: string;
-  rules: GameRules;
-  timerState?: SharedState["timerState"];
-  sessionId: string;
-  onAdvanceRound: () => Promise<boolean>;
-  onSubPhaseChange: (sub: ActiveSubPhase) => Promise<boolean>;
-  advancing: boolean;
-}) {
-  const roundNum = phase.startsWith("round-") ? parseInt(phase.split("-")[1]) : 0;
-  const maxRound = rules?.roundCount ?? 4;
-  const isRound = roundNum > 0;
-
-  const [autoAdvance, setAutoAdvance] = useState(false);
-  const [timerActionPending, setTimerActionPending] = useState(false);
-  const autoAdvanceRef = useRef(false);
-  const autoAdvanceFiredRef = useRef(false);
-
-  const subPhaseOrder = getEnabledRoundSubPhases(rules);
-  const subPhase = getCurrentRoundSubPhase(rules, currentSubPhase);
-
-  useEffect(() => { autoAdvanceRef.current = autoAdvance; }, [autoAdvance]);
-
-  // 타이머가 없거나 새 서브페이즈면 자동진행 플래그 리셋
-  useEffect(() => { autoAdvanceFiredRef.current = false; }, [phase, currentSubPhase]);
-
-  const isPaused = timerState?.pausedRemaining !== undefined;
-  const timerRunning = Boolean(timerState) && !isPaused;
-
-  const secondsLeft = timerState
-    ? isPaused
-      ? timerState.pausedRemaining ?? 0
-      : getRemainingSeconds(timerState.startedAt, timerState.durationSeconds)
-    : 0;
-
-  // 1초마다 리렌더링 (카운트다운 표시)
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!timerRunning) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [timerRunning]);
-
-  // 자동 넘김
-  useEffect(() => {
-    if (!timerRunning || secondsLeft > 0 || !autoAdvanceRef.current || autoAdvanceFiredRef.current) return;
-    autoAdvanceFiredRef.current = true;
-    const nextSubPhase = getNextRoundSubPhase(rules, subPhase);
-    if (nextSubPhase) {
-      void onSubPhaseChange(nextSubPhase);
-    } else {
-      void onAdvanceRound();
-    }
-  }, [secondsLeft, timerRunning, subPhase, rules, onAdvanceRound, onSubPhaseChange]);
-
-  async function sendTimerAction(action: string) {
-    setTimerActionPending(true);
-    try {
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-    } finally {
-      setTimerActionPending(false);
-    }
-  }
-
-  function getDuration(type: ActiveSubPhase): number {
-    const cfg = rules?.phases?.find((p) => p.type === type);
-    return Math.max(0, cfg?.durationMinutes ?? 10) * 60;
-  }
-
-  async function doAdvance() {
-    const nextSubPhase = getNextRoundSubPhase(rules, subPhase);
-    if (nextSubPhase) {
-      await onSubPhaseChange(nextSubPhase);
-    } else {
-      await onAdvanceRound();
-    }
-  }
-
-  if (!isRound) return null;
-
-  const totalSeconds = timerState?.durationSeconds ?? getDuration(subPhase);
-  const progress = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
-  const isExpired = Boolean(timerState) && !isPaused && secondsLeft === 0;
-  const isLastSubPhase = getNextRoundSubPhase(rules, subPhase) === null;
-
-  return (
-    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-dark-300">페이즈 타이머</h3>
-        <label className="flex items-center gap-1.5 text-xs text-dark-400 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autoAdvance}
-            onChange={(e) => setAutoAdvance(e.target.checked)}
-            className="rounded accent-mystery-500"
-          />
-          자동 넘김
-        </label>
-      </div>
-
-      {/* Sub-phase 진행 표시 */}
-      <div className="flex gap-1">
-        {subPhaseOrder.map((sp) => {
-          const idx = subPhaseOrder.indexOf(subPhase);
-          const spIdx = subPhaseOrder.indexOf(sp);
-          const isDone = spIdx < idx;
-          const isCurrent = sp === subPhase;
-          return (
-            <div
-              key={sp}
-              className={`flex-1 py-1 rounded text-xs text-center border ${
-                isCurrent
-                  ? "border-mystery-600 bg-mystery-900/40 text-mystery-300 font-medium"
-                  : isDone
-                  ? "border-dark-700 bg-dark-800 text-dark-600 line-through"
-                  : "border-dark-700 text-dark-700"
-              }`}
-            >
-              {getRoundSubPhaseLabel(sp)}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 카운트다운 */}
-      <div className="text-center py-1">
-        <div
-          className={`text-5xl font-mono font-bold tabular-nums ${
-            isExpired ? "text-red-400 animate-pulse" : timerRunning ? "text-dark-50" : "text-dark-400"
-          }`}
-        >
-          {formatTimerSeconds(secondsLeft)}
-        </div>
-        <p className="text-xs text-dark-600 mt-1">
-          {getRoundSubPhaseLabel(subPhase)} — {Math.round(getDuration(subPhase) / 60)}분 배정
-        </p>
-      </div>
-
-      {/* 진행 바 */}
-      <div className="h-1 bg-dark-800 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-mystery-600 rounded-full transition-all duration-1000"
-          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-        />
-      </div>
-
-      {/* 컨트롤 */}
-      <div className="flex gap-2">
-        <button
-          disabled={timerActionPending}
-          onClick={() => {
-            if (!timerState || isExpired) {
-              void sendTimerAction("start_timer");
-            } else if (isPaused) {
-              void sendTimerAction("resume_timer");
-            } else {
-              void sendTimerAction("pause_timer");
-            }
-          }}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
-            timerRunning
-              ? "bg-dark-700 hover:bg-dark-600 text-dark-200"
-              : "bg-mystery-800 hover:bg-mystery-700 text-mystery-100 border border-mystery-700"
-          }`}
-        >
-          {timerRunning ? "일시정지" : isExpired ? "재시작" : isPaused ? "재개" : "시작"}
-        </button>
-        <button
-            onClick={() => { void doAdvance(); }}
-            disabled={advancing}
-            className="px-4 py-2 text-sm rounded-lg border border-dark-600 text-dark-300 hover:bg-dark-800 transition-colors disabled:opacity-40"
-          >
-          {isLastSubPhase
-            ? roundNum >= maxRound
-              ? "투표 →"
-              : `R${roundNum + 1} 시작 →`
-            : "다음 →"}
-        </button>
-      </div>
-
-      {isExpired && (
-        <p className="text-xs text-red-400 text-center">
-          {getRoundSubPhaseLabel(subPhase)} 시간 종료
-          {!autoAdvance && " — 다음 페이즈로 이동하세요"}
-        </p>
-      )}
-    </div>
-  );
 }
 
 function isLocalOnlyHost(hostname: string): boolean {
@@ -1529,35 +1250,6 @@ export default function GMDashboard({
     }
   }
 
-  async function advanceSubPhase(sub: ActiveSubPhase) {
-    if (!session) return false;
-    setAdvancing(true);
-    try {
-      const res = await fetch(`/api/sessions/${session.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "set_subphase", subPhase: sub }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error ?? "세부 페이즈 전환 실패");
-        return false;
-      }
-
-      const data = await res.json();
-      setSession((prev) =>
-        prev ? { ...prev, sharedState: data.session.sharedState } : prev
-      );
-      return true;
-    } catch {
-      alert("세부 페이즈 전환 중 오류가 발생했습니다.");
-      return false;
-    } finally {
-      setAdvancing(false);
-    }
-  }
-
   async function forceRevealVotes() {
     if (!session) return;
     setRevealingVote(true);
@@ -1981,21 +1673,10 @@ export default function GMDashboard({
               )}
             </div>
 
-            {/* 페이즈 타이머 */}
-            <OpeningTimerCard
+            <SessionPhaseTimerCard
               sharedState={session.sharedState}
               rules={game.rules}
-            />
-
-            <PhaseTimer
-              phase={phase}
-              currentSubPhase={session.sharedState.currentSubPhase}
-              rules={game.rules}
-              timerState={session.sharedState.timerState}
-              sessionId={session.id}
-              onAdvanceRound={advancePhase}
-              onSubPhaseChange={advanceSubPhase}
-              advancing={advancing}
+              className="rounded-xl border border-dark-800 bg-dark-900 p-3"
             />
 
             {/* 세션 관리 */}

@@ -123,7 +123,7 @@ export interface SharedState {
   phase: GamePhase;
   /** 현재 메인 페이즈가 시작된 시각. 오프닝 제한시간 계산에 사용한다. */
   phaseStartedAt?: string;
-  /** GM/호스트가 명시적으로 시작한 라운드 타이머. 일시정지/재시작 지원. */
+  /** GM/호스트가 명시적으로 시작한 라운드 타이머. pausedRemaining은 과거 세션 호환용. */
   timerState?: TimerState;
   currentRound: number;
   /** 현재 라운드의 서브 페이즈 — round-N 페이즈에서만 유효 */

@@ -25,10 +25,10 @@ import {
   getPlayerAdvanceRequestLabel,
   type SessionAdvanceConfirmKind,
 } from "@/lib/session-phase";
+import SessionPhaseTimerCard from "@/app/play/_components/SessionPhaseTimerCard";
 import {
-  formatTimerSeconds,
-  getRemainingSeconds,
-  getSessionTimerSnapshot,
+  getSessionPhaseTimerSnapshot,
+  getSignedRemainingSeconds,
 } from "@/lib/session-timer";
 import type { Clue, GamePackage, Player, ClueCondition } from "@/types/game";
 import type {
@@ -1153,6 +1153,7 @@ function PhaseAdvanceRequestPanel({
   requested,
   submitting,
   onToggle,
+  timerSlot,
 }: {
   label: string;
   requestedCount: number;
@@ -1160,32 +1161,18 @@ function PhaseAdvanceRequestPanel({
   requested: boolean;
   submitting: boolean;
   onToggle: () => void;
+  timerSlot?: ReactNode;
 }) {
-  const progress = totalCount > 0 ? (requestedCount / totalCount) * 100 : 0;
-
   return (
     <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs text-dark-500">다음 단계 진행</p>
-          <p className="mt-1 text-sm font-semibold text-dark-100">{label}</p>
-        </div>
-        <span className="rounded-full border border-dark-700 px-2 py-1 text-xs text-dark-300">
+      {timerSlot}
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-medium text-dark-500">다음 단계 진행</p>
+        <span className="rounded-full border border-dark-700 px-2.5 py-1 text-xs text-dark-300">
           {requestedCount} / {totalCount}
         </span>
       </div>
-
-      <div className="h-2 overflow-hidden rounded-full bg-dark-800">
-        <div
-          className="h-full rounded-full bg-mystery-600 transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      <p className="text-xs leading-5 text-dark-500">
-        모두 요청하면 자동으로 다음 단계로 넘어갑니다.
-        {requested ? " 내 요청은 이미 반영되어 있습니다." : ""}
-      </p>
 
       <button
         type="button"
@@ -1591,138 +1578,16 @@ function LeaveSessionConfirmModal({
 }
 
 /**
- * 공통 화면 탭에서 서버 기반 라운드 타이머를 보여준다.
- * 합의 모드 호스트만 조작(시작/일시정지/재개) 가능. 나머지는 읽기 전용.
- */
-function SharedBoardTimerCard({
-  timerState,
-  canControl,
-  sessionId,
-  phase,
-}: {
-  timerState?: SharedState["timerState"];
-  canControl?: boolean;
-  sessionId?: string;
-  phase?: string;
-}) {
-  const [actionPending, setActionPending] = useState(false);
-  const [, setTick] = useState(0);
-
-  const isRoundPhase = phase?.startsWith("round-") ?? false;
-  const isPaused = timerState?.pausedRemaining !== undefined;
-  const running = Boolean(timerState) && !isPaused;
-
-  useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [running]);
-
-  async function sendAction(action: string) {
-    if (!sessionId) return;
-    setActionPending(true);
-    try {
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-    } finally {
-      setActionPending(false);
-    }
-  }
-
-  // 타이머가 아직 시작 전이고 라운드 페이즈이면 호스트에게 시작 버튼만 보여줌
-  if (!timerState) {
-    if (!canControl || !isRoundPhase) return null;
-    return (
-      <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-dark-500">페이즈 타이머</p>
-          <p className="text-xl font-semibold font-mono tabular-nums text-dark-500">--:--</p>
-        </div>
-        <button
-          disabled={actionPending}
-          onClick={() => { void sendAction("start_timer"); }}
-          className="w-full rounded-xl border border-mystery-700 bg-mystery-900/40 px-3 py-2.5 text-sm font-medium text-mystery-200 transition-colors hover:border-mystery-500 hover:text-mystery-50 disabled:opacity-50"
-        >
-          타이머 시작
-        </button>
-      </div>
-    );
-  }
-
-  const secondsLeft = isPaused
-    ? timerState.pausedRemaining ?? 0
-    : getRemainingSeconds(timerState.startedAt, timerState.durationSeconds);
-  const progress = timerState.durationSeconds > 0
-    ? (secondsLeft / timerState.durationSeconds) * 100
-    : 0;
-  const isExpired = !isPaused && secondsLeft === 0;
-
-  return (
-    <div className="rounded-2xl border border-dark-800 bg-dark-900 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-dark-500">{timerState.label} 타이머</p>
-          {isExpired && (
-            <p className="mt-1 text-xs text-red-400">시간이 종료되었습니다</p>
-          )}
-        </div>
-        <p className={`text-xl font-semibold font-mono tabular-nums ${isExpired ? "text-red-300 animate-pulse" : isPaused ? "text-dark-400" : "text-mystery-300"}`}>
-          {formatTimerSeconds(secondsLeft)}
-        </p>
-      </div>
-
-      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
-          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-        />
-      </div>
-
-      {canControl && sessionId && (
-        <div className="flex gap-2">
-          <button
-            disabled={actionPending}
-            onClick={() => {
-              if (isExpired) {
-                void sendAction("start_timer");
-              } else if (isPaused) {
-                void sendAction("resume_timer");
-              } else {
-                void sendAction("pause_timer");
-              }
-            }}
-            className="flex-1 rounded-xl border border-dark-700 bg-dark-950/60 px-3 py-2 text-sm font-medium text-dark-200 transition-colors hover:border-dark-500 disabled:opacity-50"
-          >
-            {running ? "일시정지" : isExpired ? "재시작" : "재개"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
  * 모든 세션에서 공통 화면 탭으로 보이는 패널.
  * 현재 페이즈에 필요한 텍스트, 지도, 영상, 배경음악만 플레이어에게 노출한다.
  */
 function SharedBoardPanel({
   content,
   accessPanel,
-  timerState,
-  isHost: canControlTimer,
-  sessionId,
-  sessionMode: panelSessionMode,
   phase,
 }: {
   content: PlayerSharedBoardContent;
   accessPanel?: ReactNode;
-  timerState?: SharedState["timerState"];
-  isHost?: boolean;
-  sessionId?: string;
-  sessionMode?: SessionMode;
   phase?: string;
 }) {
   const videoSource = resolveVideoSource(content.videoUrl);
@@ -1743,13 +1608,6 @@ function SharedBoardPanel({
       </div>
 
       {accessPanel}
-
-      <SharedBoardTimerCard
-        timerState={timerState}
-        canControl={canControlTimer && panelSessionMode === "player-consensus"}
-        sessionId={sessionId}
-        phase={phase}
-      />
 
       {phase !== "opening" && content.narrationBlocks.map((block) => (
         <div key={block.label} className="rounded-2xl border border-dark-800 bg-dark-900 p-4">
@@ -1818,70 +1676,6 @@ function SharedBoardPanel({
   );
 }
 
-/**
- * 플레이어 화면에서 오프닝 제한시간을 보여준다.
- * GM 없는 세션과 GM 세션 모두 같은 시각 기준을 보게 하려고 세션 상태의 시작 시각만 사용한다.
- */
-function OpeningCountdownCard({
-  sharedState,
-  rules,
-}: {
-  sharedState: SharedState;
-  rules: GamePackage["rules"];
-}) {
-  const timerSnapshot = getSessionTimerSnapshot(sharedState, rules);
-  const [secondsLeft, setSecondsLeft] = useState(() => (
-    timerSnapshot
-      ? getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds)
-      : 0
-  ));
-
-  useEffect(() => {
-    if (!timerSnapshot) {
-      setSecondsLeft(0);
-      return;
-    }
-
-    setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
-    const intervalId = window.setInterval(() => {
-      setSecondsLeft(getRemainingSeconds(timerSnapshot.startedAt, timerSnapshot.durationSeconds));
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [timerSnapshot?.durationSeconds, timerSnapshot?.startedAt]);
-
-  if (!timerSnapshot) {
-    return null;
-  }
-
-  const progress = timerSnapshot.durationSeconds > 0
-    ? (secondsLeft / timerSnapshot.durationSeconds) * 100
-    : 0;
-  const isExpired = secondsLeft === 0;
-
-  return (
-    <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-dark-500">오프닝 제한시간</p>
-          <p className="mt-1 text-sm font-medium text-dark-100">
-            {isExpired ? "오프닝 시간이 끝났습니다." : "남은 시간 안에 내용을 확인해 주세요."}
-          </p>
-        </div>
-        <p className={`text-xl font-semibold ${isExpired ? "text-red-300" : "text-mystery-300"}`}>
-          {formatTimerSeconds(secondsLeft)}
-        </p>
-      </div>
-      <div className="h-2 rounded-full bg-dark-800 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : "bg-mystery-500"}`}
-          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // ── 메인 컴포넌트 ───────────────────────────────────────────────
 export interface PlayerViewProps {
   /** 서버 컴포넌트(page.tsx)에서 쿠키로 세션 토큰을 읽어 미리 가져온 초기 상태. */
@@ -1927,6 +1721,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const [phaseAdvanceConfirmKind, setPhaseAdvanceConfirmKind] = useState<SessionAdvanceConfirmKind | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const prevEndingStageRef = useRef<string | null>(null);
+  const timerNoticeRef = useRef<{ key: string; oneMinute: boolean; expired: boolean } | null>(null);
   const [discoveryNotices, setDiscoveryNotices] = useState<{ id: string; message: string; tone?: "info" | "error"; leaving?: boolean }[]>([]);
   const lastSseAtRef = useRef<number>(0);
 
@@ -2036,7 +1831,9 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
     const previousPhase = previousPhaseRef.current;
 
-    if (nextPhase === "vote") {
+    if (nextPhase === "opening" && previousPhase !== nextPhase) {
+      setTab("character");
+    } else if (nextPhase === "vote") {
       setTab("vote");
     } else if (nextPhase.startsWith("round-") && previousPhase !== nextPhase) {
       setTab("locations");
@@ -2104,8 +1901,13 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   );
 
   // 동시 다발 알림을 스택으로 쌓고, 2.5초 뒤 부드럽게 페이드아웃(0.8s) → 제거.
-  const pushNotice = (notice: { id: string; message: string; tone?: "info" | "error" }) => {
-    setDiscoveryNotices((prev) => [{ ...notice, leaving: false }, ...prev]);
+  const pushNotice = (notice: { id: string; message: string; tone?: "info" | "error"; durationMs?: number }) => {
+    const visibleDurationMs = notice.durationMs ?? 2500;
+    setDiscoveryNotices((prev) => (
+      prev.some((item) => item.id === notice.id)
+        ? prev
+        : [{ ...notice, leaving: false }, ...prev]
+    ));
     setTimeout(() => {
       setDiscoveryNotices((prev) =>
         prev.map((n) => (n.id === notice.id ? { ...n, leaving: true } : n))
@@ -2113,8 +1915,71 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
       setTimeout(() => {
         setDiscoveryNotices((prev) => prev.filter((n) => n.id !== notice.id));
       }, 800);
-    }, 2500);
+    }, visibleDurationMs);
   };
+
+  useEffect(() => {
+    if (!game || !sharedState) {
+      timerNoticeRef.current = null;
+      return;
+    }
+
+    const timer = getSessionPhaseTimerSnapshot(sharedState, game.rules);
+    if (!timer?.startedAt) {
+      timerNoticeRef.current = null;
+      return;
+    }
+
+    if (!timerNoticeRef.current || timerNoticeRef.current.key !== timer.key) {
+      timerNoticeRef.current = { key: timer.key, oneMinute: false, expired: false };
+    }
+
+    const heading = timer.phaseLabel === timer.label
+      ? timer.phaseLabel
+      : `${timer.phaseLabel} ${timer.label}`;
+
+    const checkTimerNotice = () => {
+      const noticeState = timerNoticeRef.current;
+      if (!noticeState || noticeState.key !== timer.key || !timer.startedAt) return;
+
+      const remainingSeconds = getSignedRemainingSeconds(
+        timer.startedAt,
+        timer.durationSeconds,
+        Date.now(),
+        Number.POSITIVE_INFINITY
+      );
+
+      if (remainingSeconds <= 60 && remainingSeconds > 0 && !noticeState.oneMinute) {
+        noticeState.oneMinute = true;
+        pushNotice({
+          id: `timer-one-minute-${timer.key}`,
+          message: `${heading} 1분 남음`,
+          durationMs: 6000,
+        });
+      }
+
+      if (remainingSeconds <= 0 && !noticeState.expired) {
+        noticeState.expired = true;
+        pushNotice({
+          id: `timer-expired-${timer.key}`,
+          message: `${heading} 시간 종료`,
+          durationMs: 6000,
+        });
+      }
+    };
+
+    checkTimerNotice();
+    const intervalId = window.setInterval(checkTimerNotice, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    game,
+    sharedState?.phase,
+    sharedState?.phaseStartedAt,
+    sharedState?.currentSubPhase,
+    sharedState?.timerState?.startedAt,
+    sharedState?.timerState?.durationSeconds,
+  ]);
 
   // Supabase Realtime Broadcast — cross-instance 실시간 알림 (Vercel 서버리스 대응).
   // SSE broadcaster는 in-memory여서 서버 인스턴스가 나뉘면 다른 클라에 도달 못 함.
@@ -2168,11 +2033,15 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   }, [sessionId, game, charId, shouldStopPolling]);
 
   useEffect(() => {
-    if (sessionMode === "player-consensus" && !initializedConsensusTabRef.current) {
+    if (
+      sessionMode === "player-consensus"
+      && sharedState?.phase !== "opening"
+      && !initializedConsensusTabRef.current
+    ) {
       setTab("shared");
       initializedConsensusTabRef.current = true;
     }
-  }, [sessionMode]);
+  }, [sessionMode, sharedState?.phase]);
 
   /**
    * 클라이언트 사이드 조건 평가
@@ -2514,16 +2383,35 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     { id: "locations", label: hasAiPlayers ? "탐색·밀담" : "장소 탐색" },
     { id: "vote", label: "투표", hidden: phase !== "vote" },
   ];
+  const phaseTimerSlot = (
+    <SessionPhaseTimerCard
+      sharedState={sharedState}
+      rules={game.rules}
+      onMilestone={(milestone, timer) => {
+        const heading = timer.phaseLabel === timer.label
+          ? timer.phaseLabel
+          : `${timer.phaseLabel} ${timer.label}`;
+        pushNotice({
+          id: `timer-${milestone}-${timer.key}`,
+          message: milestone === "one-minute"
+            ? `${heading} 1분 남음`
+            : `${heading} 시간 종료`,
+          durationMs: 6000,
+        });
+      }}
+    />
+  );
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-dark-100">
       {/* 발견/오류 알림 스택 — 모달(z-50) 위에도 뜨도록 z-[60] */}
       {discoveryNotices.length > 0 && (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1.5 max-w-[92%] pointer-events-none">
+        <div className="fixed left-1/2 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[60] flex w-full max-w-[92vw] -translate-x-1/2 flex-col items-center gap-1.5 pointer-events-none">
           {discoveryNotices.map((n) => (
             <div
               key={n.id}
-              className={`px-3 py-1.5 rounded-full backdrop-blur-sm text-xs border shadow-md ${
+              aria-live="polite"
+              className={`max-w-[min(92vw,28rem)] rounded-2xl px-4 py-2 text-center text-xs leading-4 [word-break:keep-all] backdrop-blur-sm border shadow-md sm:rounded-full sm:whitespace-nowrap ${
                 n.leaving ? "animate-toast-out" : "animate-toast-in"
               } ${
                 n.tone === "error"
@@ -2606,11 +2494,6 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                 </div>
               )}
             </div>
-            <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-2">
-              <p className="text-xs text-dark-500 mb-1">내 캐릭터</p>
-              <p className="font-bold text-dark-50">{character.name}</p>
-            </div>
-            <OpeningCountdownCard sharedState={sharedState} rules={game.rules} />
           </div>
         )}
 
@@ -2657,10 +2540,6 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                   isLobby={false}
                 />
               ) : null}
-              timerState={sharedState.timerState}
-              isHost={isHost}
-              sessionId={sessionId}
-              sessionMode={sessionMode}
               phase={sharedState.phase}
             />
             <PlayerRoomRosterPanel slots={sharedState.characterSlots} players={game.players} />
@@ -2708,6 +2587,10 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
 
             {characterPanel === "profile" && (
               <div className="space-y-4">
+                <div className="rounded-xl border border-dark-800 bg-dark-900 p-4 space-y-1">
+                  <p className="text-xs text-dark-500">내 캐릭터</p>
+                  <p className="text-xl font-bold text-dark-50">{character.name}</p>
+                </div>
                 {character.cardImage ? (
                   <div className="bg-dark-900 border border-dark-800 rounded-xl p-4 space-y-3">
                     <p className="text-xs text-dark-500">이미지</p>
@@ -3189,6 +3072,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
             requested={hasRequestedAdvance}
             submitting={phaseRequestSubmitting}
             onToggle={handlePhaseAdvanceToggle}
+            timerSlot={phaseTimerSlot}
           />
         )}
       </div>

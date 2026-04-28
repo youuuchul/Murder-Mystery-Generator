@@ -1,13 +1,16 @@
 import type { GameRules } from "@/types/game";
-import type { SharedState, TimerState } from "@/types/session";
 import type { ActiveSessionSubPhase } from "@/lib/session-phase";
+import { getCurrentRoundSubPhase, getRoundSubPhaseLabel } from "@/lib/session-phase";
+import type { SharedState } from "@/types/session";
 
-export interface SessionTimerSnapshot {
+export const TIMER_OVERRUN_CAP_SECONDS = 10 * 60;
+
+export interface SessionPhaseTimerSnapshot {
+  key: string;
   label: string;
-  startedAt: string;
+  phaseLabel: string;
   durationSeconds: number;
-  /** 일시정지 중이면 남은 초. undefined면 카운트다운 진행 중. */
-  pausedRemaining?: number;
+  startedAt?: string;
 }
 
 /**
@@ -31,42 +34,50 @@ export function getSubPhaseDurationSeconds(
 }
 
 /**
- * 현재 세션 상태에서 화면에 보여줄 타이머 스냅샷을 계산한다.
- * 1. `timerState`가 있으면 그것 기반 (라운드 타이머)
- * 2. 오프닝 페이즈면 `phaseStartedAt` 기반 (기존 오프닝 자동 타이머)
+ * 오프닝/라운드별 화면 표시용 타이머 스냅샷을 만든다.
+ * 라운드는 버튼 없이 phaseStartedAt을 기준으로 흘러가며, 기존 timerState duration은 호환용으로만 참조한다.
  */
-export function getSessionTimerSnapshot(
-  sharedState: Pick<SharedState, "phase" | "phaseStartedAt" | "timerState">,
-  rules: Pick<GameRules, "openingDurationMinutes">
-): SessionTimerSnapshot | null {
-  if (sharedState.timerState) {
+export function getSessionPhaseTimerSnapshot(
+  sharedState: Pick<SharedState, "phase" | "phaseStartedAt" | "currentSubPhase" | "timerState">,
+  rules: Pick<GameRules, "openingDurationMinutes" | "phases">
+): SessionPhaseTimerSnapshot | null {
+  if (sharedState.phase === "opening" && sharedState.phaseStartedAt) {
     return {
-      label: sharedState.timerState.label,
-      startedAt: sharedState.timerState.startedAt,
-      durationSeconds: sharedState.timerState.durationSeconds,
-      pausedRemaining: sharedState.timerState.pausedRemaining,
+      key: `opening:${sharedState.phaseStartedAt}`,
+      label: "오프닝",
+      phaseLabel: "오프닝",
+      durationSeconds: getOpeningDurationSeconds(rules),
+      startedAt: sharedState.phaseStartedAt,
     };
   }
 
-  if (sharedState.phase !== "opening" || !sharedState.phaseStartedAt) {
+  if (!sharedState.phase.startsWith("round-")) {
     return null;
   }
 
+  const subPhase = getCurrentRoundSubPhase(rules, sharedState.currentSubPhase);
+  const subPhaseLabel = getRoundSubPhaseLabel(subPhase);
+  const roundLabel = `Round ${sharedState.phase.split("-")[1]}`;
+  const startedAt = sharedState.phaseStartedAt ?? sharedState.timerState?.startedAt;
+
   return {
-    label: "오프닝 남은 시간",
-    startedAt: sharedState.phaseStartedAt,
-    durationSeconds: getOpeningDurationSeconds(rules),
+    key: `${sharedState.phase}:${subPhase}:${startedAt ?? "pending"}`,
+    label: subPhaseLabel,
+    phaseLabel: roundLabel,
+    durationSeconds: sharedState.timerState?.durationSeconds ?? getSubPhaseDurationSeconds(rules, subPhase),
+    startedAt,
   };
 }
 
 /**
- * 시작 시각과 총 제한시간을 바탕으로 남은 시간을 계산한다.
- * 서버와 클라이언트가 같은 기준 문자열을 쓰기 때문에 화면만 새로고침돼도 이어진다.
+ * 제한시간 초과 후에도 음수 카운트다운을 보여주기 위한 표시용 남은 시간을 계산한다.
+ * 장시간 켜둔 화면이 과도한 음수 값을 표시하지 않도록 기본 10분에서 하한을 고정한다.
  */
-export function getRemainingSeconds(
+export function getSignedRemainingSeconds(
   startedAt: string,
   durationSeconds: number,
-  now = Date.now()
+  now = Date.now(),
+  overrunCapSeconds = TIMER_OVERRUN_CAP_SECONDS
 ): number {
   const startedAtMs = Date.parse(startedAt);
   if (!Number.isFinite(startedAtMs)) {
@@ -74,32 +85,21 @@ export function getRemainingSeconds(
   }
 
   const elapsedSeconds = Math.max(0, Math.floor((now - startedAtMs) / 1000));
-  return Math.max(0, durationSeconds - elapsedSeconds);
+  const remainingSeconds = durationSeconds - elapsedSeconds;
+
+  return Math.max(-overrunCapSeconds, remainingSeconds);
 }
 
 /**
- * 남은 초를 `MM:SS` 형태로 포맷한다.
+ * 음수 카운트다운을 `-MM:SS` 형태로 포맷한다.
+ * cap에 걸린 값은 `+`를 붙여 실제 초과 시간이 더 길 수 있음을 표시한다.
  */
-export function formatTimerSeconds(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
+export function formatSignedTimerSeconds(totalSeconds: number, capped = false): string {
+  const sign = totalSeconds < 0 ? "-" : "";
+  const absoluteSeconds = Math.abs(totalSeconds);
+  const minutes = Math.floor(absoluteSeconds / 60);
+  const seconds = absoluteSeconds % 60;
+  const suffix = capped && totalSeconds < 0 ? "+" : "";
 
-/**
- * timerState가 만료됐는지 판정한다.
- * 일시정지 중이면 만료가 아니다.
- */
-export function isTimerExpired(timerState: TimerState | undefined): boolean {
-  if (!timerState) return false;
-  if (timerState.pausedRemaining !== undefined) return false;
-  return getRemainingSeconds(timerState.startedAt, timerState.durationSeconds) === 0;
-}
-
-/**
- * timerState가 일시정지 중인지 판정한다.
- */
-export function isTimerPaused(timerState: TimerState | undefined): boolean {
-  if (!timerState) return false;
-  return timerState.pausedRemaining !== undefined;
+  return `${sign}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}${suffix}`;
 }

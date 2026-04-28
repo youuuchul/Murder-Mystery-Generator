@@ -100,8 +100,8 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   }
 
   /**
-   * 표지 이미지를 업로드하고 내부 에셋 URL을 설정값에 연결한다.
-   * 라이브러리 썸네일은 이 URL을 그대로 사용한다.
+   * 표지 이미지를 업로드하고 설정값에 내부 에셋 URL을 연결한다.
+   * 썸네일/표시용 변형은 업로드 API에서 함께 생성된다.
    */
   async function handleCoverUpload(file: File) {
     const formData = new FormData();
@@ -142,7 +142,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
     <div className="space-y-10">
       <div>
         <h2 className="text-xl font-bold text-dark-50">기본 설정</h2>
-        <p className="text-sm text-dark-500 mt-1">시나리오 제목, 태그, 난이도, 게임 규칙을 수정합니다.</p>
       </div>
 
       <div data-maker-anchor="step-1-title">
@@ -162,12 +161,11 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           rows={3}
           value={settings.summary ?? ""}
           onChange={(e) => updateSettings("summary", e.target.value || undefined)}
-          placeholder="라이브러리 목록에서 보일 한두 문장 소개를 적으세요."
+          placeholder="스포일러 없이 분위기와 배경을 짧게 적으세요."
           maxLength={220}
           className={`w-full ${inputClass} resize-none`}
         />
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="text-xs text-dark-500">스포일러 없이 분위기, 배경, 톤을 짧게 설명하는 소개글입니다.</p>
+        <div className="mt-1 flex items-center justify-end">
           <span className="shrink-0 text-[11px] text-dark-600">{(settings.summary ?? "").length}/220</span>
         </div>
       </div>
@@ -175,7 +173,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-5 space-y-4">
         <ImageAssetField
           title="표지 이미지"
-          description="라이브러리 카드 썸네일에 표시됩니다. 업로드 후 아래에서 보이는 위치를 조정할 수 있습니다."
+          description="라이브러리 카드에 표시됩니다."
           value={settings.coverImageUrl}
           alt={game.title || "시나리오 표지 미리보기"}
           profile="cover"
@@ -183,15 +181,14 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           onUpload={handleCoverUpload}
           uploading={uploadingCover}
           uploadLabel="표지 업로드"
-          emptyStateLabel="아직 연결된 표지 이미지가 없습니다."
+          emptyStateLabel="표지 이미지 없음"
         />
 
         {settings.coverImageUrl ? (
           <div className="rounded-xl border border-dark-800 bg-dark-950/40 p-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-dark-200">표지 보이는 위치</p>
-                <p className="mt-1 text-xs text-dark-500">라이브러리 카드에서 잘리는 위치를 미세 조정합니다.</p>
+                <p className="text-sm font-medium text-dark-200">카드 썸네일 위치</p>
               </div>
               <button
                 type="button"
@@ -268,7 +265,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {settings.tags.length === 0 && (
-              <span className="text-xs text-dark-600">아직 추가된 태그가 없습니다.</span>
+              <span className="text-xs text-dark-600">태그 없음</span>
             )}
             {settings.tags.map((tag) => (
               <button
@@ -293,7 +290,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                   addTag(tagInput);
                 }
               }}
-              placeholder="직접 태그 입력 후 Enter"
+              placeholder="태그 입력 후 Enter"
               className={`flex-1 ${inputClass}`}
             />
             <button
@@ -351,27 +348,15 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           </div>
           <p className="text-xs text-dark-500 text-center mt-2">1 ~ 8명 (피해자 제외)</p>
 
-          {characterCount > 0 && (
-            <div
-              className={`mt-2 px-3 py-2 rounded-lg text-xs ${
-                playerCountMismatch
-                  ? "bg-yellow-950/30 border border-yellow-800 text-yellow-400"
-                  : "bg-dark-800 border border-dark-700 text-dark-500"
-              }`}
-            >
-              {playerCountMismatch ? (
-                <>
-                  현재 {characterCount}명의 캐릭터가 등록되어 있습니다. 플레이어 탭에서 캐릭터 수를 맞춰주세요.
-                </>
-              ) : (
-                <>등록된 캐릭터 {characterCount}명과 일치합니다.</>
-              )}
+          {characterCount > 0 && playerCountMismatch && (
+            <div className="mt-2 rounded-lg border border-yellow-800 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-400">
+              현재 캐릭터 {characterCount}명. 플레이어 탭에서 수를 맞춰주세요.
             </div>
           )}
 
           {showPlayerCountWarning && (
             <div className="mt-2 px-3 py-2 rounded-lg text-xs bg-orange-950/20 border border-orange-900 text-orange-400">
-              플레이어 수 변경은 캐릭터 목록에 영향을 주지 않습니다. &apos;플레이어&apos; 탭에서 직접 캐릭터를 추가/삭제하세요.
+              플레이어 수만 바뀝니다. 캐릭터는 플레이어 탭에서 맞춰주세요.
             </div>
           )}
         </div>
@@ -418,7 +403,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       <div className="border-t border-dark-800 pt-8 space-y-6">
         <div>
           <h3 className="text-base font-semibold text-dark-100">게임 규칙</h3>
-          <p className="text-xs text-dark-500 mt-1">라운드 구성, 시간, 카드 규칙을 조정합니다.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -488,11 +472,11 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
             />
             <span className="text-dark-300 text-sm w-12 text-right">{rules.openingDurationMinutes}분</span>
           </div>
-          <p className="mt-2 text-xs text-dark-500">오프닝 페이즈 공통화면과 GM 화면에 표시될 기본 제한시간입니다.</p>
+          <p className="mt-2 text-xs text-dark-500">공통화면과 GM 화면 타이머에 적용됩니다.</p>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-dark-400 mb-3">페이즈별 시간 설정</label>
+          <label className="block text-xs font-medium text-dark-400 mb-3">페이즈별 시간</label>
           <div className="space-y-2">
             {rules.phases.map((phase, idx) => (
               <div key={phase.type} className="flex items-center gap-3 bg-dark-800/50 border border-dark-700 rounded-lg px-4 py-3">
@@ -576,7 +560,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-dark-200">카드 주고받기</p>
-                <p className="text-xs text-dark-500 mt-0.5">플레이어 간 단서 카드 이전 허용</p>
+                <p className="text-xs text-dark-500 mt-0.5">단서 카드를 서로 전달할 수 있음</p>
               </div>
               <button
                 type="button"

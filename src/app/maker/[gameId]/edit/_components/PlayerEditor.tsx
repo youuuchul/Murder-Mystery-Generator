@@ -1537,7 +1537,7 @@ function CulpritSelectorBox({
         </div>
         {primaryMode === "custom-choices" && (
           <p className="text-[11px] text-dark-500">
-            투표 탭의 주 질문이 "커스텀 선택지" 모드입니다. 범인 후보군은 임시로 전체 인물에서 고를 수 있게 열어 둡니다.
+            투표 탭의 주 질문이 "커스텀 선택지" 모드입니다. 범인 후보군은 전체 인물에서 선택할 수 있습니다.
           </p>
         )}
       </div>

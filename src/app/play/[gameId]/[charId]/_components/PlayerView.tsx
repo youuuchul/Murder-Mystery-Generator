@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import { getRealtimeClient } from "@/lib/supabase/realtime-client";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import AiChatPanel from "./AiChatPanel";
 import PlayLoadingSkeleton from "./PlayLoadingSkeleton";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
@@ -241,6 +242,8 @@ function ImageFrame({
   compact?: boolean;
   variant?: "default" | "portrait" | "document";
 }) {
+  const assetVariant = compact ? "thumb" : variant === "document" ? "large" : "display";
+
   return (
     <div
       className={[
@@ -255,7 +258,7 @@ function ImageFrame({
       ].join(" ")}
     >
       <Image
-        src={src}
+        src={withGameAssetVariant(src, assetVariant) ?? src}
         alt={alt}
         fill
         sizes={

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import {
   clearPlayerSessionToken,
   persistPlayerSessionToken,
@@ -200,7 +201,7 @@ export default function JoinPage() {
                       {player.cardImage ? (
                         <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
                           <Image
-                            src={player.cardImage}
+                            src={withGameAssetVariant(player.cardImage, "thumb") ?? player.cardImage}
                             alt={player.name}
                             fill
                             sizes="48px"

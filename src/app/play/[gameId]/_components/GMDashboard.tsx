@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSSE } from "@/hooks/useSSE";
 import { getPlayerAgentRuntimeStatusLabel } from "@/lib/ai/player-agent/core/player-agent-state";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import {
   ENDING_STAGE_LABELS,
   getNextEndingStage,
@@ -303,7 +304,7 @@ function GMBoard({ game, content }: { game: GamePackage; content: PhaseBoardCont
                   <div className="relative overflow-hidden rounded-xl border border-dark-700 bg-dark-950/80 aspect-[16/9]">
                     {resolvedImageUrl ? (
                       <Image
-                        src={resolvedImageUrl}
+                        src={withGameAssetVariant(resolvedImageUrl, "display") ?? resolvedImageUrl}
                         alt={`${game.title} 공통 이미지`}
                         fill
                         sizes="(max-width: 1280px) 100vw, 960px"

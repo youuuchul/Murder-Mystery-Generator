@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isPubliclyAccessible } from "@/lib/game-access";
 import { getGame } from "@/lib/game-repository";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import { getMakerAuthGateway } from "@/lib/maker-auth-gateway";
 import { getCurrentMakerUser } from "@/lib/maker-user.server";
 import { isMakerAdmin } from "@/lib/maker-role";
@@ -150,7 +151,7 @@ function CoverHero({
       {imageUrl ? (
         <>
           <Image
-            src={imageUrl}
+            src={withGameAssetVariant(imageUrl, "display") ?? imageUrl}
             alt={title}
             fill
             priority

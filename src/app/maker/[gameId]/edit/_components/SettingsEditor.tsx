@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { canUsePrivateChat, normalizePrivateChatConfig } from "@/lib/game-rules";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import ImageAssetField from "./ImageAssetField";
 import type { GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
@@ -245,7 +246,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/60">
                 <div className="relative aspect-[16/10]">
                   <img
-                    src={settings.coverImageUrl}
+                    src={withGameAssetVariant(settings.coverImageUrl, "display") ?? settings.coverImageUrl}
                     alt={game.title || "표지 위치 미리보기"}
                     className="h-full w-full object-cover"
                     style={{

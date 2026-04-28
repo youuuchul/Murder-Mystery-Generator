@@ -21,7 +21,7 @@ export interface OptimizedImageUploadResult {
 
 /**
  * 업로드 직전 이미지를 용도별 최대 크기에 맞춰 축소/압축한다.
- * 현재는 원본 보존보다 편집 UX와 디스크 사용량 절감을 우선해 브라우저에서 1차 최적화를 수행한다.
+ * 변환 결과가 원본보다 커지면 원본을 유지해 "최적화"가 역효과를 내지 않게 한다.
  */
 export async function optimizeImageForUpload(
   file: File,
@@ -114,6 +114,7 @@ export async function optimizeImageForUpload(
   context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
   const qualitySteps = buildQualitySteps(config.initialQuality, config.minQuality);
+  let bestBlob: Blob | null = null;
 
   for (const quality of qualitySteps) {
     const blob = await canvasToBlob(canvas, "image/webp", quality);
@@ -121,31 +122,39 @@ export async function optimizeImageForUpload(
       continue;
     }
 
-    if (blob.size <= config.targetBytes || quality === qualitySteps[qualitySteps.length - 1]) {
-      const optimizedFile = new File(
-        [blob],
-        replaceFileExtension(file.name, "webp"),
-        { type: "image/webp", lastModified: Date.now() }
-      );
-
-      return {
-        file: optimizedFile,
-        report: {
-          originalWidth: image.naturalWidth,
-          originalHeight: image.naturalHeight,
-          outputWidth: targetWidth,
-          outputHeight: targetHeight,
-          originalBytes: file.size,
-          outputBytes: blob.size,
-          outputMimeType: "image/webp",
-          transformed:
-            blob.size !== file.size
-            || targetWidth !== image.naturalWidth
-            || targetHeight !== image.naturalHeight
-            || file.type !== "image/webp",
-        },
-      };
+    if (!bestBlob || blob.size < bestBlob.size) {
+      bestBlob = blob;
     }
+
+    if (blob.size <= config.targetBytes) {
+      break;
+    }
+  }
+
+  if (bestBlob && shouldUseOptimizedBlob(file, image, targetWidth, targetHeight, bestBlob)) {
+    const optimizedFile = new File(
+      [bestBlob],
+      replaceFileExtension(file.name, "webp"),
+      { type: "image/webp", lastModified: Date.now() }
+    );
+
+    return {
+      file: optimizedFile,
+      report: {
+        originalWidth: image.naturalWidth,
+        originalHeight: image.naturalHeight,
+        outputWidth: targetWidth,
+        outputHeight: targetHeight,
+        originalBytes: file.size,
+        outputBytes: bestBlob.size,
+        outputMimeType: "image/webp",
+        transformed:
+          bestBlob.size !== file.size
+          || targetWidth !== image.naturalWidth
+          || targetHeight !== image.naturalHeight
+          || file.type !== "image/webp",
+      },
+    };
   }
 
   return {
@@ -159,6 +168,9 @@ export async function optimizeImageForUpload(
       outputBytes: file.size,
       outputMimeType: file.type,
       transformed: false,
+      note: bestBlob && bestBlob.size > file.size
+        ? "변환본이 더 커서 원본을 유지합니다."
+        : undefined,
     },
   };
 }
@@ -207,6 +219,24 @@ function buildQualitySteps(initialQuality: number, minQuality: number): number[]
 
   steps.push(minQuality);
   return Array.from(new Set(steps));
+}
+
+/** 원본보다 커지는 변환은 버리고, 실제 바이트 절감 또는 리사이즈가 있는 경우만 채택한다. */
+function shouldUseOptimizedBlob(
+  file: File,
+  image: HTMLImageElement,
+  targetWidth: number,
+  targetHeight: number,
+  blob: Blob
+): boolean {
+  const resized = targetWidth !== image.naturalWidth || targetHeight !== image.naturalHeight;
+  const smaller = blob.size < file.size;
+
+  if (blob.size > file.size) {
+    return false;
+  }
+
+  return resized || smaller || file.type !== "image/webp";
 }
 
 /** 최적화 출력이 webp가 되므로 파일명 확장자도 함께 바꾼다. */

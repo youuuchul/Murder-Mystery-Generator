@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import type { CoverImagePosition } from "@/types/game";
 
 interface LibraryCoverProps {
@@ -19,7 +20,7 @@ export default function LibraryCover({ title, imageUrl, imagePosition }: Library
       {imageUrl ? (
         <>
           <Image
-            src={imageUrl}
+            src={withGameAssetVariant(imageUrl, "thumb") ?? imageUrl}
             alt={title}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"

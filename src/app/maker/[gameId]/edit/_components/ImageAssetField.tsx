@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import { optimizeImageForUpload, type OptimizedImageUploadReport } from "./image-upload-processing";
 import { getImageAssetProfileConfig, type ImageAssetProfile } from "./image-upload-profiles";
 
@@ -169,7 +170,7 @@ export default function ImageAssetField({
           >
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-dark-700 bg-dark-950">
               <img
-                src={value}
+                src={withGameAssetVariant(value, "thumb") ?? value}
                 alt={alt}
                 className={[
                   "h-full w-full",
@@ -195,7 +196,7 @@ export default function ImageAssetField({
           ].join(" ")}
         >
           <img
-            src={value}
+            src={withGameAssetVariant(value, "display") ?? value}
             alt={alt}
             className={[
               "h-full w-full",

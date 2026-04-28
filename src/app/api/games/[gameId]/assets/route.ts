@@ -6,6 +6,7 @@ import {
   isGameAssetScope,
   uploadGameAsset,
 } from "@/lib/game-asset-storage";
+import { generateGameAssetVariants } from "@/lib/game-asset-image-processing";
 import { getGame, saveGame } from "@/lib/game-repository";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 
@@ -88,6 +89,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const filename = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    const variants = await generateGameAssetVariants({
+      scope,
+      filename,
+      contentType: file.type,
+      buffer,
+    });
     const uploadedAsset = await uploadGameAsset({
       gameId,
       scope,
@@ -96,7 +103,20 @@ export async function POST(request: NextRequest, { params }: Params) {
       buffer,
     });
 
-    return NextResponse.json(uploadedAsset);
+    for (const variant of variants) {
+      await uploadGameAsset({
+        gameId,
+        scope,
+        filename: variant.filename,
+        contentType: variant.contentType,
+        buffer: variant.buffer,
+      });
+    }
+
+    return NextResponse.json({
+      ...uploadedAsset,
+      variants: variants.map((variant) => variant.variant),
+    });
   } catch (error) {
     console.error(`[POST /api/games/${gameId}/assets]`, error);
     return NextResponse.json({ error: "이미지 업로드에 실패했습니다." }, { status: 500 });

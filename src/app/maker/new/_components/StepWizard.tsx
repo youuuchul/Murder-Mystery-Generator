@@ -178,8 +178,8 @@ export default function StepWizard({
             현재 단계에서 확인할 항목 {currentStepIssues.length}개
           </p>
           <ul className="mt-2 space-y-1">
-            {currentStepIssues.slice(0, 3).map((issue, index) => (
-              <li key={`${issue.message}-${index}`} className="text-xs text-dark-300">
+            {currentStepIssues.slice(0, 3).map((issue) => (
+              <li key={issue.id} className="text-xs text-dark-300">
                 {issue.level === "error" ? "• 필수" : "• 권장"}: {issue.message}
               </li>
             ))}

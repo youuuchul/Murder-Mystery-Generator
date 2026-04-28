@@ -302,9 +302,16 @@ function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () =>
 interface VoteEndingEditorProps {
   game: GamePackage;
   onUpdate: (partial: Partial<GamePackage>) => void;
+  focusTarget?: string | null;
+  focusToken?: number;
 }
 
-export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorProps) {
+export default function VoteEndingEditor({
+  game,
+  onUpdate,
+  focusTarget,
+  focusToken,
+}: VoteEndingEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("vote");
   const [showPreStory, setShowPreStory] = useState(Boolean(game.scripts.vote.narration?.trim()));
   // 투표 전 텍스트 off 시 캐시 (데이터 유실 방지)
@@ -312,6 +319,13 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
   const [showPersonalQuestions, setShowPersonalQuestions] = useState(
     (game.voteQuestions ?? []).some((q) => q.purpose === "personal")
   );
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    if (focusTarget === "step-6-vote") setActiveTab("vote");
+    if (focusTarget === "step-6-branches") setActiveTab("ending");
+    if (focusTarget === "step-6-author-notes") setActiveTab("author");
+  }, [focusTarget, focusToken]);
 
   const ending = game.ending;
   const players = game.players ?? [];
@@ -418,7 +432,7 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
 
       {/* ─── 투표 탭 ─── */}
       {activeTab === "vote" && (
-        <div className="space-y-6">
+        <div data-maker-anchor="step-6-vote" className="space-y-6">
 
           {/* 기본 투표 설정 */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
@@ -651,16 +665,18 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
 
       {/* ─── 엔딩 탭 ─── */}
       {activeTab === "ending" && (
-        <EndingEditor
-          ending={ending}
-          players={players}
-          npcs={npcs}
-          victim={victim}
-          voteQuestions={voteQuestions}
-          advancedVotingEnabled={advancedVotingEnabled}
-          onChange={updateEnding}
-          section="branches"
-        />
+        <div data-maker-anchor="step-6-branches">
+          <EndingEditor
+            ending={ending}
+            players={players}
+            npcs={npcs}
+            victim={victim}
+            voteQuestions={voteQuestions}
+            advancedVotingEnabled={advancedVotingEnabled}
+            onChange={updateEnding}
+            section="branches"
+          />
+        </div>
       )}
 
       {/* ─── 개인 엔딩 탭 ─── */}
@@ -679,16 +695,18 @@ export default function VoteEndingEditor({ game, onUpdate }: VoteEndingEditorPro
 
       {/* ─── 작가 후기 탭 ─── */}
       {activeTab === "author" && (
-        <EndingEditor
-          ending={ending}
-          players={players}
-          npcs={npcs}
-          victim={victim}
-          voteQuestions={voteQuestions}
-          advancedVotingEnabled={advancedVotingEnabled}
-          onChange={updateEnding}
-          section="author"
-        />
+        <div data-maker-anchor="step-6-author-notes">
+          <EndingEditor
+            ending={ending}
+            players={players}
+            npcs={npcs}
+            victim={victim}
+            voteQuestions={voteQuestions}
+            advancedVotingEnabled={advancedVotingEnabled}
+            onChange={updateEnding}
+            section="author"
+          />
+        </div>
       )}
     </div>
   );

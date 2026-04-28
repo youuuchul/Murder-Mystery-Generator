@@ -3,44 +3,31 @@ import type {
   GamePublishChecklistItem,
   GamePublishReadiness,
 } from "@/types/game";
+import { validateMakerGame } from "@/lib/maker-validation";
+
+const MAKER_STEP_LABEL: Record<number, string> = {
+  1: "기본 설정",
+  2: "오프닝 / 배경 설정",
+  3: "플레이어",
+  4: "단서 카드",
+  5: "스크립트",
+  6: "투표 & 엔딩",
+};
 
 /**
  * 공개 라이브러리에 올리기 전 필요한 최소 체크리스트를 계산한다.
- * 메이커 전체 검증보다 범위를 좁혀, 공개 전환 직전에 필요한 핵심 항목만 다룬다.
+ * 공개 전환 기준은 메이커 편집기의 필수 검증(error)을 그대로 재사용한다.
+ * 화면별 카운트와 공개 전환 실패 사유가 서로 갈라지지 않게 단일 규칙을 유지한다.
  */
 export function getGamePublishReadiness(game: GamePackage): GamePublishReadiness {
-  const checklist: GamePublishChecklistItem[] = [
-    {
-      id: "title",
-      label: "제목",
-      passed: Boolean(game.title.trim()),
-      detail: "제목이 필요합니다.",
-    },
-    {
-      id: "summary",
-      label: "라이브러리 소개글",
-      passed: Boolean(game.settings.summary?.trim()),
-      detail: "라이브러리 소개글이 필요합니다.",
-    },
-    {
-      id: "players",
-      label: "플레이어 수",
-      passed: game.players.length === game.settings.playerCount,
-      detail: "등록된 플레이어 수를 기본 설정 인원 수와 맞춰주세요.",
-    },
-    {
-      id: "opening",
-      label: "오프닝 기본 스크립트",
-      passed: Boolean(game.scripts.opening.narration.trim()),
-      detail: "오프닝 기본 스크립트가 필요합니다.",
-    },
-    {
-      id: "ending",
-      label: "엔딩",
-      passed: game.ending.branches.length > 0 || Boolean(game.scripts.ending.narration.trim()),
-      detail: "엔딩 분기 또는 엔딩 스크립트가 필요합니다.",
-    },
-  ];
+  const makerValidation = validateMakerGame(game);
+  const blockingIssues = makerValidation.issues.filter((issue) => issue.level === "error");
+  const checklist: GamePublishChecklistItem[] = blockingIssues.map<GamePublishChecklistItem>((issue) => ({
+    id: `maker:${issue.id}`,
+    label: MAKER_STEP_LABEL[issue.step] ?? `Step ${issue.step}`,
+    passed: false,
+    detail: issue.message,
+  }));
 
   return {
     ready: checklist.every((item) => item.passed),

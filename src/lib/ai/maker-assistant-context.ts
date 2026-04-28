@@ -202,19 +202,23 @@ export function buildMakerAssistantContext(
 
 /** 다음 작업 추천용 밀도를 계산해 우선 보완해야 할 빈 영역을 숫자로 보여준다. */
 function buildCompletionSummary(game: GamePackage): MakerAssistantContext["completion"] {
+  const roundsWithoutEventText = Array.from({ length: game.rules.roundCount }, (_, index) =>
+    game.scripts.rounds[index]?.narration ?? ""
+  ).filter((narration) => !narration.trim()).length;
+
   return {
     playersWithoutBackground: game.players.filter((player) => !player.background.trim()).length,
     playersWithoutStory: game.players.filter((player) => !player.story.trim()).length,
     playersWithoutSecret: game.players.filter((player) => !player.secret.trim()).length,
     playersWithoutTimeline: game.story.timeline.enabled
       ? game.players.filter((player) =>
-          !player.timelineEntries.some((entry) => entry.action.trim() || entry.inactive === true)
+          !player.timelineEntries.some((entry) => entry.inactive !== true && entry.action.trim().length > 0)
         ).length
       : 0,
     blankTimelineSlots: game.story.timeline.slots.filter((slot) => !slot.label.trim()).length,
     locationsWithoutClues: game.locations.filter((location) => location.clueIds.length === 0).length,
     cluesWithoutDescription: game.clues.filter((clue) => !clue.description.trim()).length,
-    roundsWithoutEventText: game.scripts.rounds.filter((round) => !round.narration.trim()).length,
+    roundsWithoutEventText,
     namelessNpcs: game.story.npcs.filter((npc) => !npc.name.trim()).length,
     endingBranchCount: game.ending.branches.length,
   };

@@ -421,7 +421,7 @@ export interface VoteQuestion {
 // ─── 메타데이터 ──────────────────────────────────────────────
 
 export interface GamePublishChecklistItem {
-  id: "title" | "summary" | "players" | "opening" | "ending";
+  id: string;
   label: string;
   passed: boolean;
   detail: string;

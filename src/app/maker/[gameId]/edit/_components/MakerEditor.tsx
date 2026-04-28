@@ -106,6 +106,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const currentStepIssues = validation.stepIssues[currentStep] ?? [];
   const currentStepErrorIssues = currentStepIssues.filter((issue) => issue.level === "error");
   const currentStepWarningIssues = currentStepIssues.filter((issue) => issue.level === "warning");
+  const validationErrorCount = validation.issues.filter((issue) => issue.level === "error").length;
+  const validationWarningCount = validation.issues.length - validationErrorCount;
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
     setGame((prev) => {
@@ -339,6 +341,10 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
    * 완전히 일치하는 필드가 없더라도 사용자가 가장 빨리 수정할 수 있는 블록으로 이동시키는 목적이다.
    */
   function getValidationAnchor(issue: MakerValidationIssue): string | null {
+    if (issue.anchor) {
+      return issue.anchor;
+    }
+
     const { step, message } = issue;
 
     if (step === 1) {
@@ -368,11 +374,11 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     }
 
     if (step === 5) {
-      if (message.includes("투표")) return "step-5-vote";
       return "step-5-rounds";
     }
 
     if (step === 6) {
+      if (message.includes("투표")) return "step-6-vote";
       if (message.includes("작가 추가 설명")) return "step-6-author-notes";
       return "step-6-branches";
     }
@@ -511,7 +517,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
         {validation.issues.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-dark-500">
-              검증 힌트 {validation.issues.length}개가 단계 네비게이터에 표시됩니다.
+              필수 {validationErrorCount}개
+              {validationWarningCount > 0 ? ` · 권장 ${validationWarningCount}개` : ""}
+              {" · "}단계 네비게이터에서 위치를 확인할 수 있습니다.
             </p>
           </div>
         )}
@@ -537,9 +545,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             </div>
 
             <div className="mt-4 space-y-2">
-              {currentStepIssues.map((issue, index) => (
+              {currentStepIssues.map((issue) => (
                 <button
-                  key={`${issue.step}-${issue.level}-${index}`}
+                  key={issue.id}
                   type="button"
                   onClick={() => focusValidationIssue(issue)}
                   className="flex w-full items-start justify-between gap-3 rounded-xl border border-dark-700/80 bg-dark-950/40 px-3 py-3 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
@@ -685,6 +693,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             <VoteEndingEditor
               game={game}
               onUpdate={updateGame}
+              focusTarget={focusRequest.target}
+              focusToken={focusRequest.token}
             />
           )}
         </div>

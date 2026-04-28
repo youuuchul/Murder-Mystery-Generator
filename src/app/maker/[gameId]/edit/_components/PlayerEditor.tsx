@@ -51,6 +51,17 @@ interface RelationTargetOption {
   label: string;
 }
 
+interface ClueOption {
+  id: string;
+  label: string;
+}
+
+interface ClueOptionGroup {
+  key: string;
+  label: string;
+  options: ClueOption[];
+}
+
 const VICTORY_OPTIONS: { value: VictoryCondition; label: string; desc: string; color: string }[] = [
   { value: "avoid-arrest", label: "검거 회피", desc: "범인 — 끝까지 들키지 마세요", color: "border-red-700 bg-red-950/30 text-red-300" },
   { value: "uncertain", label: "검거 or 회피", desc: "미확정 — 스스로도 확신할 수 없습니다", color: "border-yellow-700 bg-yellow-950/30 text-yellow-300" },
@@ -588,13 +599,55 @@ function PlayerForm({
     ));
   }
   const availableRelationTargetsToAdd = getRelationTargetsForRow(-1);
-  const clueOptions = clues.map((clue) => {
-    const locationName = locations.find((location) => location.id === clue.locationId)?.name?.trim() || "위치 미지정";
-    return {
-      id: clue.id,
-      label: `${locationName} · ${clue.title || "(제목 없음)"}`,
-    };
+  const locationById = new Map(locations.map((location) => [location.id, location]));
+  const locationOrder = new Map(locations.map((location, index) => [location.id, index]));
+  const clueOrderInLocation = new Map<string, number>();
+  locations.forEach((location) => {
+    location.clueIds.forEach((clueId, index) => {
+      clueOrderInLocation.set(clueId, index);
+    });
   });
+  const clueOriginalOrder = new Map(clues.map((clue, index) => [clue.id, index]));
+  const sortedClues = clues.slice().sort((a, b) => {
+    const aLocationOrder = locationOrder.get(a.locationId) ?? Number.MAX_SAFE_INTEGER;
+    const bLocationOrder = locationOrder.get(b.locationId) ?? Number.MAX_SAFE_INTEGER;
+    if (aLocationOrder !== bLocationOrder) return aLocationOrder - bLocationOrder;
+
+    const aClueOrder = clueOrderInLocation.get(a.id) ?? clueOriginalOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+    const bClueOrder = clueOrderInLocation.get(b.id) ?? clueOriginalOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+    if (aClueOrder !== bClueOrder) return aClueOrder - bClueOrder;
+
+    return (clueOriginalOrder.get(a.id) ?? 0) - (clueOriginalOrder.get(b.id) ?? 0);
+  });
+  const clueGroups = sortedClues.reduce<ClueOptionGroup[]>((groups, clue) => {
+    const location = locationById.get(clue.locationId);
+    const groupKey = location?.id ?? "unassigned";
+    let group = groups.find((item) => item.key === groupKey);
+    if (!group) {
+      group = {
+        key: groupKey,
+        label: location?.name?.trim() || "위치 미지정",
+        options: [],
+      };
+      groups.push(group);
+    }
+    group.options.push({
+      id: clue.id,
+      label: clue.title || "(제목 없음)",
+    });
+    return groups;
+  }, []);
+  const selectedRelatedClueIds = new Set(player.relatedClues.map((related) => related.clueId).filter(Boolean));
+  function getRelatedClueGroupsForRow(rowIndex: number) {
+    const currentClueId = rowIndex >= 0 ? player.relatedClues[rowIndex]?.clueId : "";
+    return clueGroups
+      .map((group) => ({
+        ...group,
+        options: group.options.filter((option) => option.id === currentClueId || !selectedRelatedClueIds.has(option.id)),
+      }))
+      .filter((group) => group.options.length > 0);
+  }
+  const availableRelatedCluesToAdd = getRelatedClueGroupsForRow(-1);
 
   const tabs = [
     { id: "basic" as const, label: "기본 정보" },
@@ -787,45 +840,54 @@ function PlayerForm({
               <p className="text-xs text-dark-500">
                 이 캐릭터와 관련된 단서를 선택하고 설명을 작성하세요. 게임 시작 시 본인에게 공개됩니다.
               </p>
-              {player.relatedClues.map((rc, idx) => (
-                <div key={idx} className="border border-dark-700/60 rounded-lg p-3 space-y-2">
-                  <div className="flex gap-2">
-                    <select
-                      value={rc.clueId}
-                      onChange={(e) => updateRelatedClue(idx, { clueId: e.target.value })}
-                      className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
-                    >
-                      <option value="">— 단서 선택 —</option>
-                      {clueOptions.map((clue) => (
-                        <option key={clue.id} value={clue.id}>
-                          {clue.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => update("relatedClues", player.relatedClues.filter((_, i) => i !== idx))}
-                      className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors"
-                    >
-                      삭제
-                    </button>
+              {player.relatedClues.map((rc, idx) => {
+                const groupsForRow = getRelatedClueGroupsForRow(idx);
+                return (
+                  <div key={idx} className="border border-dark-700/60 rounded-lg p-3 space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={rc.clueId}
+                        onChange={(e) => updateRelatedClue(idx, { clueId: e.target.value })}
+                        className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-dark-200 text-xs focus:outline-none focus:ring-1 focus:ring-mystery-500"
+                      >
+                        <option value="">— 단서 선택 —</option>
+                        {groupsForRow.map((group) => (
+                          <optgroup key={group.key} label={group.label}>
+                            {group.options.map((clue) => (
+                              <option key={clue.id} value={clue.id}>
+                                {clue.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => update("relatedClues", player.relatedClues.filter((_, i) => i !== idx))}
+                        className="text-dark-500 hover:text-red-400 text-sm px-1 transition-colors"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={rc.note}
+                      onChange={(e) => updateRelatedClue(idx, { note: e.target.value })}
+                      placeholder="예: 당신의 방에 보관된 물건이지만 직접 접근할 수 없습니다."
+                      className={inp}
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={rc.note}
-                    onChange={(e) => updateRelatedClue(idx, { note: e.target.value })}
-                    placeholder="예: 당신의 방에 보관된 물건이지만 직접 접근할 수 없습니다."
-                    className={inp}
-                  />
-                </div>
-              ))}
+                );
+              })}
               {clues.length === 0 ? (
                 <p className="text-xs text-dark-600 py-2">Step 4(장소 & 단서)에서 단서를 먼저 추가하세요.</p>
               ) : (
                 <button
                   type="button"
                   onClick={() => update("relatedClues", [...player.relatedClues, { clueId: "", note: "" }])}
-                  className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
+                  disabled={availableRelatedCluesToAdd.length === 0}
+                  title={availableRelatedCluesToAdd.length === 0 ? "모든 단서가 추가되었습니다." : undefined}
+                  className="text-xs text-mystery-400 transition-colors hover:text-mystery-300 disabled:cursor-not-allowed disabled:text-dark-600"
                 >
                   + 연관 단서 추가
                 </button>

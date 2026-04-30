@@ -36,11 +36,6 @@ const DIFFICULTIES = [
   { value: "hard", label: "어려움" },
 ] as const;
 
-const PHASE_LABELS: Record<PhaseConfig["type"], string> = {
-  investigation: "조사",
-  discussion: "토론",
-};
-
 const inputClass =
   "bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
@@ -53,12 +48,16 @@ function getTimerTotalMinutes(rules: GameRules): number {
   return rules.openingDurationMinutes + roundTotal * rules.roundCount;
 }
 
-function NumberStepper({
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function NumberInputField({
   label,
   value,
   min,
   max,
-  step = 1,
   formatValue,
   onChange,
 }: {
@@ -66,39 +65,81 @@ function NumberStepper({
   value: number;
   min: number;
   max: number;
-  step?: number;
   formatValue?: (value: number) => string;
   onChange: (value: number) => void;
 }) {
-  const canDecrease = value > min;
-  const canIncrease = value < max;
   const displayValue = formatValue ? formatValue(value) : String(value);
 
   return (
     <div className="rounded-2xl border border-dark-800 bg-dark-950/35 p-3">
       <div className="mb-2 text-xs font-medium text-dark-500">{label}</div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - step))}
-          disabled={!canDecrease}
-          className="h-9 w-9 rounded-lg border border-dark-700 bg-dark-800 text-base font-bold text-dark-200 transition-colors hover:bg-dark-700 disabled:cursor-default disabled:opacity-35"
-          aria-label={`${label} 줄이기`}
+      <div className="relative">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
+          className={`w-full pr-12 text-center font-semibold ${inputClass}`}
+        />
+        {formatValue ? (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">
+            {displayValue.replace(String(value), "")}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TimeInputField({
+  label,
+  value,
+  min = 5,
+  max = 60,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  onChange: (value: number) => void;
+}) {
+  const quickOptions = Array.from({ length: Math.floor(max / 5) + 1 }, (_, index) => index * 5)
+    .filter((option) => option >= min);
+  const selectValue = quickOptions.includes(value) ? String(value) : "";
+
+  return (
+    <div className="rounded-2xl border border-dark-800 bg-dark-950/35 p-3">
+      <div className="mb-2 text-xs font-medium text-dark-500">{label}</div>
+      <div className="grid grid-cols-[minmax(0,1fr)_118px] gap-2">
+        <label className="relative block">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            value={value}
+            onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
+            className={`w-full pr-10 text-center font-semibold ${inputClass}`}
+          />
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">분</span>
+        </label>
+        <select
+          value={selectValue}
+          onChange={(event) => {
+            if (!event.target.value) return;
+            onChange(Number(event.target.value));
+          }}
+          className={`${inputClass} w-full text-xs`}
+          aria-label={`${label} 빠른 선택`}
         >
-          −
-        </button>
-        <span className="min-w-0 flex-1 rounded-lg border border-dark-800 bg-dark-900/70 px-2 py-2 text-center text-sm font-semibold text-dark-100">
-          {displayValue}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange(Math.min(max, value + step))}
-          disabled={!canIncrease}
-          className="h-9 w-9 rounded-lg border border-dark-700 bg-dark-800 text-base font-bold text-dark-200 transition-colors hover:bg-dark-700 disabled:cursor-default disabled:opacity-35"
-          aria-label={`${label} 늘리기`}
-        >
-          +
-        </button>
+          <option value="">5분 단위</option>
+          {quickOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}분
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -109,7 +150,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   const rules = game.rules;
   const characterCount = game.players?.length ?? 0;
 
-  const [showPlayerCountWarning, setShowPlayerCountWarning] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
 
@@ -119,10 +159,14 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   const timerTotalMin = getTimerTotalMinutes(rules);
   const voteEndingMin = Math.max(0, settings.estimatedDuration - timerTotalMin);
   const displayedEstimatedDuration = timerTotalMin + voteEndingMin;
+  const investigationPhase = rules.phases.find((phase) => phase.type === "investigation");
+  const discussionPhase = rules.phases.find((phase) => phase.type === "discussion");
+  const investigationMinutes = investigationPhase?.durationMinutes ?? 0;
+  const discussionMinutes = discussionPhase?.durationMinutes ?? 0;
+  const splitRoundPhases = discussionMinutes > 0;
 
   function updateSettings<K extends keyof GameSettings>(key: K, value: GameSettings[K]) {
     if (key === "playerCount") {
-      setShowPlayerCountWarning(true);
       const nextPlayerCount = value as number;
       const nextRules = {
         ...rules,
@@ -150,9 +194,38 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
     });
   }
 
-  function updatePhase(idx: number, partial: Partial<PhaseConfig>) {
+  function updatePhaseDuration(type: PhaseConfig["type"], durationMinutes: number) {
     updateRules({
-      phases: rules.phases.map((phase, phaseIdx) => (phaseIdx === idx ? { ...phase, ...partial } : phase)),
+      phases: rules.phases.map((phase) => (
+        phase.type === type ? { ...phase, durationMinutes } : phase
+      )),
+    });
+  }
+
+  function updateRoundPhaseMode(split: boolean) {
+    if (split === splitRoundPhases) return;
+
+    const currentRoundMinutes = Math.max(5, investigationMinutes + discussionMinutes);
+    if (!split) {
+      const mergedMinutes = Math.min(60, currentRoundMinutes);
+      updateRules({
+        phases: rules.phases.map((phase) => {
+          if (phase.type === "investigation") return { ...phase, durationMinutes: mergedMinutes };
+          if (phase.type === "discussion") return { ...phase, durationMinutes: 0 };
+          return phase;
+        }),
+      });
+      return;
+    }
+
+    const nextDiscussionMinutes = Math.min(10, Math.max(5, currentRoundMinutes - 5));
+    const nextInvestigationMinutes = Math.max(5, currentRoundMinutes - nextDiscussionMinutes);
+    updateRules({
+      phases: rules.phases.map((phase) => {
+        if (phase.type === "investigation") return { ...phase, durationMinutes: nextInvestigationMinutes };
+        if (phase.type === "discussion") return { ...phase, durationMinutes: nextDiscussionMinutes };
+        return phase;
+      }),
     });
   }
 
@@ -431,10 +504,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_0.9fr]">
         <div
           data-maker-anchor="step-1-player-count"
-          className="h-full rounded-xl border border-dark-800 bg-dark-900/45 p-4"
+          className="rounded-xl border border-dark-800 bg-dark-900/45 p-4"
         >
           <label className="block text-sm font-medium text-dark-200 mb-3">플레이어 수</label>
           <div className="flex items-center gap-3">
@@ -466,12 +539,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
             </div>
           )}
 
-          {showPlayerCountWarning && (
-            <div className="mt-2 px-3 py-2 rounded-lg text-xs bg-orange-950/20 border border-orange-900 text-orange-400">
-              플레이어 수만 바뀝니다. 캐릭터는 플레이어 탭에서 맞춰주세요.
-            </div>
-          )}
-
           <div className="mt-4 border-t border-dark-800 pt-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -499,7 +566,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
             {canConfigurePrivateChat && privateChat.enabled ? (
               <div className="mt-3">
-                <NumberStepper
+                <NumberInputField
                   label="최대 인원"
                   value={privateChat.maxGroupSize}
                   min={2}
@@ -512,9 +579,9 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           </div>
         </div>
 
-        <div className="h-full rounded-xl border border-dark-800 bg-dark-900/45 p-4">
+        <div className="rounded-xl border border-dark-800 bg-dark-900/45 p-4">
           <label className="block text-sm font-medium text-dark-200 mb-3">표기 난이도</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {DIFFICULTIES.map((difficulty) => (
               <button
                 key={difficulty.value}
@@ -542,15 +609,14 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[0.8fr_1.45fr_0.8fr]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           <div className="rounded-2xl border border-dark-800 bg-dark-950/25 p-4">
             <p className="mb-3 text-sm font-semibold text-dark-100">오프닝</p>
-            <NumberStepper
+            <TimeInputField
               label="시간"
               value={rules.openingDurationMinutes}
-              min={1}
-              max={30}
-              formatValue={formatDuration}
+              min={5}
+              max={60}
               onChange={(value) => updateRules({ openingDurationMinutes: value })}
             />
           </div>
@@ -560,8 +626,34 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               <p className="text-sm font-semibold text-dark-100">라운드</p>
               <span className="text-xs text-dark-500">{formatDuration(roundBlockMin)}</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <NumberStepper
+            <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-dark-800 bg-dark-950/35 p-1">
+              <button
+                type="button"
+                onClick={() => updateRoundPhaseMode(false)}
+                className={[
+                  "rounded-xl px-3 py-2 text-xs font-medium transition-colors",
+                  !splitRoundPhases
+                    ? "bg-mystery-900/50 text-mystery-200"
+                    : "text-dark-500 hover:text-dark-200",
+                ].join(" ")}
+              >
+                통합
+              </button>
+              <button
+                type="button"
+                onClick={() => updateRoundPhaseMode(true)}
+                className={[
+                  "rounded-xl px-3 py-2 text-xs font-medium transition-colors",
+                  splitRoundPhases
+                    ? "bg-mystery-900/50 text-mystery-200"
+                    : "text-dark-500 hover:text-dark-200",
+                ].join(" ")}
+              >
+                조사/토론 별도
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <NumberInputField
                 label="횟수"
                 value={rules.roundCount}
                 min={1}
@@ -569,29 +661,42 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                 formatValue={(value) => `${value}라운드`}
                 onChange={(value) => updateRules({ roundCount: value })}
               />
-              {rules.phases.map((phase, idx) => (
-                <NumberStepper
-                  key={phase.type}
-                  label={PHASE_LABELS[phase.type]}
-                  value={phase.durationMinutes}
-                  min={phase.type === "discussion" ? 0 : 3}
+              {splitRoundPhases ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <TimeInputField
+                    label="조사"
+                    value={investigationMinutes}
+                    min={5}
+                    max={60}
+                    onChange={(value) => updatePhaseDuration("investigation", value)}
+                  />
+                  <TimeInputField
+                    label="토론"
+                    value={discussionMinutes}
+                    min={5}
+                    max={60}
+                    onChange={(value) => updatePhaseDuration("discussion", value)}
+                  />
+                </div>
+              ) : (
+                <TimeInputField
+                  label="라운드 시간"
+                  value={investigationMinutes}
+                  min={5}
                   max={60}
-                  formatValue={formatDuration}
-                  onChange={(value) => updatePhase(idx, { durationMinutes: value })}
+                  onChange={(value) => updatePhaseDuration("investigation", value)}
                 />
-              ))}
+              )}
             </div>
           </div>
 
           <div className="rounded-2xl border border-dark-800 bg-dark-950/25 p-4">
             <p className="mb-3 text-sm font-semibold text-dark-100">투표/엔딩</p>
-            <NumberStepper
+            <TimeInputField
               label="시간"
               value={voteEndingMin}
               min={0}
-              max={120}
-              step={5}
-              formatValue={(value) => `${value}분`}
+              max={60}
               onChange={updateVoteEndingMinutes}
             />
           </div>

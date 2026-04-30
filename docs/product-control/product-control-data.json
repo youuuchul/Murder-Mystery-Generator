@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T09:42:17.438Z",
+  "generatedAt": "2026-04-30T09:59:36.533Z",
   "date": "2026-04-30",
   "title": "Murder Mystery Generator Product Control Inventory",
   "sourceFiles": [
@@ -1275,19 +1275,19 @@
       "owningRoute": "/maker/[gameId]/edit"
     },
     {
-      "file": "src/app/maker/[gameId]/edit/_components/VoteEndingEditor.tsx",
-      "component": "VoteEndingEditor",
+      "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
+      "component": "SettingsEditor",
       "type": "route-private component",
-      "lineCount": 698,
+      "lineCount": 708,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"
     },
     {
-      "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
-      "component": "SettingsEditor",
+      "file": "src/app/maker/[gameId]/edit/_components/VoteEndingEditor.tsx",
+      "component": "VoteEndingEditor",
       "type": "route-private component",
-      "lineCount": 603,
+      "lineCount": 698,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"

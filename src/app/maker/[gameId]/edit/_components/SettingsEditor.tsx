@@ -44,6 +44,66 @@ const PHASE_LABELS: Record<PhaseConfig["type"], string> = {
 const inputClass =
   "bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 
+function formatDuration(minutes: number): string {
+  return minutes === 0 ? "없음" : `${minutes}분`;
+}
+
+function getTimerTotalMinutes(rules: GameRules): number {
+  const roundTotal = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
+  return rules.openingDurationMinutes + roundTotal * rules.roundCount;
+}
+
+function NumberStepper({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  formatValue,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  formatValue?: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+  const displayValue = formatValue ? formatValue(value) : String(value);
+
+  return (
+    <div className="rounded-2xl border border-dark-800 bg-dark-950/35 p-3">
+      <div className="mb-2 text-xs font-medium text-dark-500">{label}</div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - step))}
+          disabled={!canDecrease}
+          className="h-9 w-9 rounded-lg border border-dark-700 bg-dark-800 text-base font-bold text-dark-200 transition-colors hover:bg-dark-700 disabled:cursor-default disabled:opacity-35"
+          aria-label={`${label} 줄이기`}
+        >
+          −
+        </button>
+        <span className="min-w-0 flex-1 rounded-lg border border-dark-800 bg-dark-900/70 px-2 py-2 text-center text-sm font-semibold text-dark-100">
+          {displayValue}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + step))}
+          disabled={!canIncrease}
+          className="h-9 w-9 rounded-lg border border-dark-700 bg-dark-800 text-base font-bold text-dark-200 transition-colors hover:bg-dark-700 disabled:cursor-default disabled:opacity-35"
+          aria-label={`${label} 늘리기`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsEditor({ game, onChange }: SettingsEditorProps) {
   const settings = game.settings;
   const rules = game.rules;
@@ -54,24 +114,28 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   const [uploadingCover, setUploadingCover] = useState(false);
 
   const privateChat = normalizePrivateChatConfig(settings.playerCount, rules?.privateChat);
-  const cardTradingEnabled = rules?.cardTrading?.enabled ?? true;
   const canConfigurePrivateChat = canUsePrivateChat(settings.playerCount);
+  const roundTotalMin = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
+  const timerTotalMin = getTimerTotalMinutes(rules);
+  const voteEndingMin = Math.max(0, settings.estimatedDuration - timerTotalMin);
+  const displayedEstimatedDuration = timerTotalMin + voteEndingMin;
 
   function updateSettings<K extends keyof GameSettings>(key: K, value: GameSettings[K]) {
     if (key === "playerCount") {
       setShowPlayerCountWarning(true);
       const nextPlayerCount = value as number;
+      const nextRules = {
+        ...rules,
+        phases: rules.phases.map((phase) => (
+          phase.type === "discussion" && nextPlayerCount <= 1
+            ? { ...phase, durationMinutes: 0 }
+            : phase
+        )),
+        privateChat: normalizePrivateChatConfig(nextPlayerCount, privateChat),
+      };
       onChange({
-        settings: { ...settings, [key]: value },
-        rules: {
-          ...rules,
-          phases: rules.phases.map((phase) => (
-            phase.type === "discussion" && nextPlayerCount <= 1
-              ? { ...phase, durationMinutes: 0 }
-              : phase
-          )),
-          privateChat: normalizePrivateChatConfig(nextPlayerCount, privateChat),
-        },
+        settings: { ...settings, [key]: value, estimatedDuration: getTimerTotalMinutes(nextRules) + voteEndingMin },
+        rules: nextRules,
       });
       return;
     }
@@ -79,7 +143,11 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
   }
 
   function updateRules(partial: Partial<GameRules>) {
-    onChange({ rules: { ...rules, ...partial } });
+    const nextRules = { ...rules, ...partial };
+    onChange({
+      rules: nextRules,
+      settings: { ...settings, estimatedDuration: getTimerTotalMinutes(nextRules) + voteEndingMin },
+    });
   }
 
   function updatePhase(idx: number, partial: Partial<PhaseConfig>) {
@@ -90,6 +158,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
   function updatePrivateChat(partial: Partial<GameRules["privateChat"]>) {
     updateRules({ privateChat: normalizePrivateChatConfig(settings.playerCount, { ...privateChat, ...partial }) });
+  }
+
+  function updateVoteEndingMinutes(nextMinutes: number) {
+    onChange({ settings: { ...settings, estimatedDuration: timerTotalMin + Math.max(0, nextMinutes) } });
   }
 
   function addTag(raw: string) {
@@ -134,16 +206,7 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
     }
   }
 
-  const roundTotalMin = rules.phases.reduce((sum, phase) => sum + phase.durationMinutes, 0);
-  const totalMin = rules.openingDurationMinutes + roundTotalMin * rules.roundCount;
   const roundBlockMin = roundTotalMin * rules.roundCount;
-  const estimateDeltaMin = settings.estimatedDuration - totalMin;
-  const estimateDeltaAbs = Math.abs(estimateDeltaMin);
-  const estimateDeltaLabel = estimateDeltaMin > 0
-    ? `표기 여유 ${estimateDeltaMin}분`
-    : estimateDeltaMin === 0
-      ? "타이머와 동일"
-      : `타이머 초과 ${estimateDeltaAbs}분`;
   const playerCountMismatch = characterCount > 0 && characterCount !== settings.playerCount;
   const coverImagePosition = resolveCoverImagePosition(settings.coverImagePosition);
   const coverPreviewUrl = settings.coverImageUrl
@@ -163,10 +226,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
 
   function updateCoverImagePosition(partial: Partial<CoverImagePosition>) {
     updateSettings("coverImagePosition", { ...coverImagePosition, ...partial });
-  }
-
-  function formatDuration(minutes: number): string {
-    return minutes === 0 ? "없음" : `${minutes}분`;
   }
 
   return (
@@ -412,6 +471,45 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               플레이어 수만 바뀝니다. 캐릭터는 플레이어 탭에서 맞춰주세요.
             </div>
           )}
+
+          <div className="mt-4 border-t border-dark-800 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-dark-200">밀담</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => canConfigurePrivateChat && updatePrivateChat({ enabled: !privateChat.enabled })}
+                disabled={!canConfigurePrivateChat}
+                className={[
+                  "relative h-6 w-11 rounded-full transition-colors",
+                  privateChat.enabled && canConfigurePrivateChat ? "bg-mystery-600" : "bg-dark-600",
+                  !canConfigurePrivateChat ? "cursor-not-allowed opacity-50" : "",
+                ].join(" ")}
+                aria-label="밀담 사용 여부"
+              >
+                <span
+                  className={[
+                    "absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    privateChat.enabled && canConfigurePrivateChat ? "translate-x-6" : "translate-x-1",
+                  ].join(" ")}
+                />
+              </button>
+            </div>
+
+            {canConfigurePrivateChat && privateChat.enabled ? (
+              <div className="mt-3">
+                <NumberStepper
+                  label="최대 인원"
+                  value={privateChat.maxGroupSize}
+                  min={2}
+                  max={Math.max(2, settings.playerCount - 1)}
+                  formatValue={(value) => `${value}인`}
+                  onChange={(value) => updatePrivateChat({ maxGroupSize: value })}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="h-full rounded-xl border border-dark-800 bg-dark-900/45 p-4">
@@ -436,218 +534,66 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-dark-200 mb-2">예상 소요 시간</label>
-        <div className="rounded-xl border border-dark-800 bg-dark-900/50 p-4 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-2xl font-bold text-dark-50">{settings.estimatedDuration}분</p>
-              <p className="mt-1 text-xs text-dark-500">
-                타이머 합계 {totalMin}분 · 투표/엔딩은 별도
-              </p>
-            </div>
-            <span
-              className={[
-                "rounded-full border px-3 py-1 text-xs",
-                estimateDeltaMin >= 0
-                  ? "border-dark-700 bg-dark-950/60 text-dark-300"
-                  : "border-yellow-900/70 bg-yellow-950/20 text-yellow-300",
-              ].join(" ")}
-            >
-              {estimateDeltaLabel}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min={30}
-              max={300}
-              step={15}
-              value={settings.estimatedDuration}
-              onChange={(e) => updateSettings("estimatedDuration", Number(e.target.value))}
-              className="flex-1 accent-mystery-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-dark-800 pt-8 space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-dark-100">게임 규칙</h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-xs font-medium text-dark-400 mb-2">
-              총 라운드 수 <span className="text-dark-600">(조사→토론 반복)</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => updateRules({ roundCount: Math.max(1, rules.roundCount - 1) })}
-                className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors"
-              >
-                −
-              </button>
-              <span className="flex-1 text-center text-xl font-bold text-dark-50">
-                {rules.roundCount}
-                <span className="text-sm font-normal text-dark-400 ml-1">라운드</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => updateRules({ roundCount: Math.min(10, rules.roundCount + 1) })}
-                className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center">
-            <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 w-full text-sm text-dark-400 space-y-1">
-              <p className="font-medium text-dark-200 mb-2">진행 타이머 합계</p>
-              <div className="flex justify-between">
-                <span>오프닝</span>
-                <span className="text-dark-300">{rules.openingDurationMinutes}분</span>
-              </div>
-              <div className="flex justify-between">
-                <span>1라운드 합계</span>
-                <span className="text-dark-300">{roundTotalMin}분</span>
-              </div>
-              <div className="flex justify-between">
-                <span>라운드 전체</span>
-                <span className="text-dark-300">{roundBlockMin}분</span>
-              </div>
-              <div className="flex justify-between">
-                <span>투표/엔딩</span>
-                <span className="text-dark-500">별도</span>
-              </div>
-              <div className="border-t border-dark-700 pt-1 mt-1 flex justify-between text-mystery-400 font-semibold">
-                <span>타이머 합계</span>
-                <span>{totalMin}분</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-dark-400 mb-3">오프닝 제한 시간</label>
-          <div className="flex items-center gap-3 bg-dark-800/50 border border-dark-700 rounded-lg px-4 py-3">
-            <span className="text-sm font-medium text-dark-200 w-20">오프닝</span>
-            <input
-              type="range"
-              min={1}
-              max={30}
-              step={1}
-              value={rules.openingDurationMinutes}
-              onChange={(e) => updateRules({ openingDurationMinutes: Number(e.target.value) })}
-              className="flex-1 accent-mystery-500"
-            />
-            <span className="text-dark-300 text-sm w-12 text-right">{rules.openingDurationMinutes}분</span>
-          </div>
-          <p className="mt-2 text-xs text-dark-500">공통화면과 GM 화면 타이머에 적용됩니다.</p>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-dark-400 mb-3">페이즈별 시간</label>
-          <div className="space-y-2">
-            {rules.phases.map((phase, idx) => (
-              <div key={phase.type} className="flex items-center gap-3 bg-dark-800/50 border border-dark-700 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-dark-200 w-20">{PHASE_LABELS[phase.type]}</span>
-                <input
-                  type="range"
-                  min={phase.type === "discussion" ? 0 : 3}
-                  max={60}
-                  step={1}
-                  value={phase.durationMinutes}
-                  onChange={(e) => updatePhase(idx, { durationMinutes: Number(e.target.value) })}
-                  className="flex-1 accent-mystery-500"
-                />
-                <span className="text-dark-300 text-sm w-12 text-right">{formatDuration(phase.durationMinutes)}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-dark-500">
-            토론을 0분으로 두면 조사 후 바로 다음 라운드 또는 투표로 넘어갑니다.
+      <div data-maker-anchor="step-1-duration" className="rounded-2xl border border-dark-800 bg-dark-900/50 p-5 space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <label className="block text-sm font-medium text-dark-200">예상 소요 시간</label>
+          <p className="text-3xl font-bold tracking-tight text-dark-50">
+            총 {displayedEstimatedDuration}분
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-dark-200">밀담 (사적 대화)</p>
-                <p className="text-xs text-dark-500 mt-0.5">조사 페이즈 중 소그룹 비밀 대화</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => canConfigurePrivateChat && updatePrivateChat({ enabled: !privateChat.enabled })}
-                disabled={!canConfigurePrivateChat}
-                className={[
-                  "relative w-11 h-6 rounded-full transition-colors",
-                  privateChat.enabled && canConfigurePrivateChat ? "bg-mystery-600" : "bg-dark-600",
-                  !canConfigurePrivateChat ? "cursor-not-allowed opacity-60" : "",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    "absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
-                    privateChat.enabled && canConfigurePrivateChat ? "translate-x-6" : "translate-x-1",
-                  ].join(" ")}
-                />
-              </button>
-            </div>
-
-            {!canConfigurePrivateChat ? (
-              <p className="rounded-lg border border-dark-700 bg-dark-900/40 px-3 py-2 text-xs text-dark-500">
-                밀담은 플레이어 3명 이상일 때만 사용할 수 있습니다.
-              </p>
-            ) : privateChat.enabled && (
-              <div className="space-y-3 pt-1 border-t border-dark-700">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-dark-400">최대 인원</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updatePrivateChat({ maxGroupSize: Math.max(2, privateChat.maxGroupSize - 1) })}
-                      className="w-7 h-7 rounded border border-dark-600 bg-dark-700 text-dark-200 hover:bg-dark-600 flex items-center justify-center text-sm font-bold transition-colors"
-                    >
-                      −
-                    </button>
-                    <span className="text-dark-100 font-medium w-8 text-center">{privateChat.maxGroupSize}인</span>
-                    <button
-                      type="button"
-                      onClick={() => updatePrivateChat({ maxGroupSize: Math.min(Math.max(2, settings.playerCount - 1), privateChat.maxGroupSize + 1) })}
-                      className="w-7 h-7 rounded border border-dark-600 bg-dark-700 text-dark-200 hover:bg-dark-600 flex items-center justify-center text-sm font-bold transition-colors"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            )}
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[0.8fr_1.45fr_0.8fr]">
+          <div className="rounded-2xl border border-dark-800 bg-dark-950/25 p-4">
+            <p className="mb-3 text-sm font-semibold text-dark-100">오프닝</p>
+            <NumberStepper
+              label="시간"
+              value={rules.openingDurationMinutes}
+              min={1}
+              max={30}
+              formatValue={formatDuration}
+              onChange={(value) => updateRules({ openingDurationMinutes: value })}
+            />
           </div>
 
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-dark-200">카드 주고받기</p>
-                <p className="text-xs text-dark-500 mt-0.5">단서 카드를 서로 전달할 수 있음</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateRules({ cardTrading: { enabled: !cardTradingEnabled } })}
-                className={["relative w-11 h-6 rounded-full transition-colors", cardTradingEnabled ? "bg-mystery-600" : "bg-dark-600"].join(" ")}
-              >
-                <span
-                  className={[
-                    "absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
-                    cardTradingEnabled ? "translate-x-6" : "translate-x-1",
-                  ].join(" ")}
-                />
-              </button>
+          <div className="rounded-2xl border border-dark-800 bg-dark-950/25 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-dark-100">라운드</p>
+              <span className="text-xs text-dark-500">{formatDuration(roundBlockMin)}</span>
             </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <NumberStepper
+                label="횟수"
+                value={rules.roundCount}
+                min={1}
+                max={10}
+                formatValue={(value) => `${value}라운드`}
+                onChange={(value) => updateRules({ roundCount: value })}
+              />
+              {rules.phases.map((phase, idx) => (
+                <NumberStepper
+                  key={phase.type}
+                  label={PHASE_LABELS[phase.type]}
+                  value={phase.durationMinutes}
+                  min={phase.type === "discussion" ? 0 : 3}
+                  max={60}
+                  formatValue={formatDuration}
+                  onChange={(value) => updatePhase(idx, { durationMinutes: value })}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-dark-800 bg-dark-950/25 p-4">
+            <p className="mb-3 text-sm font-semibold text-dark-100">투표/엔딩</p>
+            <NumberStepper
+              label="시간"
+              value={voteEndingMin}
+              min={0}
+              max={120}
+              step={5}
+              formatValue={(value) => `${value}분`}
+              onChange={updateVoteEndingMinutes}
+            />
           </div>
         </div>
       </div>

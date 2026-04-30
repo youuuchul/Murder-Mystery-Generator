@@ -839,6 +839,7 @@ export default function LocationEditor({
   const locationsWithImages = locations.filter((location) => Boolean(location.imageUrl)).length;
   const lockedLocations = locations.filter((location) => location.unlocksAtRound !== null).length;
   const conditionalClues = clues.filter((clue) => Boolean(clue.condition)).length;
+  const cardTradingEnabled = rules.cardTrading?.enabled ?? true;
 
   return (
     <div data-maker-anchor="step-4-locations" className="space-y-6">
@@ -855,12 +856,11 @@ export default function LocationEditor({
       {/* 획득/방문 규칙 설정 */}
       <div className="bg-dark-900 border border-dark-700 rounded-xl p-4 space-y-4">
         <p className="text-sm font-medium text-dark-300">단서 획득 규칙</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* 라운드당 획득 수 */}
           <div>
             <label className="block text-xs font-medium text-dark-400 mb-1">
-              라운드당 최대 획득 단서 수
-              <span className="text-dark-600 font-normal ml-1">(0 = 무제한)</span>
+              라운드당 획득 수
             </label>
             <input
               type="number"
@@ -872,12 +872,6 @@ export default function LocationEditor({
               }
               className={inputClass}
             />
-            {(rules.cluesPerRound ?? 0) > 0 && (
-              <p className="text-xs text-mystery-500 mt-1">
-                플레이어는 라운드당 최대 {rules.cluesPerRound}개 단서를 획득할 수 있습니다.
-                라운드가 바뀌면 초기화됩니다.
-              </p>
-            )}
           </div>
 
           {/* 같은 라운드 재방문 */}
@@ -904,6 +898,39 @@ export default function LocationEditor({
                 className={[
                   "flex-1 py-2 text-sm rounded-lg border transition-colors",
                   (rules.allowLocationRevisit ?? true)
+                    ? "border-sage-700 bg-sage-900/25 text-sage-300"
+                    : "border-dark-600 text-dark-500 hover:border-dark-500",
+                ].join(" ")}
+              >
+                허용
+              </button>
+            </div>
+          </div>
+
+          {/* 카드 주고받기 */}
+          <div>
+            <label className="block text-xs font-medium text-dark-400 mb-2">
+              카드 주고받기
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onChangeRules({ ...rules, cardTrading: { enabled: false } })}
+                className={[
+                  "flex-1 py-2 text-sm rounded-lg border transition-colors",
+                  !cardTradingEnabled
+                    ? "border-mystery-600 bg-mystery-900/40 text-mystery-300"
+                    : "border-dark-600 text-dark-500 hover:border-dark-500",
+                ].join(" ")}
+              >
+                불가
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRules({ ...rules, cardTrading: { enabled: true } })}
+                className={[
+                  "flex-1 py-2 text-sm rounded-lg border transition-colors",
+                  cardTradingEnabled
                     ? "border-sage-700 bg-sage-900/25 text-sage-300"
                     : "border-dark-600 text-dark-500 hover:border-dark-500",
                 ].join(" ")}

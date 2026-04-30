@@ -53,6 +53,7 @@ for (const row of contentRows) {
     cover_image_url: game.settings?.coverImageUrl || null,
     cover_image_position_x: game.settings?.coverImagePosition?.x ?? 50,
     cover_image_position_y: game.settings?.coverImagePosition?.y ?? 50,
+    cover_image_zoom: game.settings?.coverImagePosition?.zoom ?? 1,
     opening_duration_minutes: game.rules?.openingDurationMinutes ?? 5,
     phases: game.rules?.phases ?? [],
     private_chat_config: game.rules?.privateChat ?? { enabled: false, maxGroupSize: 2, durationMinutes: 5 },

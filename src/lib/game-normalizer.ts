@@ -485,6 +485,20 @@ function clampCoverAxis(value: unknown): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
+function clampCoverZoom(value: unknown): number {
+  const numericValue = typeof value === "number"
+    ? value
+    : typeof value === "string"
+      ? Number(value)
+      : NaN;
+
+  if (Number.isFinite(numericValue) === false) {
+    return 1;
+  }
+
+  return Math.min(2.5, Math.max(1, Math.round(numericValue * 100) / 100));
+}
+
 function normalizeCoverImagePosition(value: unknown): CoverImagePosition | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -494,6 +508,7 @@ function normalizeCoverImagePosition(value: unknown): CoverImagePosition | undef
   return {
     x: clampCoverAxis(source.x),
     y: clampCoverAxis(source.y),
+    zoom: clampCoverZoom(source.zoom),
   };
 }
 

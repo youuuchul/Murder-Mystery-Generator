@@ -28,6 +28,7 @@ const SOURCE_FILES = [
   "supabase/migrations/20260411_000007_advanced_gameplay.sql",
   "supabase/migrations/20260411_000008_vote_ending_restructure.sql",
   "supabase/migrations/20260427_000001_vote_question_personal_target.sql",
+  "supabase/migrations/20260430_000001_cover_image_zoom.sql",
   "scripts/sync-screens.mjs",
 ];
 
@@ -539,9 +540,11 @@ async function buildData() {
     exists: row.path.endsWith("/") ? docsFiles.some((file) => file.startsWith(row.path)) : docsFiles.includes(row.path),
   }));
 
+  const generatedAt = new Date();
+
   return {
-    generatedAt: new Date().toISOString(),
-    date: "2026-04-28",
+    generatedAt: generatedAt.toISOString(),
+    date: generatedAt.toISOString().slice(0, 10),
     title: "Murder Mystery Generator Product Control Inventory",
     sourceFiles: SOURCE_FILES,
     summary: {

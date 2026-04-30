@@ -41,6 +41,7 @@ interface GamesRow {
   cover_image_url: string | null;
   cover_image_position_x: number;
   cover_image_position_y: number;
+  cover_image_zoom?: number | string | null;
   opening_duration_minutes: number;
   phases: unknown;
   private_chat_config: unknown;
@@ -51,6 +52,20 @@ interface GamesRow {
 }
 
 // ─── Helpers ───────────────────────────────────────────────
+
+function toCoverImageZoom(value: unknown): number {
+  const numericValue = typeof value === "number"
+    ? value
+    : typeof value === "string"
+      ? Number(value)
+      : NaN;
+
+  if (Number.isFinite(numericValue) === false) {
+    return 1;
+  }
+
+  return Math.min(2.5, Math.max(1, Math.round(numericValue * 100) / 100));
+}
 
 function buildMetadataFromRow(row: GamesRow): GameMetadata {
   // lifecycle_status는 저장 시점 getGamePublishReadiness 결과를 그대로 반영한다.
@@ -93,7 +108,7 @@ function buildMetadataFromRow(row: GamesRow): GameMetadata {
       coverImageUrl: row.cover_image_url ?? undefined,
       coverImagePosition:
         row.cover_image_url
-          ? { x: row.cover_image_position_x, y: row.cover_image_position_y }
+          ? { x: row.cover_image_position_x, y: row.cover_image_position_y, zoom: toCoverImageZoom(row.cover_image_zoom) }
           : undefined,
     },
     playerCount: row.player_count,
@@ -143,6 +158,7 @@ function buildGamesRowFromPackage(game: GamePackage): Record<string, unknown> {
     cover_image_url: game.settings.coverImageUrl ?? null,
     cover_image_position_x: game.settings.coverImagePosition?.x ?? 50,
     cover_image_position_y: game.settings.coverImagePosition?.y ?? 50,
+    cover_image_zoom: game.settings.coverImagePosition?.zoom ?? 1,
     opening_duration_minutes: game.rules.openingDurationMinutes,
     phases: game.rules.phases,
     private_chat_config: game.rules.privateChat,
@@ -334,7 +350,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       summary: g.summary ?? undefined,
       coverImageUrl: g.cover_image_url ?? undefined,
       coverImagePosition: g.cover_image_url
-        ? { x: g.cover_image_position_x, y: g.cover_image_position_y }
+        ? { x: g.cover_image_position_x, y: g.cover_image_position_y, zoom: toCoverImageZoom(g.cover_image_zoom) }
         : undefined,
     },
     rules: {

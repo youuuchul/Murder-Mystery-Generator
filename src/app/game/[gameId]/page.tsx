@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getCoverImageObjectStyle } from "@/lib/cover-image-style";
 import { isPubliclyAccessible } from "@/lib/game-access";
 import { getGame } from "@/lib/game-repository";
 import { withGameAssetVariant } from "@/lib/game-asset-variant";
@@ -157,9 +158,7 @@ function CoverHero({
             priority
             sizes="(min-width: 768px) 672px, 100vw"
             className="object-cover"
-            style={{
-              objectPosition: `${imagePosition?.x ?? 50}% ${imagePosition?.y ?? 50}%`,
-            }}
+            style={getCoverImageObjectStyle(imagePosition)}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/40 to-transparent" />
         </>

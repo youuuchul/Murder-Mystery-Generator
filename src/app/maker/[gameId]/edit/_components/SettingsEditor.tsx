@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { getCoverImageObjectStyle, resolveCoverImagePosition } from "@/lib/cover-image-style";
 import { canUsePrivateChat, normalizePrivateChatConfig } from "@/lib/game-rules";
 import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import ImageAssetField from "./ImageAssetField";
-import type { GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
+import type { CoverImagePosition, GamePackage, GameSettings, GameRules, PhaseConfig } from "@/types/game";
 
 interface SettingsEditorProps {
   game: GamePackage;
@@ -141,6 +142,15 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       ? "타이머와 동일"
       : `타이머 초과 ${estimateDeltaAbs}분`;
   const playerCountMismatch = characterCount > 0 && characterCount !== settings.playerCount;
+  const coverImagePosition = resolveCoverImagePosition(settings.coverImagePosition);
+  const coverPreviewUrl = settings.coverImageUrl
+    ? withGameAssetVariant(settings.coverImageUrl, "display") ?? settings.coverImageUrl
+    : undefined;
+  const coverZoomPercent = Math.round(coverImagePosition.zoom * 100);
+
+  function updateCoverImagePosition(partial: Partial<CoverImagePosition>) {
+    updateSettings("coverImagePosition", { ...coverImagePosition, ...partial });
+  }
 
   function formatDuration(minutes: number): string {
     return minutes === 0 ? "없음" : `${minutes}분`;
@@ -196,69 +206,84 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           <div className="rounded-xl border border-dark-800 bg-dark-950/40 p-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-dark-200">카드 썸네일 위치</p>
+                <p className="text-sm font-medium text-dark-200">표지 크롭</p>
               </div>
               <button
                 type="button"
-                onClick={() => updateSettings("coverImagePosition", { x: 50, y: 50 })}
+                onClick={() => updateCoverImagePosition({ x: 50, y: 50, zoom: 1 })}
                 className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
               >
-                가운데로 초기화
+                중앙
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="space-y-4">
-                <label className="block space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
-                    <span>좌우 위치</span>
-                    <span>{settings.coverImagePosition?.x ?? 50}%</span>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div>
+                <div className="overflow-hidden rounded-2xl border border-dark-700 bg-dark-950/60">
+                  <div className="relative aspect-[16/10]">
+                    <img
+                      src={coverPreviewUrl}
+                      alt={game.title || "표지 위치 미리보기"}
+                      className="h-full w-full object-cover"
+                      style={getCoverImageObjectStyle(coverImagePosition)}
+                    />
+                    <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={settings.coverImagePosition?.x ?? 50}
-                    onChange={(event) => updateSettings("coverImagePosition", {
-                      x: Number(event.target.value),
-                      y: settings.coverImagePosition?.y ?? 50,
-                    })}
-                    className="w-full accent-mystery-500"
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
-                    <span>상하 위치</span>
-                    <span>{settings.coverImagePosition?.y ?? 50}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={settings.coverImagePosition?.y ?? 50}
-                    onChange={(event) => updateSettings("coverImagePosition", {
-                      x: settings.coverImagePosition?.x ?? 50,
-                      y: Number(event.target.value),
-                    })}
-                    className="w-full accent-mystery-500"
-                  />
-                </label>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-dark-500">
+                  <span>라이브러리 카드 기준</span>
+                  <span>{coverImagePosition.x}% / {coverImagePosition.y}% / {coverZoomPercent}%</span>
+                </div>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-950/60">
-                <div className="relative aspect-[16/10]">
-                  <img
-                    src={withGameAssetVariant(settings.coverImageUrl, "display") ?? settings.coverImageUrl}
-                    alt={game.title || "표지 위치 미리보기"}
-                    className="h-full w-full object-cover"
-                    style={{
-                      objectPosition: `${settings.coverImagePosition?.x ?? 50}% ${settings.coverImagePosition?.y ?? 50}%`,
-                    }}
+              <div className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
+                    <span>좌우</span>
+                    <span>{coverImagePosition.x}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={coverImagePosition.x}
+                    onChange={(event) => updateCoverImagePosition({ x: Number(event.target.value) })}
+                    className="w-full accent-mystery-500"
                   />
-                </div>
+                </label>
+
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
+                    <span>상하</span>
+                    <span>{coverImagePosition.y}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={coverImagePosition.y}
+                    onChange={(event) => updateCoverImagePosition({ y: Number(event.target.value) })}
+                    className="w-full accent-mystery-500"
+                  />
+                </label>
+
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-dark-400">
+                    <span>확대</span>
+                    <span>{coverZoomPercent}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={2.5}
+                    step={0.05}
+                    value={coverImagePosition.zoom}
+                    onChange={(event) => updateCoverImagePosition({ zoom: Number(event.target.value) })}
+                    className="w-full accent-mystery-500"
+                  />
+                </label>
               </div>
             </div>
           </div>

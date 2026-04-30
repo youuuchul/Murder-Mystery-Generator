@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { getCoverImageObjectStyle } from "@/lib/cover-image-style";
 import { withGameAssetVariant } from "@/lib/game-asset-variant";
 import type { CoverImagePosition } from "@/types/game";
 
@@ -25,9 +26,7 @@ export default function LibraryCover({ title, imageUrl, imagePosition }: Library
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             className="absolute inset-0 h-full w-full object-cover object-center"
-            style={{
-              objectPosition: `${imagePosition?.x ?? 50}% ${imagePosition?.y ?? 50}%`,
-            }}
+            style={getCoverImageObjectStyle(imagePosition)}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
         </>

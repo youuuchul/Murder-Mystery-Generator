@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-28T00:43:40.907Z",
-  "date": "2026-04-28",
+  "generatedAt": "2026-04-30T08:32:08.808Z",
+  "date": "2026-04-30",
   "title": "Murder Mystery Generator Product Control Inventory",
   "sourceFiles": [
     "docs/STATUS.md",
@@ -16,13 +16,14 @@
     "supabase/migrations/20260411_000007_advanced_gameplay.sql",
     "supabase/migrations/20260411_000008_vote_ending_restructure.sql",
     "supabase/migrations/20260427_000001_vote_question_personal_target.sql",
+    "supabase/migrations/20260430_000001_cover_image_zoom.sql",
     "scripts/sync-screens.mjs"
   ],
   "summary": {
     "screensInDocs": 34,
     "pageRoutes": 17,
     "apiRoutes": 23,
-    "components": 42,
+    "components": 43,
     "largeComponents": 10,
     "dbControlRows": 11,
     "gaps": 7,
@@ -1050,7 +1051,7 @@
       "docsStatus": "문서화",
       "category": "게임 상세",
       "ownerSurface": "공개 커버",
-      "imports": "next/image, next/link, next/navigation, @/lib/game-access, @/lib/game-repository, @/lib/maker-auth-gateway, @/lib/maker-user.server, @/lib/maker-role, @/types/game, ./_components/StartPlayerSessionButton"
+      "imports": "next/image, next/link, next/navigation, @/lib/cover-image-style, @/lib/game-access, @/lib/game-repository, @/lib/game-asset-variant, @/lib/maker-auth-gateway, @/lib/maker-user.server, @/lib/maker-role, @/types/game, ./_components/StartPlayerSessionButton"
     },
     {
       "kind": "Page",
@@ -1105,7 +1106,7 @@
       "docsStatus": "문서화",
       "category": "플레이어 진입",
       "ownerSurface": "플레이어 진입",
-      "imports": "react, next/image, next/navigation, @/lib/ai/player-agent/core/player-agent-state, @/lib/player-session-cookie, @/lib/session-sanitizer, @/types/game"
+      "imports": "react, next/image, next/navigation, @/lib/ai/player-agent/core/player-agent-state, @/lib/game-asset-variant, @/lib/player-session-cookie, @/lib/session-sanitizer, @/types/game"
     },
     {
       "kind": "Page",
@@ -1223,7 +1224,7 @@
       "file": "src/app/play/[gameId]/[charId]/_components/PlayerView.tsx",
       "component": "PlayerView",
       "type": "route-private component",
-      "lineCount": 3253,
+      "lineCount": 3142,
       "importCount": 1,
       "risk": "P1 과대 컴포넌트",
       "owningRoute": "/play/[gameId]/[charId]"
@@ -1232,7 +1233,7 @@
       "file": "src/app/play/[gameId]/_components/GMDashboard.tsx",
       "component": "GMDashboard",
       "type": "route-private component",
-      "lineCount": 2160,
+      "lineCount": 1842,
       "importCount": 1,
       "risk": "P1 과대 컴포넌트",
       "owningRoute": "/play/[gameId]"
@@ -1241,7 +1242,7 @@
       "file": "src/app/maker/[gameId]/edit/_components/PlayerEditor.tsx",
       "component": "PlayerEditor",
       "type": "route-private component",
-      "lineCount": 1620,
+      "lineCount": 1799,
       "importCount": 1,
       "risk": "P1 과대 컴포넌트",
       "owningRoute": "/maker/[gameId]/edit"
@@ -1250,7 +1251,7 @@
       "file": "src/app/maker/[gameId]/edit/_components/LocationEditor.tsx",
       "component": "LocationEditor",
       "type": "route-private component",
-      "lineCount": 1007,
+      "lineCount": 977,
       "importCount": 1,
       "risk": "P1 과대 컴포넌트",
       "owningRoute": "/maker/[gameId]/edit"
@@ -1268,7 +1269,7 @@
       "file": "src/app/maker/[gameId]/edit/_components/MakerEditor.tsx",
       "component": "MakerEditor",
       "type": "route-private component",
-      "lineCount": 784,
+      "lineCount": 786,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"
@@ -1277,16 +1278,16 @@
       "file": "src/app/maker/[gameId]/edit/_components/VoteEndingEditor.tsx",
       "component": "VoteEndingEditor",
       "type": "route-private component",
-      "lineCount": 696,
+      "lineCount": 698,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"
     },
     {
-      "file": "src/app/maker/[gameId]/edit/_components/ScriptEditor.tsx",
-      "component": "ScriptEditor",
+      "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
+      "component": "SettingsEditor",
       "type": "route-private component",
-      "lineCount": 602,
+      "lineCount": 638,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"
@@ -1301,10 +1302,10 @@
       "owningRoute": "/library"
     },
     {
-      "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
-      "component": "SettingsEditor",
+      "file": "src/app/maker/[gameId]/edit/_components/ScriptEditor.tsx",
+      "component": "ScriptEditor",
       "type": "route-private component",
-      "lineCount": 599,
+      "lineCount": 518,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"
@@ -1373,15 +1374,6 @@
       "owningRoute": "/library"
     },
     {
-      "file": "src/app/maker/[gameId]/edit/_components/ImageAssetField.tsx",
-      "component": "ImageAssetField",
-      "type": "route-private component",
-      "lineCount": 224,
-      "importCount": 5,
-      "risk": "정상",
-      "owningRoute": "/maker/[gameId]/edit"
-    },
-    {
       "file": "src/app/maker/new/_components/StepWizard.tsx",
       "component": "StepWizard",
       "type": "route-private component",
@@ -1409,6 +1401,15 @@
       "owningRoute": "/game/[gameId]"
     },
     {
+      "file": "src/app/maker/[gameId]/edit/_components/ImageAssetField.tsx",
+      "component": "ImageAssetField",
+      "type": "route-private component",
+      "lineCount": 151,
+      "importCount": 5,
+      "risk": "정상",
+      "owningRoute": "/maker/[gameId]/edit"
+    },
+    {
       "file": "src/app/library/_components/MobileNavMenu.tsx",
       "component": "MobileNavMenu",
       "type": "route-private component",
@@ -1425,6 +1426,15 @@
       "importCount": 1,
       "risk": "정상",
       "owningRoute": "/maker/new"
+    },
+    {
+      "file": "src/app/play/_components/SessionPhaseTimerCard.tsx",
+      "component": "SessionPhaseTimerCard",
+      "type": "route-private component",
+      "lineCount": 130,
+      "importCount": 2,
+      "risk": "정상",
+      "owningRoute": "/play"
     },
     {
       "file": "src/app/library/_components/PublicGameCard.tsx",
@@ -1593,7 +1603,7 @@
       "component": "Card",
       "type": "공용 UI primitive",
       "lineCount": 23,
-      "importCount": 2,
+      "importCount": 4,
       "risk": "정상",
       "owningRoute": ""
     }

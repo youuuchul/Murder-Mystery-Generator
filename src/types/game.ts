@@ -48,6 +48,7 @@ export interface GameSettings {
 export interface CoverImagePosition {
   x: number;
   y: number;
+  zoom?: number;
 }
 
 export interface PhaseConfig {

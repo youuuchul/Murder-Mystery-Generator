@@ -53,6 +53,11 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
+function parseBoundedNumber(rawValue: string, min: number, max: number): number {
+  const numericValue = Number(rawValue.replace(/[^\d]/g, ""));
+  return clampNumber(numericValue, min, max);
+}
+
 function NumberInputField({
   label,
   value,
@@ -69,23 +74,22 @@ function NumberInputField({
   onChange: (value: number) => void;
 }) {
   const displayValue = formatValue ? formatValue(value) : String(value);
+  const unitLabel = formatValue ? displayValue.replace(String(value), "") : "";
 
   return (
     <div className="rounded-2xl border border-dark-800 bg-dark-950/35 p-3">
       <div className="mb-2 text-xs font-medium text-dark-500">{label}</div>
-      <div className="relative">
+      <div className="relative rounded-lg border border-dark-600 bg-dark-800 transition focus-within:border-transparent focus-within:ring-2 focus-within:ring-mystery-500">
         <input
-          type="number"
-          min={min}
-          max={max}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           value={value}
-          onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
-          className={`w-full pr-12 text-center font-semibold ${inputClass}`}
+          onChange={(event) => onChange(parseBoundedNumber(event.target.value, min, max))}
+          className="w-full rounded-lg bg-transparent px-3 py-2 pr-12 text-center text-sm font-semibold text-dark-100 outline-none"
         />
-        {formatValue ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">
-            {displayValue.replace(String(value), "")}
-          </span>
+        {unitLabel ? (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">{unitLabel}</span>
         ) : null}
       </div>
     </div>
@@ -112,15 +116,15 @@ function TimeInputField({
   return (
     <div className="rounded-2xl border border-dark-800 bg-dark-950/35 p-3">
       <div className="mb-2 text-xs font-medium text-dark-500">{label}</div>
-      <div className="grid grid-cols-[minmax(0,1fr)_118px] gap-2">
-        <label className="relative block">
+      <div className="grid grid-cols-[minmax(0,1fr)_120px] overflow-hidden rounded-lg border border-dark-600 bg-dark-800 transition focus-within:border-transparent focus-within:ring-2 focus-within:ring-mystery-500">
+        <label className="relative block min-w-0">
           <input
-            type="number"
-            min={min}
-            max={max}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={value}
-            onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
-            className={`w-full pr-10 text-center font-semibold ${inputClass}`}
+            onChange={(event) => onChange(parseBoundedNumber(event.target.value, min, max))}
+            className="w-full bg-transparent px-3 py-2 pr-9 text-center text-sm font-semibold text-dark-100 outline-none"
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">분</span>
         </label>
@@ -130,10 +134,10 @@ function TimeInputField({
             if (!event.target.value) return;
             onChange(Number(event.target.value));
           }}
-          className={`${inputClass} w-full text-xs`}
+          className="h-full w-full border-l border-dark-600 bg-dark-900 px-3 py-2 text-xs text-dark-200 outline-none transition-colors hover:bg-dark-800"
           aria-label={`${label} 빠른 선택`}
         >
-          <option value="">5분 단위</option>
+          <option value="">빠른 선택</option>
           {quickOptions.map((option) => (
             <option key={option} value={option}>
               {option}분

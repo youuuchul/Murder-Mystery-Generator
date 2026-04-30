@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T09:59:36.533Z",
+  "generatedAt": "2026-04-30T10:13:00.173Z",
   "date": "2026-04-30",
   "title": "Murder Mystery Generator Product Control Inventory",
   "sourceFiles": [
@@ -1278,7 +1278,7 @@
       "file": "src/app/maker/[gameId]/edit/_components/SettingsEditor.tsx",
       "component": "SettingsEditor",
       "type": "route-private component",
-      "lineCount": 708,
+      "lineCount": 712,
       "importCount": 1,
       "risk": "P2 분리 검토",
       "owningRoute": "/maker/[gameId]/edit"

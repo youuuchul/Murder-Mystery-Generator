@@ -87,6 +87,11 @@ function phaseLabel(p: string, subPhase?: string) {
   return PHASE_LABEL[p] ?? p;
 }
 
+/** 기존 데이터에 설정값이 없으면 카드 양도를 허용하던 기존 동작을 유지한다. */
+function isCardTradingEnabled(game: Pick<GamePackage, "rules">): boolean {
+  return game.rules?.cardTrading?.enabled ?? true;
+}
+
 const VICTORY_COLOR: Record<string, string> = {
   "avoid-arrest":   "text-red-300 border-red-700 bg-red-950/20",
   uncertain:        "text-yellow-300 border-yellow-700 bg-yellow-950/20",
@@ -452,6 +457,7 @@ function CardDetailModal({
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
+  const cardTradingEnabled = isCardTradingEnabled(game);
 
   const candidates = joinedSlots
     .filter((slot) => slot.playerId !== myPlayerId)
@@ -522,7 +528,7 @@ function CardDetailModal({
         </div>
 
         {/* 양도 */}
-        {candidates.length > 0 && (
+        {cardTradingEnabled && candidates.length > 0 && (
           <div className="space-y-3">
             {!showTransferForm ? (
               <button

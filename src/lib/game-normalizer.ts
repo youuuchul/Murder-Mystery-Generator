@@ -477,6 +477,20 @@ function normalizeTags(settings: Partial<GameSettings> & { theme?: string; tone?
   return Array.from(new Set(normalized));
 }
 
+function normalizePlayerCount(value: unknown): number {
+  if (typeof value !== "number" || Number.isFinite(value) === false) {
+    return 5;
+  }
+
+  return Math.min(15, Math.max(1, Math.round(value)));
+}
+
+function normalizeDifficulty(value: unknown): GameSettings["difficulty"] {
+  return value === "easy" || value === "normal" || value === "hard"
+    ? value
+    : "normal";
+}
+
 function clampCoverAxis(value: unknown): number {
   if (typeof value !== "number" || Number.isFinite(value) === false) {
     return 50;
@@ -515,8 +529,8 @@ function normalizeCoverImagePosition(value: unknown): CoverImagePosition | undef
 /** 기존/신규 게임 데이터 모두를 현재 편집기 구조에 맞춰 정규화한다. */
 export function normalizeGame(game: GamePackage): GamePackage {
   const settings: GameSettings = {
-    playerCount: game.settings?.playerCount ?? 5,
-    difficulty: game.settings?.difficulty ?? "normal",
+    playerCount: normalizePlayerCount(game.settings?.playerCount),
+    difficulty: normalizeDifficulty(game.settings?.difficulty),
     estimatedDuration: game.settings?.estimatedDuration ?? 120,
     tags: normalizeTags(game.settings ?? {}),
     summary: asOptionalString(game.settings?.summary),

@@ -27,10 +27,13 @@ const TAG_SUGGESTION_GROUPS: { label: string; tags: string[] }[] = [
   },
 ];
 
+const MIN_PLAYER_COUNT = 1;
+const MAX_PLAYER_COUNT = 15;
+
 const DIFFICULTIES = [
-  { value: "easy", label: "쉬움", desc: "초보자 권장" },
-  { value: "normal", label: "보통", desc: "일반적인 난이도" },
-  { value: "hard", label: "어려움", desc: "고난도 추리" },
+  { value: "easy", label: "쉬움" },
+  { value: "normal", label: "보통" },
+  { value: "hard", label: "어려움" },
 ] as const;
 
 const PHASE_LABELS: Record<PhaseConfig["type"], string> = {
@@ -153,11 +156,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
       tags: group.tags.filter((tag) => !settings.tags.includes(tag)),
     }))
     .filter((group) => group.tags.length > 0);
-  const availableTagSuggestionCount = availableTagSuggestionGroups.reduce(
-    (sum, group) => sum + group.tags.length,
-    0
-  );
+  const hasAvailableTagSuggestions = availableTagSuggestionGroups.length > 0;
   const tagLimitReached = settings.tags.length >= 10;
+  const canDecreasePlayerCount = settings.playerCount > MIN_PLAYER_COUNT;
+  const canIncreasePlayerCount = settings.playerCount < MAX_PLAYER_COUNT;
 
   function updateCoverImagePosition(partial: Partial<CoverImagePosition>) {
     updateSettings("coverImagePosition", { ...coverImagePosition, ...partial });
@@ -240,10 +242,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                     />
                     <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
                   </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[11px] text-dark-500">
-                  <span>라이브러리 카드 기준</span>
-                  <span>{coverImagePosition.x}% / {coverImagePosition.y}% / {coverZoomPercent}%</span>
                 </div>
               </div>
 
@@ -335,7 +333,6 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
                   addTag(tagInput);
                 }
               }}
-              placeholder="예: 현대, 추리 중시"
               className={`flex-1 ${inputClass}`}
             />
             <button
@@ -348,12 +345,10 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
             </button>
           </div>
 
-          {availableTagSuggestionCount > 0 && !tagLimitReached ? (
+          {hasAvailableTagSuggestions && !tagLimitReached ? (
             <details className="group rounded-lg border border-dark-800 bg-dark-950/35">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs text-dark-400 transition-colors hover:text-dark-200">
                 <span>추천 태그</span>
-                <span className="text-dark-600 group-open:hidden">{availableTagSuggestionCount}개</span>
-                <span className="hidden text-dark-600 group-open:inline">닫기</span>
               </summary>
               <div className="space-y-2 border-t border-dark-800 px-3 py-3">
                 {availableTagSuggestionGroups.map((group) => (
@@ -377,30 +372,34 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div data-maker-anchor="step-1-player-count">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div
+          data-maker-anchor="step-1-player-count"
+          className="h-full rounded-xl border border-dark-800 bg-dark-900/45 p-4"
+        >
           <label className="block text-sm font-medium text-dark-200 mb-3">플레이어 수</label>
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => updateSettings("playerCount", Math.max(1, settings.playerCount - 1))}
-              className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors"
+              onClick={() => updateSettings("playerCount", Math.max(MIN_PLAYER_COUNT, settings.playerCount - 1))}
+              disabled={!canDecreasePlayerCount}
+              className="w-10 h-10 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors disabled:cursor-default disabled:opacity-35"
             >
               −
             </button>
-            <span className="flex-1 text-center text-xl font-bold text-dark-50">
+            <span className="flex-1 rounded-lg border border-dark-800 bg-dark-950/45 py-2 text-center text-xl font-bold text-dark-50">
               {settings.playerCount}
               <span className="text-sm font-normal text-dark-400 ml-1">명</span>
             </span>
             <button
               type="button"
-              onClick={() => updateSettings("playerCount", Math.min(8, settings.playerCount + 1))}
-              className="w-9 h-9 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors"
+              onClick={() => updateSettings("playerCount", Math.min(MAX_PLAYER_COUNT, settings.playerCount + 1))}
+              disabled={!canIncreasePlayerCount}
+              className="w-10 h-10 rounded-lg border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 flex items-center justify-center text-lg font-bold transition-colors disabled:cursor-default disabled:opacity-35"
             >
               +
             </button>
           </div>
-          <p className="text-xs text-dark-500 text-center mt-2">1 ~ 8명 (피해자 제외)</p>
 
           {characterCount > 0 && playerCountMismatch && (
             <div className="mt-2 rounded-lg border border-yellow-800 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-400">
@@ -415,23 +414,22 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-3">난이도</label>
-          <div className="space-y-2">
+        <div className="h-full rounded-xl border border-dark-800 bg-dark-900/45 p-4">
+          <label className="block text-sm font-medium text-dark-200 mb-3">표기 난이도</label>
+          <div className="grid grid-cols-2 gap-2">
             {DIFFICULTIES.map((difficulty) => (
               <button
                 key={difficulty.value}
                 type="button"
                 onClick={() => updateSettings("difficulty", difficulty.value)}
                 className={[
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all",
+                  "flex items-center justify-center rounded-lg border px-3 py-3 text-sm font-medium transition-all",
                   settings.difficulty === difficulty.value
                     ? "border-mystery-600 bg-mystery-950/50 text-mystery-200"
                     : "border-dark-700 bg-dark-800/50 text-dark-400 hover:border-dark-500",
                 ].join(" ")}
               >
-                <span className="font-medium">{difficulty.label}</span>
-                <span className="text-xs text-dark-500">{difficulty.desc}</span>
+                {difficulty.label}
               </button>
             ))}
           </div>

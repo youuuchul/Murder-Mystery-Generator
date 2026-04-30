@@ -13,12 +13,6 @@ const difficultyLabel: Record<string, string> = {
   hard: "어려움",
 };
 
-const difficultyColor: Record<string, string> = {
-  easy: "text-green-400 bg-green-900/30 border-green-800",
-  normal: "text-yellow-400 bg-yellow-900/30 border-yellow-800",
-  hard: "text-red-400 bg-red-900/30 border-red-800",
-};
-
 interface GameCardProps {
   game: GameMetadata;
   canEdit: boolean;

@@ -21,6 +21,7 @@ export interface MakerAssistantContext {
   };
   gameSummary: {
     title: string;
+    tags: string[];
     playerCount: number;
     expectedPlayerCount: number;
     locationCount: number;
@@ -78,6 +79,7 @@ export function buildMakerAssistantContext(
     },
     gameSummary: {
       title: normalizedGame.title,
+      tags: normalizedGame.settings.tags,
       playerCount: normalizedGame.players.length,
       expectedPlayerCount: normalizedGame.settings.playerCount,
       locationCount: normalizedGame.locations.length,

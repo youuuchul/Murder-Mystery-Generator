@@ -147,6 +147,17 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
     ? withGameAssetVariant(settings.coverImageUrl, "display") ?? settings.coverImageUrl
     : undefined;
   const coverZoomPercent = Math.round(coverImagePosition.zoom * 100);
+  const availableTagSuggestionGroups = TAG_SUGGESTION_GROUPS
+    .map((group) => ({
+      ...group,
+      tags: group.tags.filter((tag) => !settings.tags.includes(tag)),
+    }))
+    .filter((group) => group.tags.length > 0);
+  const availableTagSuggestionCount = availableTagSuggestionGroups.reduce(
+    (sum, group) => sum + group.tags.length,
+    0
+  );
+  const tagLimitReached = settings.tags.length >= 10;
 
   function updateCoverImagePosition(partial: Partial<CoverImagePosition>) {
     updateSettings("coverImagePosition", { ...coverImagePosition, ...partial });
@@ -295,64 +306,74 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
           태그
           <span className="ml-2 text-xs font-normal text-dark-500">{settings.tags.length}/10</span>
         </label>
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {settings.tags.length === 0 && (
-              <span className="text-xs text-dark-600">태그 없음</span>
-            )}
-            {settings.tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => removeTag(tag)}
-                className="rounded-full border border-mystery-700 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-200 hover:bg-mystery-950/50 transition-colors"
-              >
-                # {tag} ×
-              </button>
-            ))}
-          </div>
+        <div className="rounded-xl border border-dark-800 bg-dark-900/45 p-4 space-y-3">
+          {settings.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {settings.tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  aria-label={`${tag} 태그 제거`}
+                  className="rounded-full border border-mystery-700 bg-mystery-950/30 px-3 py-1 text-xs font-medium text-mystery-200 hover:bg-mystery-950/50 transition-colors"
+                >
+                  # {tag} ×
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="flex gap-2">
             <input
               type="text"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
+              disabled={tagLimitReached}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === ",") {
                   e.preventDefault();
                   addTag(tagInput);
                 }
               }}
-              placeholder="태그 입력 후 Enter"
+              placeholder="예: 현대, 추리 중시"
               className={`flex-1 ${inputClass}`}
             />
             <button
               type="button"
               onClick={() => addTag(tagInput)}
-              className="rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm text-dark-200 hover:bg-dark-700 transition-colors"
+              disabled={tagLimitReached || !tagInput.trim()}
+              className="rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm text-dark-200 hover:bg-dark-700 transition-colors disabled:cursor-default disabled:opacity-40"
             >
               추가
             </button>
           </div>
 
-          <div className="space-y-2">
-            {TAG_SUGGESTION_GROUPS.map((group) => (
-              <div key={group.label} className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-[11px] text-dark-600">{group.label}</span>
-                {group.tags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => addTag(tag)}
-                    disabled={settings.tags.includes(tag)}
-                    className="rounded-full border border-dark-700 bg-dark-800/60 px-3 py-1 text-xs text-dark-300 hover:border-dark-500 hover:text-dark-100 transition-colors disabled:opacity-30 disabled:cursor-default"
-                  >
-                    # {tag}
-                  </button>
+          {availableTagSuggestionCount > 0 && !tagLimitReached ? (
+            <details className="group rounded-lg border border-dark-800 bg-dark-950/35">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs text-dark-400 transition-colors hover:text-dark-200">
+                <span>추천 태그</span>
+                <span className="text-dark-600 group-open:hidden">{availableTagSuggestionCount}개</span>
+                <span className="hidden text-dark-600 group-open:inline">닫기</span>
+              </summary>
+              <div className="space-y-2 border-t border-dark-800 px-3 py-3">
+                {availableTagSuggestionGroups.map((group) => (
+                  <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[11px] text-dark-600">{group.label}</span>
+                    {group.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => addTag(tag)}
+                        className="rounded-full border border-dark-700 bg-dark-800/60 px-3 py-1 text-xs text-dark-300 hover:border-dark-500 hover:text-dark-100 transition-colors"
+                      >
+                        # {tag}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
-            ))}
-          </div>
+            </details>
+          ) : null}
         </div>
       </div>
 

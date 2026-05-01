@@ -145,7 +145,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           ...turnContextMessages,
         ];
 
-        const chat = getMakerAssistantChat(MAX_COMPLETION_TOKENS);
+        const chat = getMakerAssistantChat(MAX_COMPLETION_TOKENS, { reasoningEffort: "low" });
         const response = await chat.invoke(messages);
         const content = typeof response.content === "string"
           ? response.content.trim()

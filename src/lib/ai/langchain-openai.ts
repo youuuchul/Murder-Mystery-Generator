@@ -2,6 +2,9 @@ import "server-only";
 
 import { ChatOpenAI } from "@langchain/openai";
 import { warmLangfuseTracing } from "@/lib/ai/langfuse";
+import { getMakerAssistantReasoningEffort } from "@/lib/ai/openai";
+
+type ReasoningEffort = "low" | "medium" | "high";
 
 let cachedModel: ChatOpenAI | null = null;
 
@@ -9,8 +12,14 @@ let cachedModel: ChatOpenAI | null = null;
  * LangChain ChatOpenAI 인스턴스를 지연 생성한다.
  * gpt-5-mini 같은 reasoning 모델은 temperature를 지원하지 않으므로 설정하지 않는다.
  * max_completion_tokens는 호출별로 다르게 지정하므로 여기서는 기본값만 둔다.
+ *
+ * reasoningEffort 미지정 시 OPENAI_REASONING_EFFORT env(기본 "low")를 따른다.
+ * 호출 측에서 명시하면 env를 무시한다 — 짧은 대화처럼 reasoning이 거의 불필요한 경로는 "low"를 강제.
  */
-export function getMakerAssistantChat(maxCompletionTokens: number): ChatOpenAI {
+export function getMakerAssistantChat(
+  maxCompletionTokens: number,
+  options?: { reasoningEffort?: ReasoningEffort }
+): ChatOpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
   if (!apiKey) {
@@ -19,12 +28,14 @@ export function getMakerAssistantChat(maxCompletionTokens: number): ChatOpenAI {
 
   warmLangfuseTracing();
 
-  // 호출마다 token budget이 다르므로 항상 새 인스턴스 생성
+  const reasoningEffort = options?.reasoningEffort ?? getMakerAssistantReasoningEffort();
+
   return new ChatOpenAI({
     apiKey,
     model: getMakerAssistantModelName(),
     modelKwargs: {
       max_completion_tokens: maxCompletionTokens,
+      reasoning_effort: reasoningEffort,
     },
   });
 }

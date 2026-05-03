@@ -109,7 +109,7 @@ export default function StepWizard({
                     <span
                       className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${issueBadgeClass}`}
                     >
-                      {highestLevel === "error" ? `확인 ${issues.length}` : `주의 ${issues.length}`}
+                      {highestLevel === "error" ? `필수 ${issues.length}` : `권장 ${issues.length}`}
                     </span>
                   )}
                 </div>
@@ -159,8 +159,7 @@ export default function StepWizard({
         </div>
       </div>
 
-      {/* 현재 단계 issue 상세는 MakerEditor 안의 "Step N 확인 항목" 카드(위치 보기 버튼 포함)가 단일 진실로 처리.
-          여기 중복 panel은 폐기(2026-05-03). step 배지 라벨 ("주의 N" / "확인 N")로 1차 알림만 유지. */}
+      {/* 전체 카운트는 step별 뱃지("필수 N"/"권장 N")로 충분 — 별도 합계 줄은 두지 않는다. */}
     </div>
   );
 }

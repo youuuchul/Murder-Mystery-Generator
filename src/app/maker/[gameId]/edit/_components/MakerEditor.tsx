@@ -98,8 +98,6 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
   const currentStepIssues = validation.stepIssues[currentStep] ?? [];
   const currentStepErrorIssues = currentStepIssues.filter((issue) => issue.level === "error");
   const currentStepWarningIssues = currentStepIssues.filter((issue) => issue.level === "warning");
-  const validationErrorCount = validation.issues.filter((issue) => issue.level === "error").length;
-  const validationWarningCount = validation.issues.length - validationErrorCount;
 
   /**
    * validation panel 변동에 따른 scroll 보정은 자식 editor의 `captureScrollAnchor`가 담당한다.
@@ -437,15 +435,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
 
         <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 shadow-[0_20px_48px_rgba(23,15,18,0.4)] sm:p-8">
 
-          {/* validation 카운트 + 현재 step 확인 항목 panel.
-              wrapper 안 첫 줄에 둠. panel이 동적으로 추가/제거되어도 wrapper 위 layout(step 네비)은
-              안정. 메이커는 step 진입 시 panel + 위치 보기 버튼을 한 화면에서 본다. */}
-          {validation.issues.length > 0 && (
-            <p className="mb-3 text-xs text-dark-500" style={{ overflowAnchor: "none" }}>
-              필수 {validationErrorCount}개
-              {validationWarningCount > 0 ? ` · 권장 ${validationWarningCount}개` : ""}
-            </p>
-          )}
+          {/* 현재 step 확인 항목 panel — 이 step에 issue 있을 때만 노출.
+              전체 카운트는 StepWizard 네비게이터 하단에서 단일 진실로 표시.
+              패널 안 카운트 줄 제거(이슈 목록 자체가 시각적으로 카운트). 라벨 "필수"/"권장"으로 통일. */}
           {currentStepIssues.length > 0 && (
             <div
               ref={validationPanelRef}
@@ -454,25 +446,10 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                   ? "border-red-900/70 bg-red-950/20"
                   : "border-yellow-900/70 bg-yellow-950/20"
               }`}
-              /**
-               * scroll anchoring에서 panel 자체를 제외한다.
-               * panel이 추가/제거될 때 브라우저가 panel "다음" element(편집 폼 등)를 anchor로 잡아
-               * scroll 위치를 자동 보존 → 토글/버튼 클릭 시 화면이 튀는 현상 차단.
-               * 적용 범위: Step 1~5 모두 (panel은 모든 step 공용).
-               */
               style={{ overflowAnchor: "none" }}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
-                  <p className="mt-1 text-xs text-dark-400">
-                    필수 {currentStepErrorIssues.length}개
-                    {currentStepWarningIssues.length > 0 ? ` · 권장 ${currentStepWarningIssues.length}개` : ""}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
+              <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
+              <div className="mt-3 space-y-2">
                 {currentStepIssues.map((issue) => (
                   <div
                     key={issue.id}
@@ -483,7 +460,7 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                         issue.level === "error" ? "text-red-300" : "text-yellow-300"
                       }`}
                     >
-                      {issue.level === "error" ? "필수 입력 필요" : "보완 권장"}
+                      {issue.level === "error" ? "필수" : "권장"}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-dark-100">{issue.message}</p>
                   </div>

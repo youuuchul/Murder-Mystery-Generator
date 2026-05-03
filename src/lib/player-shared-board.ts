@@ -25,17 +25,20 @@ export function buildPlayerSharedBoardContent(
   sharedState: SharedState
 ): PlayerSharedBoardContent | null {
   const phase = sharedState.phase;
+  const useLobbyScript = game.rules?.useLobbyScript === true;
+  const useRoundEvents = game.rules?.useRoundEvents === true;
+  const defaultBgm = game.story.defaultBackgroundMusic;
 
   if (phase === "lobby") {
     return {
       title: "대기실",
       badge: "Lobby",
-      narrationBlocks: game.scripts.lobby.narration
+      narrationBlocks: useLobbyScript && game.scripts.lobby.narration
         ? [{ label: "안내", text: game.scripts.lobby.narration }]
         : [],
       imageUrl: game.story.mapImageUrl,
-      videoUrl: game.scripts.lobby.videoUrl,
-      backgroundMusic: game.scripts.lobby.backgroundMusic,
+      videoUrl: useLobbyScript ? game.scripts.lobby.videoUrl : undefined,
+      backgroundMusic: useLobbyScript ? game.scripts.lobby.backgroundMusic : defaultBgm,
     };
   }
 
@@ -44,7 +47,7 @@ export function buildPlayerSharedBoardContent(
       title: "오프닝",
       badge: "Opening",
       narrationBlocks: game.scripts.opening.narration
-        ? [{ label: "스토리 텍스트", text: game.scripts.opening.narration }]
+        ? [{ label: "스토리", text: game.scripts.opening.narration }]
         : [],
       imageUrl: game.story.mapImageUrl,
       videoUrl: game.scripts.opening.videoUrl,
@@ -55,16 +58,17 @@ export function buildPlayerSharedBoardContent(
   if (phase.startsWith("round-")) {
     const roundNumber = sharedState.currentRound;
     const roundScript = game.scripts.rounds.find((round) => round.round === roundNumber);
+    const roundActive = useRoundEvents && roundScript?.enabled === true;
 
     return {
       title: `Round ${roundNumber}`,
       badge: sharedState.currentSubPhase === "discussion" ? "토론" : "조사",
-      narrationBlocks: roundScript?.narration
+      narrationBlocks: roundActive && roundScript?.narration
         ? [{ label: `Round ${roundNumber} 안내`, text: roundScript.narration }]
         : [],
-      imageUrl: roundScript?.imageUrl ?? game.story.mapImageUrl,
-      videoUrl: roundScript?.videoUrl,
-      backgroundMusic: roundScript?.backgroundMusic,
+      imageUrl: roundActive ? (roundScript?.imageUrl ?? game.story.mapImageUrl) : game.story.mapImageUrl,
+      videoUrl: roundActive ? roundScript?.videoUrl : undefined,
+      backgroundMusic: roundActive ? (roundScript?.backgroundMusic ?? defaultBgm) : defaultBgm,
     };
   }
 

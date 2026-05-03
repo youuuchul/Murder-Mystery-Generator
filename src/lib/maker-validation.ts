@@ -61,17 +61,21 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     });
   }
 
-  const blankTimelineSlots = game.story.timeline.slots.filter((slot) => isBlank(slot.label)).length;
-  if (blankTimelineSlots > 0) {
-    addIssue(issues, 3, "warning", `이름이 비어 있는 타임라인 슬롯이 ${blankTimelineSlots}개 있습니다.`, {
+  const blankTimelineSlotIndices = game.story.timeline.slots
+    .map((slot, index) => (isBlank(slot.label) ? index : -1))
+    .filter((index) => index >= 0);
+  if (blankTimelineSlotIndices.length > 0) {
+    addIssue(issues, 3, "warning", `이름이 비어 있는 타임라인 슬롯: ${describeIndices(blankTimelineSlotIndices)}`, {
       id: "timeline.slots.nameless",
       anchor: "step-3-timeline",
     });
   }
 
-  const namelessNpcs = game.story.npcs.filter((npc) => isBlank(npc.name)).length;
-  if (namelessNpcs > 0) {
-    addIssue(issues, 2, "warning", `이름이 비어 있는 NPC가 ${namelessNpcs}명 있습니다.`, {
+  const namelessNpcIndices = game.story.npcs
+    .map((npc, index) => (isBlank(npc.name) ? index : -1))
+    .filter((index) => index >= 0);
+  if (namelessNpcIndices.length > 0) {
+    addIssue(issues, 2, "warning", `이름이 비어 있는 NPC: ${describeIndices(namelessNpcIndices)}`, {
       id: "story.npcs.nameless",
       anchor: "step-2-npcs",
     });
@@ -83,20 +87,31 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
       anchor: "step-3-players",
     });
   } else {
-    const namelessPlayers = countPlayersBy(game.players, (player) => isBlank(player.name));
-    const backgroundlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.background));
-    const storylessPlayers = countPlayersBy(game.players, (player) => isBlank(player.story));
-    const secretlessPlayers = countPlayersBy(game.players, (player) => isBlank(player.secret));
+    const namelessPlayerItems = game.players
+      .map((player, index) => ({ name: player.name, index, isMissing: isBlank(player.name) }))
+      .filter((item) => item.isMissing);
+    const backgroundlessPlayerItems = game.players
+      .map((player, index) => ({ name: player.name, index, isMissing: isBlank(player.background) }))
+      .filter((item) => item.isMissing);
+    const storylessPlayerItems = game.players
+      .map((player, index) => ({ name: player.name, index, isMissing: isBlank(player.story) }))
+      .filter((item) => item.isMissing);
+    const secretlessPlayerItems = game.players
+      .map((player, index) => ({ name: player.name, index, isMissing: isBlank(player.secret) }))
+      .filter((item) => item.isMissing);
     // 타임라인 사용 중일 때, 어떤 슬롯에도 "행동 입력"이나 "의도적 비활성" 둘 다 없는 캐릭터만 누락으로 본다.
     // 비활성으로 명시한 캐릭터는 제작자가 N/A 결정을 내린 상태이므로 경고에서 제외한다.
-    const timelineMissingPlayers = game.story.timeline.enabled
-      ? countPlayersBy(
-          game.players,
-          (player) => !player.timelineEntries?.some((entry) =>
-            !isBlank(entry.action) || entry.inactive === true
-          )
-        )
-      : 0;
+    const timelineMissingPlayerItems = game.story.timeline.enabled
+      ? game.players
+          .map((player, index) => ({
+            name: player.name,
+            index,
+            isMissing: !player.timelineEntries?.some((entry) =>
+              !isBlank(entry.action) || entry.inactive === true
+            ),
+          }))
+          .filter((item) => item.isMissing)
+      : [];
 
     if (playerCount !== expectedPlayerCount) {
       addIssue(
@@ -111,43 +126,43 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
       );
     }
 
-    if (namelessPlayers > 0) {
-      addIssue(issues, 3, "error", `이름이 비어 있는 캐릭터가 ${namelessPlayers}명 있습니다.`, {
+    if (namelessPlayerItems.length > 0) {
+      addIssue(issues, 3, "error", `이름이 비어 있는 캐릭터: ${describeIndices(namelessPlayerItems.map((i) => i.index))}`, {
         id: "players.nameless",
         anchor: "step-3-players",
       });
     }
 
     if (!isCulpritIdValid(game.story.culpritPlayerId, game.players, game.story)) {
-      addIssue(issues, 3, "error", "범인을 지정하세요. 플레이어·NPC·피해자 중에서 선택할 수 있습니다.", {
+      addIssue(issues, 5, "error", "범인을 지정하세요. 플레이어·NPC·피해자 중에서 선택할 수 있습니다.", {
         id: "story.culprit",
-        anchor: "step-3-culprit",
+        anchor: "step-5-culprit",
       });
     }
 
-    if (backgroundlessPlayers > 0) {
-      addIssue(issues, 3, "warning", `공개 배경이 비어 있는 캐릭터가 ${backgroundlessPlayers}명 있습니다.`, {
+    if (backgroundlessPlayerItems.length > 0) {
+      addIssue(issues, 3, "warning", `공개 배경이 비어 있는 캐릭터: ${describeNamedItems(backgroundlessPlayerItems)}`, {
         id: "players.background.empty",
         anchor: "step-3-players",
       });
     }
 
-    if (storylessPlayers > 0) {
-      addIssue(issues, 3, "warning", `상세 스토리가 비어 있는 캐릭터가 ${storylessPlayers}명 있습니다.`, {
+    if (storylessPlayerItems.length > 0) {
+      addIssue(issues, 3, "warning", `상세 스토리가 비어 있는 캐릭터: ${describeNamedItems(storylessPlayerItems)}`, {
         id: "players.story.empty",
         anchor: "step-3-players",
       });
     }
 
-    if (secretlessPlayers > 0) {
-      addIssue(issues, 3, "warning", `비밀 정보가 비어 있는 캐릭터가 ${secretlessPlayers}명 있습니다.`, {
+    if (secretlessPlayerItems.length > 0) {
+      addIssue(issues, 3, "warning", `비밀 정보가 비어 있는 캐릭터: ${describeNamedItems(secretlessPlayerItems)}`, {
         id: "players.secret.empty",
         anchor: "step-3-players",
       });
     }
 
-    if (timelineMissingPlayers > 0) {
-      addIssue(issues, 3, "warning", `행동 타임라인이 비어 있는 캐릭터가 ${timelineMissingPlayers}명 있습니다.`, {
+    if (timelineMissingPlayerItems.length > 0) {
+      addIssue(issues, 3, "warning", `행동 타임라인이 비어 있는 캐릭터: ${describeNamedItems(timelineMissingPlayerItems)}`, {
         id: "players.timeline.empty",
         anchor: "step-3-timeline",
       });
@@ -168,34 +183,46 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     });
   }
 
-  const namelessLocations = game.locations.filter((location) => isBlank(location.name)).length;
-  const emptyLocations = game.locations.filter((location) => !game.clues.some((clue) => clue.locationId === location.id)).length;
-  const untitledClues = game.clues.filter((clue) => isBlank(clue.title)).length;
-  const descriptionlessClues = game.clues.filter((clue) => isBlank(clue.description)).length;
+  const namelessLocationIndices = game.locations
+    .map((location, index) => (isBlank(location.name) ? index : -1))
+    .filter((index) => index >= 0);
+  const emptyLocationItems = game.locations
+    .map((location, index) => ({ name: location.name, index, isEmpty: !game.clues.some((clue) => clue.locationId === location.id) }))
+    .filter((item) => item.isEmpty);
+  // 단서는 어느 장소 소속인지가 식별에 가장 유용. 이름이 비어 있으면 장소명으로 추적.
+  const untitledClueItems = game.clues
+    .map((clue, index) => {
+      const location = game.locations.find((l) => l.id === clue.locationId);
+      return { name: location?.name ?? "", index, isMissing: isBlank(clue.title) };
+    })
+    .filter((item) => item.isMissing);
+  const descriptionlessClueItems = game.clues
+    .map((clue, index) => ({ name: clue.title, index, isMissing: isBlank(clue.description) }))
+    .filter((item) => item.isMissing);
 
-  if (namelessLocations > 0) {
-    addIssue(issues, 4, "error", `이름이 비어 있는 장소가 ${namelessLocations}개 있습니다.`, {
+  if (namelessLocationIndices.length > 0) {
+    addIssue(issues, 4, "error", `이름이 비어 있는 장소: ${describeIndices(namelessLocationIndices)}`, {
       id: "locations.nameless",
       anchor: "step-4-locations",
     });
   }
 
-  if (untitledClues > 0) {
-    addIssue(issues, 4, "error", `제목이 비어 있는 단서가 ${untitledClues}개 있습니다.`, {
+  if (untitledClueItems.length > 0) {
+    addIssue(issues, 4, "error", `제목이 비어 있는 단서: ${describeNamedItems(untitledClueItems)}의 단서`, {
       id: "clues.untitled",
       anchor: "step-4-clues",
     });
   }
 
-  if (descriptionlessClues > 0) {
-    addIssue(issues, 4, "warning", `설명이 비어 있는 단서가 ${descriptionlessClues}개 있습니다.`, {
+  if (descriptionlessClueItems.length > 0) {
+    addIssue(issues, 4, "warning", `설명이 비어 있는 단서: ${describeNamedItems(descriptionlessClueItems)}`, {
       id: "clues.description.empty",
       anchor: "step-4-clues",
     });
   }
 
-  if (emptyLocations > 0) {
-    addIssue(issues, 4, "warning", `배치된 단서가 없는 장소가 ${emptyLocations}개 있습니다.`, {
+  if (emptyLocationItems.length > 0) {
+    addIssue(issues, 4, "warning", `배치된 단서가 없는 장소: ${describeNamedItems(emptyLocationItems)}`, {
       id: "locations.clues.empty",
       anchor: "step-4-locations",
     });
@@ -209,64 +236,73 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
   }
 
   const voteQuestions = game.voteQuestions ?? [];
-  const customVoteQuestionsWithoutChoices = voteQuestions.filter((question) =>
-    question.targetMode === "custom-choices"
-    && question.choices.filter((choice) => !isBlank(choice.label)).length === 0
-  ).length;
-  if (customVoteQuestionsWithoutChoices > 0) {
-    addIssue(issues, 6, "error", `커스텀 투표 선택지가 비어 있는 질문이 ${customVoteQuestionsWithoutChoices}개 있습니다.`, {
+  const customVoteQuestionsWithoutChoiceItems = voteQuestions
+    .map((question, index) => ({ name: question.label, index, question }))
+    .filter((item) =>
+      item.question.targetMode === "custom-choices"
+      && item.question.choices.filter((choice) => !isBlank(choice.label)).length === 0
+    );
+  if (customVoteQuestionsWithoutChoiceItems.length > 0) {
+    addIssue(issues, 5, "error", `커스텀 투표 선택지가 비어 있는 질문: ${describeNamedItems(customVoteQuestionsWithoutChoiceItems)}`, {
       id: "vote.custom-choices.empty",
-      anchor: "step-6-vote",
+      anchor: "step-5-vote",
     });
   }
 
-  const customVoteQuestionsWithBlankChoices = voteQuestions.filter((question) =>
-    question.targetMode === "custom-choices"
-    && question.choices.some((choice) => isBlank(choice.label))
-  ).length;
-  if (customVoteQuestionsWithBlankChoices > 0) {
-    addIssue(issues, 6, "warning", `이름이 비어 있는 커스텀 투표 선택지가 ${customVoteQuestionsWithBlankChoices}개 질문에 포함되어 있습니다.`, {
+  const customVoteQuestionsWithBlankChoiceItems = voteQuestions
+    .map((question, index) => ({ name: question.label, index, question }))
+    .filter((item) =>
+      item.question.targetMode === "custom-choices"
+      && item.question.choices.some((choice) => isBlank(choice.label))
+    );
+  if (customVoteQuestionsWithBlankChoiceItems.length > 0) {
+    addIssue(issues, 5, "warning", `이름이 비어 있는 커스텀 투표 선택지가 포함된 질문: ${describeNamedItems(customVoteQuestionsWithBlankChoiceItems)}`, {
       id: "vote.custom-choices.blank-label",
-      anchor: "step-6-vote",
+      anchor: "step-5-vote",
     });
   }
 
   const round2Questions = voteQuestions.filter((question) => question.voteRound === 2);
   if (game.advancedVotingEnabled && round2Questions.length === 0) {
-    addIssue(issues, 6, "warning", "2차 투표가 켜져 있지만 질문이 없습니다.", {
+    addIssue(issues, 5, "warning", "2차 투표가 켜져 있지만 질문이 없습니다.", {
       id: "vote.round2.empty",
-      anchor: "step-6-vote",
+      anchor: "step-5-vote",
     });
   }
 
-  const missingRoundNarrations = normalizedRounds.filter((round) => isBlank(round.narration)).length;
-  if (missingRoundNarrations > 0) {
-    addIssue(issues, 5, "warning", `라운드 이벤트 텍스트가 비어 있는 구간이 ${missingRoundNarrations}개 있습니다.`, {
-      id: "scripts.rounds.narration.empty",
-      anchor: "step-5-rounds",
-    });
+  // 라운드 이벤트 검증: 게임 단위 useRoundEvents off 또는 라운드 단위 enabled false면 skip — 메이커가 의도적으로 비활성한 라운드까지 경고하지 않는다.
+  if (game.rules?.useRoundEvents === true) {
+    const missingRoundIndices = normalizedRounds
+      .map((round, index) => (round.enabled === true && isBlank(round.narration) ? index : -1))
+      .filter((index) => index >= 0);
+    if (missingRoundIndices.length > 0) {
+      addIssue(issues, 2, "warning", `라운드 이벤트 텍스트가 비어 있는 라운드: ${describeIndices(missingRoundIndices).replace(/번째/g, "")}라운드`, {
+        id: "scripts.rounds.narration.empty",
+        anchor: "step-2-rounds",
+      });
+    }
   }
 
   if (game.ending.branches.length === 0) {
-    addIssue(issues, 6, "error", "엔딩 분기를 1개 이상 추가하세요.", {
+    addIssue(issues, 5, "error", "엔딩 분기를 1개 이상 추가하세요.", {
       id: "ending.branches.empty",
-      anchor: "step-6-branches",
+      anchor: "step-5-branches",
     });
   }
 
   const hasCulpritCapturedBranch = game.ending.branches.some((branch) => branch.triggerType === "culprit-captured");
   if (!hasCulpritCapturedBranch) {
-    addIssue(issues, 6, "warning", "범인 검거 분기가 아직 없습니다.", {
+    addIssue(issues, 5, "warning", "범인 검거 분기가 아직 없습니다.", {
       id: "ending.branch.culprit-captured.missing",
-      anchor: "step-6-branches",
+      anchor: "step-5-branches",
     });
   }
 
   const hasCulpritEscaped = game.ending.branches.some((branch) => branch.triggerType === "culprit-escaped");
   if (!hasCulpritEscaped) {
-    addIssue(issues, 6, "warning", "미검거 분기가 아직 없습니다.", {
+    addIssue(issues, 5, "warning", "미검거 분기가 아직 없습니다.", {
       id: "ending.branch.culprit-escaped.missing",
-      anchor: "step-6-branches",
+      anchor: "step-5-branches",
     });
   }
 
@@ -279,21 +315,21 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     if (!hasBranchPersonalEnding) {
       addIssue(
         issues,
-        6,
+        5,
         "warning",
         `${branch.label || `분기 ${index + 1}`}에 개인 엔딩이 켜져 있지만 입력된 텍스트가 없습니다.`,
         {
           id: `ending.branch.${branch.id}.personal-ending.empty`,
-          anchor: "step-6-branches",
+          anchor: "step-5-branches",
         }
       );
     }
   });
 
   if (game.ending.authorNotesEnabled && game.ending.authorNotes.length === 0) {
-    addIssue(issues, 6, "warning", "작가 추가 설명 기능이 켜져 있지만 입력된 항목이 없습니다.", {
+    addIssue(issues, 5, "warning", "작가 추가 설명 기능이 켜져 있지만 입력된 항목이 없습니다.", {
       id: "ending.author-notes.empty",
-      anchor: "step-6-author-notes",
+      anchor: "step-5-author-notes",
     });
   }
 
@@ -301,6 +337,33 @@ export function validateMakerGame(game: GamePackage): MakerValidationResult {
     issues,
     stepIssues: buildStepIssueMap(issues),
   };
+}
+
+/**
+ * issue 메시지에 어느 항목인지 식별 정보를 덧붙이기 위한 포맷 헬퍼.
+ *
+ * 위치 보기 버튼이 폐기(2026-05-03)되면서 메이커가 step 영역으로 이동한 뒤
+ * 문제 항목을 직접 찾아야 하는데, 메시지 자체에 식별 정보가 있어야 빠르게 찾는다.
+ *
+ * 형식 규칙:
+ * - 이름이 있으면 `'이름'`, 없으면 `N번째` (인덱스+1)
+ * - 3개 이하 모두 나열, 4개 이상이면 첫 2개 + `외 N개`
+ */
+function describeNamedItems(items: { name: string; index: number }[]): string {
+  const formatted = items.map(({ name, index }) => {
+    const trimmed = name.trim();
+    return trimmed ? `'${trimmed}'` : `${index + 1}번째`;
+  });
+  if (formatted.length === 0) return "";
+  if (formatted.length <= 3) return formatted.join(", ");
+  return `${formatted.slice(0, 2).join(", ")} 외 ${formatted.length - 2}개`;
+}
+
+function describeIndices(indices: number[]): string {
+  const formatted = indices.map((i) => `${i + 1}번째`);
+  if (formatted.length === 0) return "";
+  if (formatted.length <= 3) return formatted.join(", ");
+  return `${formatted.slice(0, 2).join(", ")} 외 ${formatted.length - 2}개`;
 }
 
 /**
@@ -348,16 +411,6 @@ function ensureRoundScripts(roundCount: number, rounds: RoundScript[]): RoundScr
  */
 function isBlank(value: string | undefined | null): boolean {
   return !value?.trim();
-}
-
-/**
- * 조건에 맞는 캐릭터 수를 세는 간단한 헬퍼다.
- */
-function countPlayersBy(
-  players: GamePackage["players"],
-  predicate: (player: GamePackage["players"][number]) => boolean
-): number {
-  return players.filter(predicate).length;
 }
 
 /**

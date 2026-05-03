@@ -48,6 +48,9 @@ interface GamesRow {
   card_trading_enabled: boolean;
   clues_per_round: number;
   allow_location_revisit: boolean;
+  scoring_enabled: boolean;
+  use_round_events: boolean;
+  use_lobby_script: boolean;
   advanced_voting_enabled: boolean;
 }
 
@@ -165,6 +168,9 @@ function buildGamesRowFromPackage(game: GamePackage): Record<string, unknown> {
     card_trading_enabled: game.rules.cardTrading.enabled,
     clues_per_round: game.rules.cluesPerRound,
     allow_location_revisit: game.rules.allowLocationRevisit,
+    scoring_enabled: game.rules.scoringEnabled ?? true,
+    use_round_events: game.rules.useRoundEvents ?? false,
+    use_lobby_script: game.rules.useLobbyScript ?? false,
     advanced_voting_enabled: game.advancedVotingEnabled ?? false,
   };
 }
@@ -361,6 +367,9 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       cardTrading: { enabled: g.card_trading_enabled },
       cluesPerRound: g.clues_per_round,
       allowLocationRevisit: g.allow_location_revisit,
+      scoringEnabled: g.scoring_enabled ?? true,
+      useRoundEvents: (g as { use_round_events?: boolean }).use_round_events === true,
+      useLobbyScript: (g as { use_lobby_script?: boolean }).use_lobby_script === true,
     },
     story: {
       synopsis: storyRow?.synopsis ?? "",
@@ -378,6 +387,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       incident: storyRow?.incident ?? "",
       gmOverview: storyRow?.gm_overview ?? undefined,
       mapImageUrl: storyRow?.map_image_url ?? undefined,
+      defaultBackgroundMusic: (storyRow as { default_background_music?: string | null } | undefined)?.default_background_music ?? undefined,
       timeline: {
         enabled: storyRow?.timeline_enabled ?? false,
         slots: slots.map((s) => ({ id: s.id, label: s.slot_label })),
@@ -399,6 +409,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
       relatedClues: rcByPlayer.get(p.id) ?? [],
       relationships: relsByPlayer.get(p.id) ?? [],
       cardImage: p.card_image ?? undefined,
+      uncertainResolution: p.uncertain_resolution ?? undefined,
     })),
     locations: locationRows.map((l) => ({
       id: l.id,
@@ -454,6 +465,7 @@ async function loadGamePackageFromTables(gameId: string): Promise<GamePackage | 
         imageUrl: s.image_url ?? undefined,
         videoUrl: s.video_url ?? undefined,
         backgroundMusic: s.background_music ?? undefined,
+        enabled: (s as { enabled?: boolean }).enabled === true,
       })),
       vote: toScriptSegment(scriptMap.get("vote")),
       ending: toScriptSegment(scriptMap.get("ending")),
@@ -535,6 +547,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
     incident: story.incident,
     gm_overview: story.gmOverview ?? null,
     map_image_url: story.mapImageUrl ?? null,
+    default_background_music: story.defaultBackgroundMusic ?? null,
     victim_name: story.victim.name,
     victim_background: story.victim.background,
     victim_image_url: story.victim.imageUrl ?? null,
@@ -576,6 +589,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
         story: p.story, secret: p.secret, victory_condition: p.victoryCondition,
         personal_goal: p.personalGoal ?? null, score_conditions: p.scoreConditions,
         card_image: p.cardImage ?? null, sort_order: i,
+        uncertain_resolution: p.uncertainResolution ?? null,
       }))
     );
     if (pError) throw new Error(`Failed to insert game_players: ${pError.message}`);
@@ -627,7 +641,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
     const { error } = await supabase.from("game_locations").insert(
       normalizedGame.locations.map((l, i) => ({
         id: l.id, game_id: gameId, name: l.name, description: l.description,
-        image_url: l.imageUrl ?? null, unlocks_at_round: l.unlocksAtRound ?? null,
+        image_url: null, unlocks_at_round: l.unlocksAtRound ?? null,
         owner_player_id: l.ownerPlayerId ?? null, access_condition: l.accessCondition ?? null,
         preview_clues_enabled: l.previewCluesEnabled ?? false,
         sort_order: i,
@@ -674,6 +688,7 @@ async function saveGameToTables(game: GamePackage): Promise<void> {
       narration: rs.narration || "", image_url: rs.imageUrl ?? null,
       video_url: rs.videoUrl ?? null, background_music: rs.backgroundMusic ?? null,
       unlocked_location_ids: rs.unlockedLocationIds ?? [],
+      enabled: rs.enabled === true,
     });
   }
   if (scriptRows.length > 0) {

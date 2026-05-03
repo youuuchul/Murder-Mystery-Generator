@@ -5,24 +5,20 @@ import { useRouter } from "next/navigation";
 import { isCulpritIdValid } from "@/lib/culprit";
 import StepWizard from "@/app/maker/new/_components/StepWizard";
 import SettingsEditor from "./SettingsEditor";
-import StoryEditor from "./StoryEditor";
+import Step2Editor from "./Step2Editor";
 import PlayerEditor from "./PlayerEditor";
 import LocationEditor from "./LocationEditor";
-import ScriptEditor from "./ScriptEditor";
 import VoteEndingEditor from "./VoteEndingEditor";
 import MakerAssistantDock from "./MakerAssistantDock";
 import Button from "@/components/ui/Button";
 import type { GamePackage, Player, Story } from "@/types/game";
-import {
-  validateMakerGame,
-  type MakerValidationIssue,
-} from "@/lib/maker-validation";
+import { validateMakerGame } from "@/lib/maker-validation";
 
 interface MakerEditorProps {
   initialGame: GamePackage;
 }
 
-const STEP_COUNT = 6;
+const STEP_COUNT = 5;
 const ACTION_BAR_POS_STORAGE_KEY = "maker-editor-actionbar-pos-v1";
 const VIEWPORT_MARGIN = 12;
 /** AI 런처 버튼 예상 높이 (텍스트 2줄 + 패딩). 콘텐츠 하단 여백 계산용. */
@@ -98,16 +94,20 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     origX: number;
     origY: number;
   } | null>(null);
-  const [focusRequest, setFocusRequest] = useState<{ target: string | null; token: number }>({
-    target: null,
-    token: 0,
-  });
   const validation = validateMakerGame(game);
   const currentStepIssues = validation.stepIssues[currentStep] ?? [];
   const currentStepErrorIssues = currentStepIssues.filter((issue) => issue.level === "error");
   const currentStepWarningIssues = currentStepIssues.filter((issue) => issue.level === "warning");
   const validationErrorCount = validation.issues.filter((issue) => issue.level === "error").length;
   const validationWarningCount = validation.issues.length - validationErrorCount;
+
+  /**
+   * validation panel 변동에 따른 scroll 보정은 자식 editor의 `captureScrollAnchor`가 담당한다.
+   * 자식이 클릭한 button 위치를 viewport에 고정하면 panel 추가/제거에 따른 scroll 변동도 함께 보존됨.
+   * 부모에서 panel height 기반으로 추가 보정을 하면 자식 보정과 합쳐져 overshoot(이중 보정)이 발생해
+   * button이 viewport 밖으로 밀려나는 문제가 있었음. 부모 보정은 제거하고 자식에만 책임을 둔다.
+   * (`overflow-anchor: none`은 보조로 panel에 명시되어 있음.)
+   */
 
   const updateGame = useCallback((partial: Partial<GamePackage>) => {
     setGame((prev) => {
@@ -336,83 +336,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
     }
   }, [barPosition]);
 
-  /**
-   * 검증 이슈 문구를 현재 편집기 내부 섹션 anchor로 매핑한다.
-   * 완전히 일치하는 필드가 없더라도 사용자가 가장 빨리 수정할 수 있는 블록으로 이동시키는 목적이다.
-   */
-  function getValidationAnchor(issue: MakerValidationIssue): string | null {
-    if (issue.anchor) {
-      return issue.anchor;
-    }
-
-    const { step, message } = issue;
-
-    if (step === 1) {
-      if (message.includes("시나리오 제목")) return "step-1-title";
-      if (message.includes("태그")) return "step-1-tags";
-      if (message.includes("소개글")) return "step-1-summary";
-      if (message.includes("플레이어 수") || message.includes("등록 캐릭터")) return "step-1-player-count";
-      return "step-1-title";
-    }
-
-    if (step === 2) {
-      if (message.includes("오프닝 스토리")) return "step-2-opening";
-      if (message.includes("피해자")) return "step-2-victim";
-      if (message.includes("NPC")) return "step-2-npcs";
-      return "step-2-opening";
-    }
-
-    if (step === 3) {
-      if (message.includes("범인")) return "step-3-culprit";
-      if (message.includes("타임라인") || message.includes("시간대 슬롯")) return "step-3-timeline";
-      return "step-3-players";
-    }
-
-    if (step === 4) {
-      if (message.includes("단서")) return "step-4-clues";
-      return "step-4-locations";
-    }
-
-    if (step === 5) {
-      return "step-5-rounds";
-    }
-
-    if (step === 6) {
-      if (message.includes("투표")) return "step-6-vote";
-      if (message.includes("작가 추가 설명")) return "step-6-author-notes";
-      return "step-6-branches";
-    }
-
-    return null;
-  }
-
-  /**
-   * 현재 스텝의 검증 이슈 위치로 이동한다.
-   * 탭 전환이 필요한 컴포넌트도 있어 한 번 더 지연 호출해 DOM이 바뀐 뒤 다시 스크롤한다.
-   */
-  function focusValidationIssue(issue: MakerValidationIssue) {
-    const target = getValidationAnchor(issue);
-    setFocusRequest((prev) => ({
-      target,
-      token: prev.token + 1,
-    }));
-
-    const runScroll = () => {
-      const anchor = target
-        ? document.querySelector<HTMLElement>(`[data-maker-anchor="${target}"]`)
-        : validationPanelRef.current;
-
-      if (!anchor) {
-        return;
-      }
-
-      const top = Math.max(anchor.getBoundingClientRect().top + window.scrollY - 20, 0);
-      window.scrollTo({ top, behavior: "smooth" });
-    };
-
-    window.requestAnimationFrame(runScroll);
-    window.setTimeout(runScroll, 180);
-  }
+  // "위치 보기" 버튼은 정밀도 부족(같은 step 영역으로만 이동)으로 폐기됨(2026-05-03).
+  // issue 메시지 자체에 식별 정보를 담는 방식으로 전환. anchor 시스템(data-maker-anchor /
+  // focusTarget prop)도 함께 정리됨. 메이커는 step 배지로 1차 알림 + panel 메시지로 항목을 직접 식별한다.
 
   async function save(updatedGame: GamePackage = game): Promise<boolean> {
     if (saving) {
@@ -509,43 +435,49 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
           />
         </div>
 
-        {validation.issues.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-dark-500">
+        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 shadow-[0_20px_48px_rgba(23,15,18,0.4)] sm:p-8">
+
+          {/* validation 카운트 + 현재 step 확인 항목 panel.
+              wrapper 안 첫 줄에 둠. panel이 동적으로 추가/제거되어도 wrapper 위 layout(step 네비)은
+              안정. 메이커는 step 진입 시 panel + 위치 보기 버튼을 한 화면에서 본다. */}
+          {validation.issues.length > 0 && (
+            <p className="mb-3 text-xs text-dark-500" style={{ overflowAnchor: "none" }}>
               필수 {validationErrorCount}개
               {validationWarningCount > 0 ? ` · 권장 ${validationWarningCount}개` : ""}
             </p>
-          </div>
-        )}
-
-        {currentStepIssues.length > 0 && (
-          <div
-            ref={validationPanelRef}
-            className={`rounded-2xl border px-5 py-4 ${
-              currentStepErrorIssues.length > 0
-                ? "border-red-900/70 bg-red-950/20"
-                : "border-yellow-900/70 bg-yellow-950/20"
-            }`}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
-                <p className="mt-1 text-xs text-dark-400">
-                  필수 {currentStepErrorIssues.length}개
-                  {currentStepWarningIssues.length > 0 ? ` · 권장 ${currentStepWarningIssues.length}개` : ""}
-                </p>
+          )}
+          {currentStepIssues.length > 0 && (
+            <div
+              ref={validationPanelRef}
+              className={`mb-6 rounded-2xl border px-5 py-4 ${
+                currentStepErrorIssues.length > 0
+                  ? "border-red-900/70 bg-red-950/20"
+                  : "border-yellow-900/70 bg-yellow-950/20"
+              }`}
+              /**
+               * scroll anchoring에서 panel 자체를 제외한다.
+               * panel이 추가/제거될 때 브라우저가 panel "다음" element(편집 폼 등)를 anchor로 잡아
+               * scroll 위치를 자동 보존 → 토글/버튼 클릭 시 화면이 튀는 현상 차단.
+               * 적용 범위: Step 1~5 모두 (panel은 모든 step 공용).
+               */
+              style={{ overflowAnchor: "none" }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-dark-50">Step {currentStep} 확인 항목</p>
+                  <p className="mt-1 text-xs text-dark-400">
+                    필수 {currentStepErrorIssues.length}개
+                    {currentStepWarningIssues.length > 0 ? ` · 권장 ${currentStepWarningIssues.length}개` : ""}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 space-y-2">
-              {currentStepIssues.map((issue) => (
-                <button
-                  key={issue.id}
-                  type="button"
-                  onClick={() => focusValidationIssue(issue)}
-                  className="flex w-full items-start justify-between gap-3 rounded-xl border border-dark-700/80 bg-dark-950/40 px-3 py-3 text-left transition-colors hover:border-dark-500 hover:bg-dark-900/70"
-                >
-                  <div className="min-w-0">
+              <div className="mt-4 space-y-2">
+                {currentStepIssues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="rounded-xl border border-dark-700/80 bg-dark-950/40 px-3 py-3"
+                  >
                     <p
                       className={`text-[11px] font-medium uppercase tracking-[0.18em] ${
                         issue.level === "error" ? "text-red-300" : "text-yellow-300"
@@ -555,14 +487,11 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-dark-100">{issue.message}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-mystery-300">위치 보기</span>
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="rounded-2xl border border-dark-700/80 bg-[linear-gradient(180deg,rgba(42,46,47,0.68),rgba(23,15,18,0.94))] p-6 shadow-[0_20px_48px_rgba(23,15,18,0.4)] sm:p-8">
           {currentStep === 1 && (
             <SettingsEditor
               game={game}
@@ -570,17 +499,15 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             />
           )}
           {currentStep === 2 && (
-            <StoryEditor
+            <Step2Editor
               gameId={game.id}
               story={game.story}
-              opening={game.scripts.opening}
+              scripts={game.scripts}
+              rules={game.rules}
+              locations={game.locations ?? []}
               onChangeStory={(story) => updateGame({ story })}
-              onChangeOpening={(opening) => updateGame({
-                scripts: {
-                  ...game.scripts,
-                  opening,
-                },
-              })}
+              onChangeScripts={(scripts) => updateGame({ scripts })}
+              onChangeRules={(rules) => updateGame({ rules })}
             />
           )}
           {currentStep === 3 && (
@@ -617,46 +544,8 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
                 },
               })}
               onChangeVoteQuestions={(voteQuestions) => updateGame({ voteQuestions })}
-              onChangeCulprit={(culpritPlayerId) => updateGame({
-                story: {
-                  ...game.story,
-                  culpritPlayerId,
-                },
-              })}
-              onChangeCulpritScope={(mode) => {
-                /**
-                 * 범인 박스의 후보군 모드를 투표 탭 주 질문 targetMode 와 동기화.
-                 * 주 질문이 없으면 새로 만들어 끼워 넣는다(VoteEndingEditor 의 자동 생성과 동일한 형태).
-                 */
-                const questions = game.voteQuestions ?? [];
-                const primary = questions.find(
-                  (q) => q.purpose === "ending" && q.voteRound === 1,
-                );
-                if (primary) {
-                  updateGame({
-                    voteQuestions: questions.map((q) =>
-                      q.id === primary.id ? { ...q, targetMode: mode, choices: [] } : q,
-                    ),
-                  });
-                  return;
-                }
-                updateGame({
-                  voteQuestions: [
-                    {
-                      id: crypto.randomUUID(),
-                      voteRound: 1,
-                      label: "",
-                      targetMode: mode,
-                      purpose: "ending",
-                      sortOrder: 0,
-                      choices: [],
-                    },
-                    ...questions,
-                  ],
-                });
-              }}
-              focusTarget={focusRequest.target}
-              focusToken={focusRequest.token}
+              onJumpToCulpritStep={() => { void moveToStep(5); }}
+              scoringEnabled={game.rules?.scoringEnabled ?? true}
             />
           )}
           {currentStep === 4 && (
@@ -672,22 +561,9 @@ export default function MakerEditor({ initialGame }: MakerEditorProps) {
             />
           )}
           {currentStep === 5 && (
-            <ScriptEditor
-              gameId={game.id}
-              scripts={game.scripts}
-              rounds={game.rules?.roundCount ?? 4}
-              locations={game.locations ?? []}
-              onChange={(scripts) => updateGame({ scripts })}
-              focusTarget={focusRequest.target}
-              focusToken={focusRequest.token}
-            />
-          )}
-          {currentStep === 6 && (
             <VoteEndingEditor
               game={game}
               onUpdate={updateGame}
-              focusTarget={focusRequest.target}
-              focusToken={focusRequest.token}
             />
           )}
         </div>

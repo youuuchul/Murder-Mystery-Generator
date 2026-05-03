@@ -19,7 +19,7 @@ import {
 } from "@/lib/ending-flow";
 import type { PlayerSharedBoardContent } from "@/lib/player-shared-board";
 import { evaluatePlayerScore } from "@/lib/score-evaluator";
-import { CULPRIT_VICTIM_ID } from "@/lib/culprit";
+import { CULPRIT_VICTIM_ID, getDisplayedVictoryRole } from "@/lib/culprit";
 import { syncPlayerSessionCookieFromLocalStorage } from "@/lib/player-session-cookie";
 import {
   getAdvanceConfirmKind,
@@ -690,20 +690,32 @@ function PersonalEndingPanel({
   myPlayerId,
   inventory,
   myVotes,
+  uncertainResolutions,
 }: {
   game: GamePackage;
   reveal: VoteReveal;
   myPlayerId: string;
   inventory: InventoryCard[];
   myVotes: Record<string, string>;
+  uncertainResolutions?: Record<string, "culprit" | "innocent">;
 }) {
   const branch = resolveActiveEndingBranch(game, reveal);
   const branchPersonalEndings = resolveBranchPersonalEndings(branch);
   const personalEnding = branchPersonalEndings.find((ending) => ending.playerId === myPlayerId)
     ?? branchPersonalEndings[0];
   const myPlayer = game.players.find((p) => p.id === myPlayerId);
-  const hasScore = (myPlayer?.scoreConditions?.length ?? 0) > 0;
-  const scoreEval = myPlayer ? evaluatePlayerScore({ player: myPlayer, reveal, inventory, myVotes }) : null;
+  // 게임 단위 승점 시스템 toggle. false면 결과 화면 점수 영역 자체 숨김 — 승리조건 라벨만 노출.
+  const scoringEnabled = game.rules?.scoringEnabled ?? true;
+  const hasScore = scoringEnabled && (myPlayer?.scoreConditions?.length ?? 0) > 0;
+  const scoreEval = myPlayer ? evaluatePlayerScore({
+    player: myPlayer,
+    story: game.story,
+    reveal,
+    inventory,
+    myVotes,
+    scoringEnabled,
+    uncertainResolutions,
+  }) : null;
 
   return (
     <div className="space-y-5">
@@ -1735,6 +1747,8 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
   const timerNoticeRef = useRef<{ key: string; oneMinute: boolean; expired: boolean } | null>(null);
   const [discoveryNotices, setDiscoveryNotices] = useState<{ id: string; message: string; tone?: "info" | "error"; leaving?: boolean }[]>([]);
   const lastSseAtRef = useRef<number>(0);
+  // 미확신 트리거 발동 시 본인 카드 toast — 같은 결정에 대해 중복 표시 방지.
+  const uncertainResolutionShownRef = useRef<string | null>(null);
 
   // 엔딩 단계 변경 시 스크롤 상단으로
   useEffect(() => {
@@ -1991,6 +2005,25 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
     sharedState?.timerState?.startedAt,
     sharedState?.timerState?.durationSeconds,
   ]);
+
+  // 미확신 트리거 발동 toast — 본인 캐릭터의 결정이 sharedState에 박힌 시점 1회 표시.
+  useEffect(() => {
+    const myCharacter = game?.players.find((p) => p.id === charId);
+    if (!myCharacter || myCharacter.victoryCondition !== "uncertain") return;
+    const decision = sharedState?.uncertainResolutions?.[charId];
+    if (!decision) return;
+    if (uncertainResolutionShownRef.current === decision) return;
+    uncertainResolutionShownRef.current = decision;
+    const message =
+      sharedState?.uncertainResolutionMessages?.[charId]
+      ?? (decision === "culprit" ? "당신이 범인이었습니다." : "당신은 무고합니다.");
+    pushNotice({
+      id: `uncertain-resolution-${decision}-${Date.now()}`,
+      message,
+      tone: "info",
+      durationMs: 8000,
+    });
+  }, [game, charId, sharedState?.uncertainResolutions, sharedState?.uncertainResolutionMessages]);
 
   // Supabase Realtime Broadcast — cross-instance 실시간 알림 (Vercel 서버리스 대응).
   // SSE broadcaster는 in-memory여서 서버 인스턴스가 나뉘면 다른 클라에 도달 못 함.
@@ -2328,6 +2361,7 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
               myPlayerId={charId}
               inventory={inventory}
               myVotes={myVotes}
+              uncertainResolutions={sharedState.uncertainResolutions}
             />
           )}
           {endingStage === "author-notes" && (
@@ -2619,11 +2653,13 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                   </p>
                 </div>
                 {/* 승리 조건 — 배경과 상세 스토리 사이에 두어 프로필 컨텍스트 안에서 열람.
-                    옆사람 노출 방지를 위해 기본 접힘, 엔딩 페이즈에선 자동 펼침. */}
+                    옆사람 노출 방지를 위해 기본 접힘, 엔딩 페이즈에선 자동 펼침.
+                    미확신 캐릭터는 런타임 결정(uncertainResolutions)이 박히면 그 결과로 라벨 변환. */}
                 {(() => {
                   const isEndingPhase = sharedState?.phase === "ending";
                   const expanded = isEndingPhase || showVictoryCondition;
-                  const colorClass = VICTORY_COLOR[character.victoryCondition] ?? "border-dark-800 bg-dark-900";
+                  const displayedRole = getDisplayedVictoryRole(character, game.story, sharedState?.uncertainResolutions);
+                  const colorClass = VICTORY_COLOR[displayedRole] ?? "border-dark-800 bg-dark-900";
 
                   if (!expanded) {
                     return (
@@ -2652,8 +2688,8 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                           </button>
                         )}
                       </div>
-                      <p className="text-sm font-bold">{VICTORY_LABEL[character.victoryCondition] ?? character.victoryCondition}</p>
-                      {character.victoryCondition === "personal-goal" && character.personalGoal && (
+                      <p className="text-sm font-bold">{VICTORY_LABEL[displayedRole] ?? displayedRole}</p>
+                      {displayedRole === "personal-goal" && character.personalGoal && (
                         <p className="text-sm opacity-80 leading-relaxed whitespace-pre-line">{character.personalGoal}</p>
                       )}
                     </div>
@@ -2671,14 +2707,33 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                     content={character.secret}
                   />
                 ) : null}
-                {character.scoreConditions.length > 0 ? (
+                {game.rules?.scoringEnabled !== false && character.scoreConditions.length > 0 ? (
                   <CollapsibleSection title="승점 조건">
-                    {character.scoreConditions.map((sc, i) => (
-                      <div key={i} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-dark-300">{sc.description}</span>
-                        <span className="text-mystery-400 font-bold shrink-0">+{sc.points}점</span>
-                      </div>
-                    ))}
+                    {character.scoreConditions.map((sc, i) => {
+                      // 승리조건 자동 항목 라벨:
+                      // - 개인 목표: 본인이 자기 목표를 알아야 의미 있으므로 personalGoal 텍스트 노출
+                      // - 기본/미확신: 통일 "승리 조건 달성" — 결정 전/후 같은 라벨로 스포일러 방지
+                      let label = sc.description;
+                      if (sc.autoFromVictory) {
+                        if (character.victoryCondition === "personal-goal") {
+                          label = (character.personalGoal ?? "").trim() || "개인 목표 달성";
+                        } else {
+                          label = "승리 조건 달성";
+                        }
+                      }
+                      // per-clue 모드: 본인은 "1개당 N점"만 노출. 선택 단서 수/최대 점수는 메이커 정보라 스포일러 위험으로 비공개.
+                      const isPerClue = sc.autoFromVictory
+                        && (sc.type ?? "manual") === "clue-collection"
+                        && sc.config?.clueCountMode === "per-clue";
+                      return (
+                        <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-dark-300">{label}</span>
+                          <span className="text-mystery-400 font-bold shrink-0">
+                            +{sc.points}점{isPerClue ? " · 단서 1개당" : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </CollapsibleSection>
                 ) : null}
                 {character.relatedClues.length > 0 ? (
@@ -2936,14 +2991,6 @@ export default function PlayerView({ initialState, initialToken }: PlayerViewPro
                         {locationLocked && loc.accessCondition?.hint && (
                           <div className="px-4 py-2 text-xs text-red-400 bg-red-950/10">
                             {loc.accessCondition.hint}
-                          </div>
-                        )}
-                        {!locationLocked && loc.imageUrl && (
-                          <div className="px-4 pt-4">
-                            <ImageFrame
-                              src={loc.imageUrl}
-                              alt={loc.name || "장소 이미지"}
-                            />
                           </div>
                         )}
                         {!locationLocked && loc.description && (

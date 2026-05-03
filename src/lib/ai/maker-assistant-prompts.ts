@@ -238,10 +238,6 @@ function inferDraftIntent(message: string | undefined, currentStep: number): Dra
     };
   }
 
-  if (currentStep === 5) {
-    return { targetLabel: "GM 진행 텍스트", profile: "gm_guide" };
-  }
-
   if (currentStep === 4 || currentStep === 1) {
     return { targetLabel: "설명형 입력 텍스트", profile: "descriptive_copy" };
   }

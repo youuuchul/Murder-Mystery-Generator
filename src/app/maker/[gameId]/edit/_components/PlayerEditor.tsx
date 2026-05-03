@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import Button from "@/components/ui/Button";
 import ImageAssetField from "./ImageAssetField";
+import { useScrollAnchor } from "./useScrollAnchor";
+import { withGameAssetVariant } from "@/lib/game-asset-variant";
+import { optimizeImageForUpload } from "./image-upload-processing";
 import {
-  CULPRIT_VICTIM_ID,
   buildPlayersNpcsVictimTargets,
-  formatCulpritLabel,
-  resolveCulpritIdentity,
+  getDisplayedVictoryRole,
+  getVictoryConditionInputMode,
+  type VictoryConditionInputMode,
 } from "@/lib/culprit";
 import type {
   Player,
@@ -23,6 +26,8 @@ import type {
   TimelineSlot,
   PlayerTimelineEntry,
   VoteQuestion,
+  UncertainResolution,
+  UncertainResolutionTrigger,
 } from "@/types/game";
 
 interface PlayerEditorProps {
@@ -36,15 +41,10 @@ interface PlayerEditorProps {
   onChange: (players: Player[]) => void;
   onChangeTimeline: (timeline: StoryTimeline) => void;
   onChangeVoteQuestions: (next: VoteQuestion[]) => void;
-  onChangeCulprit: (playerId: string) => void;
-  /**
-   * 범인 후보군 모드 변경 콜백.
-   * "players-only" → 플레이어만, "players-and-npcs" → 플레이어 + NPC + 피해자.
-   * 투표 탭의 주 질문 targetMode 와 동기화된다.
-   */
-  onChangeCulpritScope: (mode: "players-only" | "players-and-npcs") => void;
-  focusTarget?: string | null;
-  focusToken?: number;
+  /** 캐릭터 카드의 "Step 5로 이동" 버튼 콜백 — 범인 미지정 시 메이커가 빨리 점프할 수 있게. */
+  onJumpToCulpritStep: () => void;
+  /** 게임 단위 승점 시스템 활성 여부. false면 [승점] 탭 숨김 + 자동 동기화 skip. */
+  scoringEnabled: boolean;
 }
 
 interface RelationTargetOption {
@@ -63,12 +63,21 @@ interface ClueOptionGroup {
   options: ClueOption[];
 }
 
-const VICTORY_OPTIONS: { value: VictoryCondition; label: string; desc: string; color: string }[] = [
-  { value: "avoid-arrest", label: "검거 회피", desc: "범인 — 끝까지 들키지 마세요", color: "border-red-700 bg-red-950/30 text-red-300" },
-  { value: "uncertain", label: "검거 or 회피", desc: "미확정 — 스스로도 확신할 수 없습니다", color: "border-yellow-700 bg-yellow-950/30 text-yellow-300" },
-  { value: "arrest-culprit", label: "범인 검거", desc: "무고 — 진범을 찾아내세요", color: "border-blue-700 bg-blue-950/30 text-blue-300" },
-  { value: "personal-goal", label: "개인 목표", desc: "별도 목표 달성이 우선", color: "border-purple-700 bg-purple-950/30 text-purple-300" },
+/**
+ * 메이커가 직접 선택할 수 있는 승리조건 모드.
+ * `avoid-arrest`/`arrest-culprit`는 culpritPlayerId 1곳을 보면 자동 결정되므로 `auto`로 통합.
+ */
+const VICTORY_INPUT_OPTIONS: { value: VictoryConditionInputMode; label: string; color: string }[] = [
+  { value: "auto", label: "기본", color: "border-mystery-600 bg-mystery-950/30 text-mystery-200" },
+  { value: "personal-goal", label: "개인 목표", color: "border-purple-700 bg-purple-950/30 text-purple-300" },
+  { value: "uncertain", label: "미확신", color: "border-yellow-700 bg-yellow-950/30 text-yellow-300" },
 ];
+
+const DERIVED_LABEL: Record<"avoid-arrest" | "arrest-culprit" | "no-culprit", { text: string; color: string }> = {
+  "avoid-arrest": { text: "범인 → 검거 회피", color: "text-red-300" },
+  "arrest-culprit": { text: "무고 → 범인 검거", color: "text-blue-300" },
+  "no-culprit": { text: "범인 미지정", color: "text-yellow-300" },
+};
 
 const inp = "w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm";
 const ta = inp + " resize-none";
@@ -81,11 +90,12 @@ function createPlayer(): Player {
     name: "",
     victoryCondition: "arrest-culprit",
     personalGoal: "",
+    // expectedOutcome 비워둠 — score-evaluator가 displayedRole 기반으로 자동 파생 (auto/uncertain 둘 다 자동 연동).
     scoreConditions: [{
-      description: "범인 검거 성공",
-      points: 3,
+      description: "승리 조건 달성",
+      points: 5,
       type: "culprit-outcome",
-      config: { expectedOutcome: "arrested" },
+      autoFromVictory: true,
     }],
     background: "",
     story: "",
@@ -170,6 +180,10 @@ function TimelineUsageToggle({
   timeline: StoryTimeline;
   onChange: (timeline: StoryTimeline) => void;
 }) {
+  // 사용/사용안함 토글 시 panel 추가/제거 + 타임라인 영역 펼침/접힘으로 layout shift 큼.
+  // hook으로 클릭 element viewport 위치 보존.
+  const captureScrollAnchor = useScrollAnchor();
+
   function toggleTimeline(enabled: boolean) {
     onChange({
       ...timeline,
@@ -189,7 +203,7 @@ function TimelineUsageToggle({
         <div className="flex gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => toggleTimeline(false)}
+            onClick={(e) => { captureScrollAnchor(e); toggleTimeline(false); }}
             className={[
               "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
               !timeline.enabled
@@ -201,7 +215,7 @@ function TimelineUsageToggle({
           </button>
           <button
             type="button"
-            onClick={() => toggleTimeline(true)}
+            onClick={(e) => { captureScrollAnchor(e); toggleTimeline(true); }}
             className={[
               "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
               timeline.enabled
@@ -452,7 +466,7 @@ function TimelineMatrixEditor({
   return (
     <div className="space-y-4">
       <div className="bg-dark-900 border border-dark-800 rounded-xl p-4">
-        <p className="text-sm text-dark-300 font-medium">중앙 타임라인</p>
+        <p className="text-sm text-dark-300 font-medium">타임라인</p>
       </div>
 
       <TimelineOverviewTable
@@ -515,6 +529,9 @@ function TimelineSlotManager({
   timeline: StoryTimeline;
   onChange: (timeline: StoryTimeline) => void;
 }) {
+  // 슬롯 추가/삭제 시 panel(이름 비어있는 슬롯 N개) 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
+
   function updateSlots(slots: TimelineSlot[]) {
     onChange({ ...timeline, slots });
   }
@@ -547,7 +564,7 @@ function TimelineSlotManager({
         </div>
         <button
           type="button"
-          onClick={() => updateSlots([...timeline.slots, createTimelineSlot()])}
+          onClick={(e) => { captureScrollAnchor(e); updateSlots([...timeline.slots, createTimelineSlot()]); }}
           className="shrink-0 text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
         >
           + 시간대 슬롯 추가
@@ -583,7 +600,7 @@ function TimelineSlotManager({
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateSlots(timeline.slots.filter((item) => item.id !== slot.id))}
+                    onClick={(e) => { captureScrollAnchor(e); updateSlots(timeline.slots.filter((item) => item.id !== slot.id)); }}
                     className="text-xs text-dark-500 hover:text-red-400 transition-colors"
                   >
                     삭제
@@ -618,8 +635,11 @@ function PlayerForm({
   npcs,
   victim,
   isCulprit,
+  story,
   onChange,
   onDelete,
+  onJumpToCulpritStep,
+  scoringEnabled,
 }: {
   gameId: string;
   player: Player;
@@ -632,13 +652,21 @@ function PlayerForm({
   npcs: Story["npcs"];
   victim: Story["victim"] | undefined;
   isCulprit: boolean;
+  story: Story;
   onChange: (p: Player) => void;
   onDelete: () => void;
+  onJumpToCulpritStep: () => void;
+  scoringEnabled: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [tab, setTab] = useState<"basic" | "score" | "clues" | "rel">("basic");
+  // 승점 시스템이 꺼지면 [승점] 탭이 사라지므로 basic으로 fallback. 데이터는 보존, UI만 안전 처리.
+  const effectiveTab = !scoringEnabled && tab === "score" ? "basic" : tab;
   const [uploadingImage, setUploadingImage] = useState(false);
   const [storyExpanded, setStoryExpanded] = useState(false);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  // 캐릭터 삭제 시 panel(인원 mismatch / 이름 비어있음) 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
 
   function update<K extends keyof Player>(key: K, value: Player[K]) {
     onChange({ ...player, [key]: value });
@@ -679,6 +707,16 @@ function PlayerForm({
     update("scoreConditions", player.scoreConditions.map((s, i) => i === idx ? { ...s, ...partial } : s));
   }
 
+  /** 승리조건 자동 연동 점수 항목(autoFromVictory=true). 한 캐릭터당 1개. */
+  const autoVictoryScore = player.scoreConditions.find((sc) => sc.autoFromVictory === true);
+
+  function patchAutoVictoryScore(patch: Partial<ScoreCondition>) {
+    update(
+      "scoreConditions",
+      player.scoreConditions.map((sc) => (sc.autoFromVictory === true ? { ...sc, ...patch } : sc)),
+    );
+  }
+
   function updateRelatedClue(idx: number, partial: Partial<RelatedClueRef>) {
     update("relatedClues", player.relatedClues.map((r, i) => i === idx ? { ...r, ...partial } : r));
   }
@@ -699,7 +737,16 @@ function PlayerForm({
     ]);
   }
 
-  const conditionInfo = VICTORY_OPTIONS.find((v) => v.value === player.victoryCondition);
+  // 헤더 배지: 캐릭터 입장(범인/무고/개인 목표/도중 결정) 짧게 표시.
+  const inputMode = getVictoryConditionInputMode(player);
+  const displayedRole = getDisplayedVictoryRole(player, story);
+  const headerBadge = (() => {
+    if (inputMode === "personal-goal") return { label: "개인 목표", color: "border-purple-700 bg-purple-950/30 text-purple-300" };
+    if (inputMode === "uncertain") return { label: "미확신", color: "border-yellow-700 bg-yellow-950/30 text-yellow-300" };
+    if (displayedRole === "avoid-arrest") return { label: "범인", color: "border-red-700 bg-red-950/30 text-red-300" };
+    return { label: "무고", color: "border-blue-700 bg-blue-950/30 text-blue-300" };
+  })();
+  const culpritAssigned = Boolean(story.culpritPlayerId?.trim());
   const filteredRelationTargets = relationTargets.filter((target) => target.value !== `player:${player.id}`);
   const selectedRelationshipTargets = new Set(
     player.relationships
@@ -765,9 +812,10 @@ function PlayerForm({
   }
   const availableRelatedCluesToAdd = getRelatedClueGroupsForRow(-1);
 
+  // 게임 단위 승점 시스템 off면 [승점] 탭 자체 숨김. 데이터(player.scoreConditions)는 보존되며 다시 켜면 복원.
   const tabs = [
-    { id: "basic" as const, label: "기본 정보" },
-    { id: "score" as const, label: `승점 (${player.scoreConditions.length})` },
+    { id: "basic" as const, label: "개인 정보" },
+    ...(scoringEnabled ? [{ id: "score" as const, label: `승점 (${player.scoreConditions.length})` }] : []),
     { id: "clues" as const, label: `연관 단서 (${player.relatedClues.length})` },
     { id: "rel" as const, label: `관계 (${player.relationships.length})` },
   ];
@@ -788,16 +836,14 @@ function PlayerForm({
               범인
             </span>
           )}
-          {conditionInfo && (
-            <span className={`text-xs px-2 py-0.5 rounded-full border ${conditionInfo.color} shrink-0`}>
-              {conditionInfo.label}
-            </span>
-          )}
+          <span className={`text-xs px-2 py-0.5 rounded-full border ${headerBadge.color} shrink-0`}>
+            {headerBadge.label}
+          </span>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => { e.stopPropagation(); captureScrollAnchor(e); onDelete(); }}
             className="text-xs text-dark-500 hover:text-red-400 transition-colors px-2 py-1"
           >
             삭제
@@ -808,49 +854,305 @@ function PlayerForm({
 
       {expanded && (
         <div className="p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1">캐릭터 이름 *</label>
-              <input
-                type="text"
-                value={player.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder="이름"
-                className={inp}
+          {/* 좌: 캐릭터 이미지 (큰 사각형) / 우: 이름+배경. 이미지 클릭 시 모달로 크게 보기. */}
+          <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-dark-400">캐릭터 이미지</label>
+              {(player.cardImage ?? "").trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setImageModalOpen(true)}
+                  className="block aspect-square w-full overflow-hidden rounded-xl border border-dark-700 bg-dark-950 transition-colors hover:border-dark-500"
+                >
+                  <img
+                    src={withGameAssetVariant(player.cardImage, "display") ?? player.cardImage}
+                    alt={player.name || "캐릭터 이미지"}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ) : (
+                <div className="flex aspect-square w-full items-center justify-center rounded-xl border border-dashed border-dark-700 bg-dark-950 text-[11px] text-dark-600">
+                  이미지 없음
+                </div>
+              )}
+              <div className="flex gap-1">
+                <label
+                  htmlFor={`character-image-${player.id}`}
+                  className={`flex-1 cursor-pointer rounded-md border border-dark-600 px-2 py-1 text-center text-[11px] text-dark-300 transition-colors hover:border-dark-400 ${uploadingImage ? "opacity-60 pointer-events-none" : ""}`}
+                >
+                  <input
+                    id={`character-image-${player.id}`}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    disabled={uploadingImage}
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      try {
+                        const optimized = await optimizeImageForUpload(file, "portrait");
+                        await handleCardImageUpload(optimized.file);
+                      } catch (error) {
+                        console.error("이미지 준비 실패:", error);
+                        alert(error instanceof Error ? error.message : "이미지 준비 실패");
+                      }
+                    }}
+                  />
+                  {uploadingImage ? "업로드중…" : "업로드"}
+                </label>
+                {(player.cardImage ?? "").trim() && (
+                  <button
+                    type="button"
+                    onClick={() => update("cardImage", undefined)}
+                    className="rounded-md border border-dark-700 px-2 py-1 text-[11px] text-dark-500 transition-colors hover:border-red-900/50 hover:text-red-400"
+                  >
+                    제거
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-dark-400 mb-1">캐릭터 이름 *</label>
+                <input
+                  type="text"
+                  value={player.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder="이름"
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-dark-400 mb-1">배경 (전원 공개)</label>
+                <textarea
+                  rows={5}
+                  value={player.background}
+                  onChange={(e) => update("background", e.target.value)}
+                  placeholder="다른 플레이어에게도 공개되는 캐릭터 소개"
+                  className={ta}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 이미지 크게 보기 모달 — 어디든 클릭 시 닫힘. */}
+          {imageModalOpen && (player.cardImage ?? "").trim() && (
+            <div
+              onClick={() => setImageModalOpen(false)}
+              className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/85 p-6 backdrop-blur-sm"
+            >
+              <img
+                src={withGameAssetVariant(player.cardImage, "display") ?? player.cardImage}
+                alt={player.name || "캐릭터 이미지"}
+                className="pointer-events-none max-h-[90vh] max-w-[90vw] object-contain"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-2">승리 조건</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {VICTORY_OPTIONS.map((v) => (
+          )}
+
+          {/* 승리 조건 — 별도 섹션. 모드별 컬러 톤으로 인식 강조. */}
+          {(() => {
+            const sectionTone = inputMode === "personal-goal"
+              ? "border-purple-700/50 bg-purple-950/15"
+              : inputMode === "uncertain"
+                ? "border-yellow-700/50 bg-yellow-950/15"
+                : "border-mystery-700/50 bg-mystery-950/15";
+            return (
+          <div className={`rounded-xl border p-4 space-y-3 ${sectionTone}`}>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-dark-200">승리 조건</label>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+                {VICTORY_INPUT_OPTIONS.map((v) => (
                   <button
                     key={v.value}
                     type="button"
-                    title={v.desc}
-                    onClick={() => update("victoryCondition", v.value)}
+                    onClick={() => {
+                      // "auto" 선택 → 자동 파생 결과(avoid-arrest / arrest-culprit)를 victoryCondition에 박는다.
+                      // 옛 4-enum 데이터 호환성 + 메이커가 명시적으로 "auto"를 골랐다는 의도가 데이터에 담김.
+                      // culpritPlayerId 변경 시 동기화는 VoteEndingEditor의 handleChangeCulprit이 담당.
+                      //
+                      // 승점 자동 연동: "auto" / "uncertain" 모드 둘 다 "승리 조건 달성" culprit-outcome 점수 1개를 [승점] 탭에 자동 유지.
+                      // expectedOutcome은 박지 않는다 — score-evaluator가 displayedRole 기반으로 동적 파생한다.
+                      // (auto: culpritId 따라 / uncertain: 트리거 결정 따라). 메이커가 삭제했어도 모드 재선택 시 재추가.
+                      // 단, 게임 단위 승점 시스템이 꺼져 있으면 자동 보충 skip.
+                      const ensureOutcomeScore = (existing: ScoreCondition[]): ScoreCondition[] => {
+                        if (!scoringEnabled) return existing;
+                        // 승리조건 자동 항목은 한 캐릭터당 1개만. 이미 marker가 박힌 항목이 있으면 skip.
+                        const hasAuto = existing.some((sc) => sc.autoFromVictory === true);
+                        if (hasAuto) return existing;
+                        const auto: ScoreCondition = {
+                          description: "승리 조건 달성",
+                          points: 5,
+                          type: "culprit-outcome",
+                          autoFromVictory: true,
+                          // expectedOutcome 비워둠 — evaluator가 displayedRole로 자동 파생.
+                        };
+                        return [auto, ...existing];
+                      };
+
+                      if (v.value === "auto") {
+                        const expectedRole: VictoryCondition = story.culpritPlayerId === player.id ? "avoid-arrest" : "arrest-culprit";
+                        onChange({
+                          ...player,
+                          victoryCondition: expectedRole,
+                          scoreConditions: ensureOutcomeScore(player.scoreConditions),
+                        });
+                      } else if (v.value === "uncertain") {
+                        onChange({
+                          ...player,
+                          victoryCondition: "uncertain",
+                          scoreConditions: ensureOutcomeScore(player.scoreConditions),
+                        });
+                      } else if (v.value === "personal-goal") {
+                        // 개인 목표 모드: personalGoal 텍스트가 description인 manual 점수 1개 자동 보장.
+                        // 자동 추가된 항목은 [승점] 탭에서 메이커가 자유 편집 가능 (점수 액수 등).
+                        const ensurePersonalGoalScore = (existing: ScoreCondition[]): ScoreCondition[] => {
+                          if (!scoringEnabled) return existing;
+                          const hasAuto = existing.some((sc) => sc.autoFromVictory === true);
+                          if (hasAuto) return existing;
+                          const goalText = (player.personalGoal ?? "").trim();
+                          const auto: ScoreCondition = {
+                            description: goalText || "개인 목표 달성",
+                            points: 5,
+                            type: "manual",
+                            autoFromVictory: true,
+                          };
+                          return [auto, ...existing];
+                        };
+                        onChange({
+                          ...player,
+                          victoryCondition: "personal-goal",
+                          scoreConditions: ensurePersonalGoalScore(player.scoreConditions),
+                        });
+                      } else {
+                        update("victoryCondition", v.value);
+                      }
+                    }}
                     className={[
                       "px-2 py-2 rounded-lg border text-xs font-medium transition-all text-left leading-tight",
-                      player.victoryCondition === v.value
+                      inputMode === v.value
                         ? v.color
                         : "border-dark-700 text-dark-500 hover:border-dark-500 hover:text-dark-300",
                     ].join(" ")}
                   >
                     {v.label}
-                    <span className="block text-[10px] opacity-70 mt-0.5 font-normal">{v.desc}</span>
                   </button>
                 ))}
               </div>
-              {player.victoryCondition === "personal-goal" && (
-                <input
-                  type="text"
-                  value={player.personalGoal ?? ""}
-                  onChange={(e) => update("personalGoal", e.target.value)}
-                  placeholder="개인 목표 설명 (예: 유언장 카드 획득)"
-                  className={`${inp} mt-2`}
+
+              {/* "기본" 모드일 때 현재 범인 지정 결과 안내. 큰 라벨 + 보조 한 줄. */}
+              {inputMode === "auto" && (() => {
+                const role = displayedRole as "avoid-arrest" | "arrest-culprit";
+                const tone = !culpritAssigned
+                  ? "border-yellow-600/60 bg-yellow-950/25 text-yellow-100"
+                  : role === "avoid-arrest"
+                    ? "border-red-700/60 bg-red-950/30 text-red-100"
+                    : "border-blue-700/60 bg-blue-950/30 text-blue-100";
+                const headline = !culpritAssigned ? "범인 미지정" : role === "avoid-arrest" ? "이 캐릭터는 범인" : "이 캐릭터는 무고";
+                const sub = !culpritAssigned ? "투표 단계에서 범인을 지정하세요" : role === "avoid-arrest" ? "검거 회피 시 승리" : "범인 검거 시 승리";
+                return (
+                  <div className={`mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${tone}`}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold leading-tight">{headline}</p>
+                      <p className="mt-0.5 text-[11px] opacity-75">{sub}</p>
+                    </div>
+                    {!culpritAssigned && (
+                      <button
+                        type="button"
+                        onClick={onJumpToCulpritStep}
+                        className="shrink-0 rounded-md border border-yellow-700/60 bg-yellow-950/40 px-2.5 py-1.5 text-[11px] font-medium text-yellow-100 hover:bg-yellow-900/40 transition-colors"
+                      >
+                        지정하러 가기
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {inputMode === "personal-goal" && (
+                <div className="mt-2 space-y-3">
+                  <input
+                    type="text"
+                    value={player.personalGoal ?? ""}
+                    onChange={(e) => {
+                      // personalGoal + 자동 점수 description 동기화를 한 번의 onChange로 처리.
+                      // 두 update 콜을 분리하면 첫 콜이 stale player로 덮여 사라진다.
+                      const next = e.target.value;
+                      const desc = next.trim() || "개인 목표 달성";
+                      onChange({
+                        ...player,
+                        personalGoal: next,
+                        scoreConditions: player.scoreConditions.map((sc) =>
+                          sc.autoFromVictory === true ? { ...sc, description: desc } : sc,
+                        ),
+                      });
+                    }}
+                    placeholder="개인 목표 설명 (예: 유언장 카드 획득)"
+                    className={inp}
+                  />
+                  {/* 판정 방식 — 다른 점수 조건처럼 자동 type 선택. config는 type별 헬퍼로 입력. */}
+                  {autoVictoryScore && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-dark-400 shrink-0">판정 방식</label>
+                        <select
+                          value={autoVictoryScore.type ?? "manual"}
+                          onChange={(e) => {
+                            const nextType = e.target.value as ScoreConditionType;
+                            // type 변경 시 config 초기화 (이전 타입의 config가 stale로 남는 것 방지).
+                            patchAutoVictoryScore({ type: nextType, config: undefined });
+                          }}
+                          className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                        >
+                          <option value="manual">수동 판정</option>
+                          <option value="target-player-not-arrested">특정 플레이어 미검거</option>
+                          <option value="target-player-arrested">특정 플레이어 검거</option>
+                          <option value="clue-collection">단서 수집</option>
+                        </select>
+                      </div>
+
+                      {(autoVictoryScore.type === "target-player-not-arrested"
+                        || autoVictoryScore.type === "target-player-arrested") && (
+                        <TargetPlayerSelector
+                          label="대상"
+                          players={players.filter((p) => p.id !== player.id)}
+                          value={autoVictoryScore.config?.targetPlayerId ?? ""}
+                          onChange={(targetPlayerId) => patchAutoVictoryScore({
+                            config: { ...autoVictoryScore.config, targetPlayerId },
+                          })}
+                          emptyHint="대상 플레이어를 선택하세요."
+                        />
+                      )}
+
+                      {autoVictoryScore.type === "clue-collection" && (
+                        <ClueCollectionInput
+                          clues={clues}
+                          locations={locations}
+                          config={autoVictoryScore.config}
+                          points={autoVictoryScore.points}
+                          onChange={(patch) => patchAutoVictoryScore({
+                            config: { ...autoVictoryScore.config, ...patch },
+                          })}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {inputMode === "uncertain" && (
+                <UncertainResolutionEditor
+                  resolution={player.uncertainResolution}
+                  clues={clues}
+                  locations={locations}
+                  onChange={(next) => update("uncertainResolution", next)}
                 />
               )}
-            </div>
+              {/* 점수 입력은 [승점] 탭 자동 row에서만 — 승점 시스템 off 시 점수가 의미 없으므로 정보 통일. */}
           </div>
+            );
+          })()}
 
           <div className="flex gap-1 bg-dark-800 p-1 rounded-lg">
             {tabs.map((t) => (
@@ -868,30 +1170,8 @@ function PlayerForm({
             ))}
           </div>
 
-          {tab === "basic" && (
+          {effectiveTab === "basic" && (
             <div className="space-y-3">
-              <ImageAssetField
-                title="캐릭터 대표 이미지"
-                description="선택·투표 화면에 표시됩니다."
-                value={player.cardImage}
-                alt={player.name || "플레이어 캐릭터 이미지"}
-                profile="portrait"
-                onChange={(nextValue) => update("cardImage", nextValue)}
-                onUpload={handleCardImageUpload}
-                uploading={uploadingImage}
-                uploadLabel="인물 이미지 업로드"
-                emptyStateLabel="이미지 없음"
-              />
-              <div>
-                <label className="block text-xs font-medium text-dark-400 mb-1">배경 (전원 공개)</label>
-                <textarea
-                  rows={3}
-                  value={player.background}
-                  onChange={(e) => update("background", e.target.value)}
-                  placeholder="다른 플레이어에게도 공개되는 캐릭터 소개"
-                  className={ta}
-                />
-              </div>
               <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <label className="block text-xs font-medium text-dark-400">
@@ -930,23 +1210,87 @@ function PlayerForm({
             </div>
           )}
 
-          {tab === "score" && (
-            <ScoreConditionsEditor
-              scoreConditions={player.scoreConditions}
-              clues={clues}
-              voteQuestions={voteQuestions}
-              onChangeVoteQuestions={onChangeVoteQuestions}
-              currentPlayerId={player.id}
-              players={players}
-              npcs={npcs}
-              victim={victim}
-              onUpdate={(idx, patch) => updateScore(idx, patch)}
-              onAdd={() => update("scoreConditions", [...player.scoreConditions, { description: "", points: 1, type: "manual" }])}
-              onDelete={(idx) => update("scoreConditions", player.scoreConditions.filter((_, i) => i !== idx))}
-            />
-          )}
+          {effectiveTab === "score" && (() => {
+            // 자동 연동 항목(autoFromVictory)은 승리조건 영역에서 편집되므로 [승점] 탭에는 read-only row로 노출.
+            // 다른 점수 항목과 동일한 row 폼 + 모드 라벨 + 우측 점수 정렬 — 메인 승리조건 인식 + 추가 점수와 시각 통일.
+            const visible = player.scoreConditions
+              .map((sc, idx) => ({ sc, idx }))
+              .filter(({ sc }) => !sc.autoFromVictory);
+            // 캐릭터 입장이 확정되면 그에 맞는 라벨로, 아직 미입력/미설정이면 모드 명만 노출.
+            // 미확신은 첫 트리거의 resolveAs를 메이커 시점 결과로 보고 그 라벨로 업데이트.
+            const modeLabel = (() => {
+              if (inputMode === "auto") {
+                if (!culpritAssigned) return "기본";
+                return displayedRole === "avoid-arrest" ? "검거 회피 시" : "범인 검거 시";
+              }
+              if (inputMode === "personal-goal") {
+                const goal = (player.personalGoal ?? "").trim();
+                return goal || "개인 목표";
+              }
+              // uncertain
+              const triggers = player.uncertainResolution?.triggers ?? [];
+              if (triggers.length === 0) return "미확신";
+              const result = triggers[0]?.resolveAs;
+              if (result === "culprit") return "검거 회피 시";
+              if (result === "innocent") return "범인 검거 시";
+              return "미확신";
+            })();
+            return (
+              <div className="space-y-3">
+                {autoVictoryScore && (() => {
+                  const isPerClue = (autoVictoryScore.type ?? "manual") === "clue-collection"
+                    && autoVictoryScore.config?.clueCountMode === "per-clue";
+                  const selectedCount = autoVictoryScore.config?.clueIds?.length ?? 0;
+                  const maxPoints = autoVictoryScore.points * selectedCount;
+                  return (
+                    <div className="rounded-lg border border-mystery-800/60 bg-mystery-950/15 p-3 space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <span className="flex-1 px-3 py-2 text-xs text-mystery-200 font-medium">
+                          승리 조건 ({modeLabel})
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={autoVictoryScore.points}
+                          onChange={(e) => patchAutoVictoryScore({ points: Math.max(0, Number(e.target.value)) })}
+                          className="w-14 bg-dark-800 border border-dark-600 rounded-lg px-2 py-2 text-dark-100 text-xs text-center focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                        />
+                        <span className="text-xs text-dark-500 shrink-0">점</span>
+                      </div>
+                      {/* per-clue 모드: 메이커 시점 동적 계산 — 단서당 점수 + 선택 개수 + 최대 점수. */}
+                      {isPerClue && (
+                        <p className="text-[11px] text-mystery-200/90 border-t border-mystery-800/40 pt-2">
+                          단서 1개당 <span className="font-semibold">{autoVictoryScore.points}점</span>
+                          <span className="text-dark-500"> · </span>
+                          선택 <span className="font-semibold">{selectedCount}개</span> 모두 보유 시 최대{" "}
+                          <span className="font-semibold">{maxPoints}점</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+                <ScoreConditionsEditor
+                  scoreConditions={visible.map((v) => v.sc)}
+                  clues={clues}
+                  locations={locations}
+                  voteQuestions={voteQuestions}
+                  onChangeVoteQuestions={onChangeVoteQuestions}
+                  currentPlayerId={player.id}
+                  players={players}
+                  npcs={npcs}
+                  victim={victim}
+                  onUpdate={(localIdx, patch) => updateScore(visible[localIdx].idx, patch)}
+                  onAdd={() => update("scoreConditions", [...player.scoreConditions, { description: "", points: 1, type: "manual" }])}
+                  onDelete={(localIdx) => {
+                    const realIdx = visible[localIdx].idx;
+                    update("scoreConditions", player.scoreConditions.filter((_, i) => i !== realIdx));
+                  }}
+                />
+              </div>
+            );
+          })()}
 
-          {tab === "clues" && (
+          {effectiveTab === "clues" && (
             <div className="space-y-2">
               {player.relatedClues.map((rc, idx) => {
                 const groupsForRow = getRelatedClueGroupsForRow(idx);
@@ -1003,7 +1347,7 @@ function PlayerForm({
             </div>
           )}
 
-          {tab === "rel" && (
+          {effectiveTab === "rel" && (
             <div className="space-y-2">
               {player.relationships.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-dark-700 px-4 py-5">
@@ -1077,12 +1421,12 @@ export default function PlayerEditor({
   onChange,
   onChangeTimeline,
   onChangeVoteQuestions,
-  onChangeCulprit,
-  onChangeCulpritScope,
-  focusTarget,
-  focusToken,
+  onJumpToCulpritStep,
+  scoringEnabled,
 }: PlayerEditorProps) {
   const [view, setView] = useState<"profiles" | "timeline">("profiles");
+  // 캐릭터 추가/삭제로 panel(인원 mismatch / 이름 비어있음) 변동 시 viewport 보존.
+  const captureScrollAnchor = useScrollAnchor();
   const syncedPlayers = players.map((player) => alignTimelineEntries(player, timeline));
   const relationTargets: RelationTargetOption[] = [
     ...syncedPlayers.map((player) => ({
@@ -1099,21 +1443,6 @@ export default function PlayerEditor({
     })),
   ];
 
-  useEffect(() => {
-    if (!focusTarget) {
-      return;
-    }
-
-    if (focusTarget === "step-3-timeline") {
-      setView("timeline");
-      return;
-    }
-
-    if (focusTarget.startsWith("step-3-")) {
-      setView("profiles");
-    }
-  }, [focusTarget, focusToken, timeline.enabled]);
-
   return (
     <div className="space-y-6">
       <div data-maker-anchor="step-3-players" className="flex items-start justify-between">
@@ -1127,16 +1456,8 @@ export default function PlayerEditor({
               : "타임라인 꺼짐"}
           </p>
         </div>
-        <Button size="sm" onClick={() => onChange([...players, createPlayer()])}>+ 플레이어 추가</Button>
+        <Button size="sm" onClick={(e) => { captureScrollAnchor(e); onChange([...players, createPlayer()]); }}>+ 플레이어 추가</Button>
       </div>
-
-      <CulpritSelectorBox
-        story={story}
-        syncedPlayers={syncedPlayers}
-        voteQuestions={voteQuestions}
-        onChangeCulprit={onChangeCulprit}
-        onChangeCulpritScope={onChangeCulpritScope}
-      />
 
       <div className="flex gap-1 bg-dark-900 p-1 rounded-xl border border-dark-800">
         <button
@@ -1157,7 +1478,7 @@ export default function PlayerEditor({
             view === "timeline" ? "bg-dark-700 text-dark-50" : "text-dark-500 hover:text-dark-300",
           ].join(" ")}
         >
-          중앙 타임라인
+          타임라인
         </button>
       </div>
 
@@ -1186,7 +1507,7 @@ export default function PlayerEditor({
           <p className="text-dark-500">등록된 플레이어가 없습니다.</p>
           <button
             type="button"
-            onClick={() => onChange([...players, createPlayer()])}
+            onClick={(e) => { captureScrollAnchor(e); onChange([...players, createPlayer()]); }}
             className="mt-2 text-sm text-mystery-400 hover:text-mystery-300 transition-colors"
           >
             + 첫 번째 플레이어 추가
@@ -1208,8 +1529,11 @@ export default function PlayerEditor({
               npcs={story.npcs}
               victim={story.victim}
               isCulprit={player.id === story.culpritPlayerId}
+              story={story}
               onChange={(updated) => onChange(players.map((p, i) => i === idx ? updated : p))}
               onDelete={() => onChange(players.filter((_, i) => i !== idx))}
+              onJumpToCulpritStep={onJumpToCulpritStep}
+              scoringEnabled={scoringEnabled}
             />
           ))}
         </div>
@@ -1223,13 +1547,16 @@ export default function PlayerEditor({
 const SCORE_TYPE_LABELS: Record<ScoreConditionType, string> = {
   manual: "수동 판정",
   "culprit-outcome": "범인 검거 결과",
-  "clue-ownership": "단서 보유 여부",
   "vote-answer": "개인 투표 답변",
+  "target-player-not-arrested": "특정 플레이어 미검거",
+  "target-player-arrested": "특정 플레이어 검거",
+  "clue-collection": "단서 수집",
 };
 
 function ScoreConditionsEditor({
   scoreConditions,
   clues,
+  locations,
   voteQuestions,
   onChangeVoteQuestions,
   currentPlayerId,
@@ -1242,6 +1569,7 @@ function ScoreConditionsEditor({
 }: {
   scoreConditions: ScoreCondition[];
   clues: Clue[];
+  locations: Location[];
   voteQuestions: VoteQuestion[];
   onChangeVoteQuestions: (next: VoteQuestion[]) => void;
   currentPlayerId: string;
@@ -1340,44 +1668,6 @@ function ScoreConditionsEditor({
                   <option value="arrested">범인이 검거됐을 때</option>
                   <option value="escaped">범인이 도주했을 때</option>
                 </select>
-              </div>
-            )}
-
-            {type === "clue-ownership" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-dark-500 shrink-0">대상 단서</label>
-                  <select
-                    value={sc.config?.clueId ?? ""}
-                    onChange={(e) => onUpdate(idx, {
-                      config: { ...sc.config, clueId: e.target.value || undefined },
-                    })}
-                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
-                  >
-                    <option value="">— 단서 선택 —</option>
-                    {clues.map((c) => (
-                      <option key={c.id} value={c.id}>{c.title || "(이름 없음)"}</option>
-                    ))}
-                  </select>
-                </div>
-                {!sc.config?.clueId && (
-                  <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
-                    대상 단서를 선택해야 자동 판정됩니다.
-                  </p>
-                )}
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-dark-500 shrink-0">조건</label>
-                  <select
-                    value={sc.config?.expectedOwnership ?? "has"}
-                    onChange={(e) => onUpdate(idx, {
-                      config: { ...sc.config, expectedOwnership: e.target.value as "has" | "not-has" },
-                    })}
-                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
-                  >
-                    <option value="has">보유해야 달성</option>
-                    <option value="not-has">미보유해야 달성</option>
-                  </select>
-                </div>
               </div>
             )}
 
@@ -1592,6 +1882,39 @@ function ScoreConditionsEditor({
                 </div>
               );
             })()}
+
+            {/* 신규 — 케이스 A: 특정 플레이어 미검거 */}
+            {type === "target-player-not-arrested" && (
+              <TargetPlayerSelector
+                label="이 플레이어가 검거되지 않으면"
+                players={players}
+                value={sc.config?.targetPlayerId ?? ""}
+                onChange={(targetPlayerId) => onUpdate(idx, { config: { ...sc.config, targetPlayerId } })}
+                emptyHint="대상 플레이어를 선택해야 자동 판정됩니다."
+              />
+            )}
+
+            {/* 신규 — 케이스 C: 특정 플레이어 검거 (범인 유무 무관) */}
+            {type === "target-player-arrested" && (
+              <TargetPlayerSelector
+                label="이 플레이어가 검거되면 (범인 유무 무관)"
+                players={players}
+                value={sc.config?.targetPlayerId ?? ""}
+                onChange={(targetPlayerId) => onUpdate(idx, { config: { ...sc.config, targetPlayerId } })}
+                emptyHint="대상 플레이어를 선택해야 자동 판정됩니다."
+              />
+            )}
+
+            {/* 신규 — 케이스 D: 단서 N개 수집 */}
+            {type === "clue-collection" && (
+              <ClueCollectionInput
+                clues={clues}
+                locations={locations}
+                config={sc.config}
+                points={sc.points}
+                onChange={(next) => onUpdate(idx, { config: { ...sc.config, ...next } })}
+              />
+            )}
           </div>
         );
       })}
@@ -1607,192 +1930,418 @@ function ScoreConditionsEditor({
   );
 }
 
-// ─── 범인 지정 박스 ─────────────────────────────────────────
+// ─── 승점 조건 type별 부가 입력 헬퍼 ─────────────────────────
 
-/**
- * 범인 지정 셀렉트.
- *
- * 위쪽에 후보군 모드 토글(플레이어만 / 플레이어 + NPC + 피해자)을 두고,
- * 같은 값을 투표 탭의 주 질문 `targetMode` 와 동기화한다.
- * 즉 여기서 모드를 바꾸면 투표 탭의 1차 투표 대상도 같이 갱신되고, 반대도 동일.
- *
- * 이미 NPC/피해자 가 범인으로 저장돼 있으면(레거시 데이터 포함) 모드를 자동으로 확장 모드로 띄운다.
- */
-function CulpritSelectorBox({
-  story,
-  syncedPlayers,
-  voteQuestions,
-  onChangeCulprit,
-  onChangeCulpritScope,
+function TargetPlayerSelector({
+  label,
+  players,
+  value,
+  onChange,
+  emptyHint,
 }: {
-  story: Story;
-  syncedPlayers: Player[];
-  voteQuestions: VoteQuestion[];
-  onChangeCulprit: (culpritId: string) => void;
-  onChangeCulpritScope: (mode: "players-only" | "players-and-npcs") => void;
+  label: string;
+  players: Player[];
+  value: string;
+  onChange: (targetPlayerId: string | undefined) => void;
+  emptyHint?: string;
 }) {
-  const culpritIdentity = resolveCulpritIdentity(story.culpritPlayerId, syncedPlayers, story);
-  const victimName = story.victim?.name?.trim() ?? "";
-  const npcOptions = (story.npcs ?? []).filter((n) => (n.name ?? "").trim().length > 0);
-  const noCandidates = syncedPlayers.length === 0 && !victimName && npcOptions.length === 0;
-  const staleCulpritId = story.culpritPlayerId && !culpritIdentity ? story.culpritPlayerId : null;
-
-  const primaryQuestion = voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
-  const primaryMode = primaryQuestion?.targetMode;
-
-  // 표시용 모드 결정.
-  // - 투표 탭 주 질문이 custom-choices 라면 범인 셀렉트는 "플레이어만" 토글이 어색하므로 확장 모드로 전부 노출.
-  // - NPC/피해자 가 이미 범인으로 지정돼 있으면 확장 모드로 강제 표시.
-  // - 그 외는 주 질문의 targetMode 기준.
-  const requiresExpanded = (culpritIdentity && culpritIdentity.kind !== "player") || primaryMode === "custom-choices";
-  const effectiveMode: "players-only" | "players-and-npcs" =
-    requiresExpanded ? "players-and-npcs"
-    : primaryMode === "players-and-npcs" ? "players-and-npcs"
-    : "players-only";
-
-  function handleChangeMode(next: "players-only" | "players-and-npcs") {
-    if (next === "players-only" && culpritIdentity && culpritIdentity.kind !== "player") {
-      // 현재 범인이 NPC/피해자 인데 모드를 좁히면 후보에서 사라지므로 먼저 클리어.
-      onChangeCulprit("");
-    }
-    onChangeCulpritScope(next);
-  }
-
-  function handleChangeCulprit(nextId: string) {
-    if (!nextId) {
-      onChangeCulprit("");
-      return;
-    }
-    // NPC/피해자 를 골랐는데 현재 모드가 좁으면 자동으로 확장 모드로 넓힌다.
-    const isNonPlayer = nextId === CULPRIT_VICTIM_ID || npcOptions.some((n) => n.id === nextId);
-    if (isNonPlayer && primaryMode !== "players-and-npcs") {
-      onChangeCulpritScope("players-and-npcs");
-    }
-    onChangeCulprit(nextId);
-  }
-
-  const showVictimGroup = effectiveMode === "players-and-npcs";
-  const showNpcGroup = effectiveMode === "players-and-npcs";
-
   return (
-    <div data-maker-anchor="step-3-culprit" className="rounded-xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-dark-100">범인 지정</p>
-        </div>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-dark-500 shrink-0">{label}</label>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value || undefined)}
+          className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+        >
+          <option value="">— 플레이어 선택 —</option>
+          {players.map((p) => (
+            <option key={p.id} value={p.id}>{p.name || "(이름 없음)"}</option>
+          ))}
+        </select>
       </div>
-
-      {/* 후보군 모드 토글 — 투표 탭 주 질문 targetMode 와 동기화됨. */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-dark-400">범인 후보군</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleChangeMode("players-only")}
-            disabled={primaryMode === "custom-choices"}
-            className={[
-              "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-              effectiveMode === "players-only"
-                ? "border-mystery-600 bg-mystery-950/40 text-mystery-200"
-                : "border-dark-700 bg-dark-800/40 text-dark-400 hover:border-dark-500",
-              primaryMode === "custom-choices" ? "cursor-not-allowed opacity-50" : "",
-            ].join(" ")}
-          >
-            플레이어만
-          </button>
-          <button
-            type="button"
-            onClick={() => handleChangeMode("players-and-npcs")}
-            disabled={primaryMode === "custom-choices"}
-            className={[
-              "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-              effectiveMode === "players-and-npcs"
-                ? "border-mystery-600 bg-mystery-950/40 text-mystery-200"
-                : "border-dark-700 bg-dark-800/40 text-dark-400 hover:border-dark-500",
-              primaryMode === "custom-choices" ? "cursor-not-allowed opacity-50" : "",
-            ].join(" ")}
-          >
-            플레이어 + NPC + 피해자
-          </button>
-        </div>
-        {primaryMode === "custom-choices" && (
-          <p className="text-[11px] text-dark-500">
-            커스텀 선택지 모드에서는 전체 인물을 표시합니다.
-          </p>
-        )}
-      </div>
-
-      <select
-        value={story.culpritPlayerId}
-        onChange={(e) => handleChangeCulprit(e.target.value)}
-        className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 focus:border-transparent transition text-sm"
-      >
-        <option value="">— 범인을 선택하세요 —</option>
-
-        <optgroup label="플레이어">
-          {syncedPlayers.length === 0 ? (
-            <option value="" disabled>
-              플레이어를 먼저 추가하세요
-            </option>
-          ) : (
-            syncedPlayers.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.name || "(이름 없음)"}
-              </option>
-            ))
-          )}
-        </optgroup>
-
-        {showVictimGroup && (
-          <optgroup label="피해자">
-            {victimName ? (
-              <option value={CULPRIT_VICTIM_ID}>{victimName}</option>
-            ) : (
-              <option value="" disabled>
-                (피해자 이름 미입력 — 사건 개요 탭에서 설정 가능)
-              </option>
-            )}
-          </optgroup>
-        )}
-
-        {showNpcGroup && (
-          <optgroup label="NPC">
-            {npcOptions.length === 0 ? (
-              <option value="" disabled>
-                (NPC 없음 — 필요할 때만 사건 개요 탭에서 추가)
-              </option>
-            ) : (
-              npcOptions.map((npc) => (
-                <option key={npc.id} value={npc.id}>
-                  {npc.name}
-                </option>
-              ))
-            )}
-          </optgroup>
-        )}
-
-        {staleCulpritId && (
-          <option value={staleCulpritId} disabled>
-            (삭제된 캐릭터)
-          </option>
-        )}
-      </select>
-
-      {noCandidates ? (
-        <p className="text-xs text-dark-600">
-          선택 가능한 인물이 없습니다.
+      {!value && emptyHint && (
+        <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
+          {emptyHint}
         </p>
-      ) : culpritIdentity ? (
-        <p className="text-xs text-mystery-400">
-          선택됨: {formatCulpritLabel(culpritIdentity)}
-        </p>
-      ) : staleCulpritId ? (
-        <p className="text-xs text-red-300">
-          기존에 지정한 범인이 삭제됐습니다. 다시 선택해 주세요.
-        </p>
-      ) : (
-        <p className="text-xs text-yellow-300">아직 범인이 지정되지 않았습니다.</p>
       )}
     </div>
   );
 }
+
+/** 단서를 소속 장소별로 그룹핑한다. 장소 미지정 단서는 마지막에 묶음. */
+function groupCluesByLocation(clues: Clue[], locations: Location[]): { locationName: string; clues: Clue[] }[] {
+  const byLoc = new Map<string, Clue[]>();
+  const orphan: Clue[] = [];
+  for (const clue of clues) {
+    const locId = clue.locationId;
+    if (!locId) { orphan.push(clue); continue; }
+    if (!byLoc.has(locId)) byLoc.set(locId, []);
+    byLoc.get(locId)!.push(clue);
+  }
+  const groups: { locationName: string; clues: Clue[] }[] = [];
+  for (const loc of locations) {
+    const arr = byLoc.get(loc.id);
+    if (arr && arr.length > 0) groups.push({ locationName: loc.name?.trim() || "(이름 없는 장소)", clues: arr });
+  }
+  if (orphan.length > 0) groups.push({ locationName: "(장소 미지정)", clues: orphan });
+  return groups;
+}
+
+function ClueCollectionInput({
+  clues,
+  locations,
+  config,
+  points,
+  onChange,
+}: {
+  clues: Clue[];
+  locations: Location[];
+  config: ScoreCondition["config"];
+  /** 단위 점수 (개당). per-clue 모드의 총점 동적 계산에 사용. 0 이하면 per-clue 옵션 비활성. */
+  points: number;
+  onChange: (patch: Partial<NonNullable<ScoreCondition["config"]>>) => void;
+}) {
+  const selectedIds = config?.clueIds ?? [];
+  const mode = config?.clueCountMode ?? "all";
+  const threshold = config?.clueCountThreshold ?? 1;
+  const groups = groupCluesByLocation(clues, locations);
+  const perClueAllowed = points > 0;
+
+  function toggleClue(clueId: string, checked: boolean) {
+    const next = checked
+      ? Array.from(new Set([...selectedIds, clueId]))
+      : selectedIds.filter((id) => id !== clueId);
+    onChange({ clueIds: next });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="text-[11px] text-dark-500 mb-1 block">대상 단서 (다중 선택)</label>
+        {clues.length === 0 ? (
+          <p className="text-[11px] text-dark-600 border border-dashed border-dark-700 rounded-lg px-2 py-1.5">
+            등록된 단서가 없습니다.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto rounded-lg border border-dark-700 bg-dark-950/40 p-2">
+            {groups.map((g) => (
+              <div key={g.locationName}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-dark-500 mb-1 px-1">
+                  {g.locationName}
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {g.clues.map((c) => (
+                    <label key={c.id} className="flex items-center gap-1.5 text-[11px] text-dark-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(c.id)}
+                        onChange={(e) => toggleClue(c.id, e.target.checked)}
+                        className="shrink-0"
+                      />
+                      <span className="truncate">{c.title || "(이름 없음)"}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className={`mt-1 text-[11px] rounded-lg px-2 py-1.5 ${selectedIds.length === 0
+          ? "text-red-400/80 border border-red-900/40 bg-red-950/10"
+          : "text-dark-400 border border-dark-700 bg-dark-950/40"}`}>
+          {selectedIds.length === 0
+            ? "대상 단서를 1개 이상 선택해야 자동 판정됩니다."
+            : `선택 ${selectedIds.length}개`}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-dark-500 shrink-0">조건</label>
+        <select
+          value={mode}
+          onChange={(e) => {
+            const next = e.target.value as "all" | "at-least-n" | "per-clue";
+            // per-clue는 단위 점수가 있어야 의미 있음. 점수 0이면 per-clue 선택해도 다시 all로 되돌림.
+            if (next === "per-clue" && !perClueAllowed) {
+              onChange({ clueCountMode: "all" });
+              return;
+            }
+            onChange({ clueCountMode: next });
+          }}
+          className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+        >
+          <option value="all">선택한 단서 모두 보유 시</option>
+          <option value="at-least-n">N개 이상 보유 시</option>
+          <option value="per-clue" disabled={!perClueAllowed}>
+            {perClueAllowed ? "보유 단서 1개당 (누적)" : "보유 단서 1개당 — 아래 점수 설정 필요"}
+          </option>
+        </select>
+      </div>
+
+      {mode === "at-least-n" && (
+        <div className="flex items-center gap-2">
+          <label className="text-[11px] text-dark-500 shrink-0">최소 N</label>
+          <input
+            type="number"
+            min={1}
+            max={selectedIds.length || 1}
+            value={threshold}
+            onChange={(e) => onChange({ clueCountThreshold: Math.max(1, Number(e.target.value)) })}
+            className="w-16 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs text-center focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+          />
+          <span className="text-[11px] text-dark-500">/ {selectedIds.length}개 중</span>
+        </div>
+      )}
+
+      {/* per-clue 동적 계산은 [승점] 탭 자동 row에 표시 — 개인 목표 영역에 점수 정보가 흩어지지 않도록. */}
+    </div>
+  );
+}
+
+// ─── 미확신 캐릭터 결정 트리거 입력 ─────────────────────────
+
+/**
+ * 미확신(uncertain) 캐릭터의 도중 결정 트리거 편집기.
+ *
+ * triggers 하위에서 종류·조건·결정·메시지를 모두 편집한다. 추가 버튼은 1개 — 트리거 1개부터 시작.
+ * triggerMatch는 트리거 2개 이상일 때만 노출되며 "any"(어느 하나) / "all"(모두) 중 선택.
+ * 단서 트리거 라벨이 "단서 확인/보유"인 이유: 본인이 인벤토리로 보유 OR 공용 단서 카드를 직접 확인(모달 열람)한 시점에 발동.
+ *
+ * 발동 시 본인 카드에 toast 알림이 뜨며, message 입력 시 그 값, 없으면 시스템 기본 문구.
+ * defaultResolveAs는 어떤 트리거도 발동 안 한 채 게임 종료 시 적용. 비워두면 "미결정" 라벨 유지.
+ */
+function UncertainResolutionEditor({
+  resolution,
+  clues,
+  locations,
+  onChange,
+}: {
+  resolution: UncertainResolution | undefined;
+  clues: Clue[];
+  locations: Location[];
+  onChange: (next: UncertainResolution | undefined) => void;
+}) {
+  const triggers = resolution?.triggers ?? [];
+  const clueGroups = groupCluesByLocation(clues, locations);
+  const triggerMatch = resolution?.triggerMatch ?? "any";
+  const defaultResolveAs = resolution?.defaultResolveAs;
+  const captureAnchor = useScrollAnchor();
+  // 삭제 시 클릭 element가 detach되어 보정이 망가지는 것을 막기 위해 컨테이너를 stable anchor로 사용.
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  function commit(next: {
+    triggers?: UncertainResolutionTrigger[];
+    triggerMatch?: "any" | "all";
+    defaultResolveAs?: "culprit" | "innocent";
+  }) {
+    const nextTriggers = next.triggers ?? triggers;
+    const nextMatch = next.triggerMatch ?? triggerMatch;
+    const nextDefault = "defaultResolveAs" in next ? next.defaultResolveAs : defaultResolveAs;
+    if (nextTriggers.length === 0 && nextDefault === undefined) {
+      onChange(undefined);
+      return;
+    }
+    onChange({ triggers: nextTriggers, triggerMatch: nextMatch, defaultResolveAs: nextDefault });
+  }
+
+  function addTrigger() {
+    // 신규 트리거는 기존 트리거의 resolveAs를 이어받아 매칭 박스의 단일 결정과 정합 유지.
+    const carryResolveAs = triggers[0]?.resolveAs ?? "innocent";
+    const newTrigger: UncertainResolutionTrigger = { kind: "round-reached", round: 1, resolveAs: carryResolveAs };
+    commit({ triggers: [...triggers, newTrigger] });
+  }
+
+  /** 매칭 박스의 단일 "결정"이 변경되면 모든 트리거의 resolveAs를 일괄 동기화한다. */
+  function setCommonResolveAs(value: "culprit" | "innocent") {
+    const next = triggers.map((t) => ({ ...t, resolveAs: value }) as UncertainResolutionTrigger);
+    commit({ triggers: next });
+  }
+
+  function updateTrigger(idx: number, patch: Partial<UncertainResolutionTrigger>) {
+    const next = triggers.map((t, i) => (i === idx ? ({ ...t, ...patch } as UncertainResolutionTrigger) : t));
+    commit({ triggers: next });
+  }
+
+  function changeKind(idx: number, nextKind: "round-reached" | "clue-seen") {
+    const current = triggers[idx];
+    if (current.kind === nextKind) return;
+    const carry = { resolveAs: current.resolveAs, message: current.message };
+    const nextTrigger: UncertainResolutionTrigger =
+      nextKind === "round-reached"
+        ? { kind: "round-reached", round: 1, ...carry }
+        : { kind: "clue-seen", clueId: "", ...carry };
+    commit({ triggers: triggers.map((t, i) => (i === idx ? nextTrigger : t)) });
+  }
+
+  function removeTrigger(idx: number) {
+    commit({ triggers: triggers.filter((_, i) => i !== idx) });
+  }
+
+  // 트리거 설정 요약 — 위 안내 박스에 동적 표시. 트리거 카드와 중복되지 않도록 결과 한 줄.
+  const summaryText = (() => {
+    if (triggers.length === 0) return "트리거 미설정 — 게임 동안 미결정 유지";
+    const result = triggers[0]?.resolveAs === "culprit" ? "범인" : "무고";
+    if (triggers.length === 1) return `조건 만족 시 → ${result}`;
+    const matchLabel = triggerMatch === "all" ? "모든" : "어느 한";
+    return `${matchLabel} 트리거 만족 시 → ${result}`;
+  })();
+
+  return (
+    <div ref={containerRef} className="mt-2 space-y-2 rounded-lg border border-yellow-900/40 bg-yellow-950/10 p-2">
+      <p className="text-[11px] font-medium text-yellow-200">{summaryText}</p>
+
+      <div className="space-y-1.5">
+        {triggers.length === 0 ? null : (
+          triggers.map((trigger, idx) => (
+            <div key={idx} className="rounded-lg border border-dark-700 bg-dark-900/40 p-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <select
+                  value={trigger.kind}
+                  onChange={(e) => changeKind(idx, e.target.value as "round-reached" | "clue-seen")}
+                  className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                >
+                  <option value="round-reached">특정 라운드 진입 시</option>
+                  <option value="clue-seen">특정 단서 확인/보유 시</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { captureAnchor(containerRef.current); removeTrigger(idx); }}
+                  className="px-2 py-1 text-[11px] text-red-400/80 hover:text-red-300"
+                >
+                  삭제
+                </button>
+              </div>
+
+              {trigger.kind === "round-reached" && (
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-dark-500 shrink-0">라운드</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={trigger.round}
+                    onChange={(e) => updateTrigger(idx, { round: Math.max(1, Number(e.target.value)) })}
+                    className="w-16 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs text-center focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                  />
+                  <span className="text-[11px] text-dark-500">진입 시</span>
+                </div>
+              )}
+
+              {trigger.kind === "clue-seen" && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-dark-500 shrink-0">단서</label>
+                    <select
+                      value={trigger.clueId}
+                      onChange={(e) => updateTrigger(idx, { clueId: e.target.value })}
+                      className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                    >
+                      <option value="">— 단서 선택 —</option>
+                      {clueGroups.map((g) => (
+                        <optgroup key={g.locationName} label={g.locationName}>
+                          {g.clues.map((c) => (
+                            <option key={c.id} value={c.id}>{c.title || "(이름 없음)"}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  {!trigger.clueId && (
+                    <p className="text-[11px] text-red-400/80 border border-red-900/40 bg-red-950/10 rounded-lg px-2 py-1.5">
+                      단서를 선택해야 트리거가 동작합니다.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* 결정 셀렉트는 트리거 1개일 때만 트리거 카드 안에 표시. 2개 이상이면 매칭 박스의 통합 결정이 적용. */}
+              {triggers.length === 1 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-dark-500 shrink-0">결정</label>
+                  <select
+                    value={trigger.resolveAs}
+                    onChange={(e) => updateTrigger(idx, { resolveAs: e.target.value as "culprit" | "innocent" })}
+                    className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                  >
+                    <option value="innocent">무고로 결정</option>
+                    <option value="culprit">범인으로 결정</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[11px] text-dark-500 mb-1 block">알림 메시지 (선택)</label>
+                <input
+                  type="text"
+                  value={trigger.message ?? ""}
+                  onChange={(e) => updateTrigger(idx, { message: e.target.value || undefined })}
+                  placeholder={trigger.resolveAs === "culprit" ? "예: 당신이 범인이었습니다." : "예: 당신은 무고합니다."}
+                  className="w-full bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs placeholder:text-dark-600 focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+                />
+                <p className="mt-1 text-[10px] text-dark-600">
+                  비워두면 시스템 기본 문구로 표시됩니다.
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={(e) => { captureAnchor(e); addTrigger(); }}
+        className="w-full py-1.5 px-2 rounded-md border border-dashed border-dark-600 hover:border-yellow-500 text-dark-400 hover:text-yellow-300 text-[11px] font-medium transition-colors"
+      >
+        + 트리거 추가
+      </button>
+
+      {/* 매칭 모드 + 통합 결정 — 트리거 2개 이상일 때 노출. 결정은 모든 트리거에 일괄 동기화되어 중복 제거. */}
+      {triggers.length >= 2 && (
+        <div className="space-y-1.5 rounded-lg border border-amber-700/60 bg-amber-950/30 px-2 py-2">
+          <div className="flex items-center gap-2">
+            <label className="w-10 shrink-0 text-[11px] font-semibold text-amber-200">매칭</label>
+            <select
+              value={triggerMatch}
+              onChange={(e) => commit({ triggerMatch: e.target.value === "all" ? "all" : "any" })}
+              className="flex-1 bg-dark-800 border border-amber-700/40 rounded-lg px-2 py-1 text-amber-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 transition"
+            >
+              <option value="any">어느 한 트리거라도 만족 시 (OR)</option>
+              <option value="all">모든 트리거 동시 만족 시 (AND)</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="w-10 shrink-0 text-[11px] font-semibold text-amber-200">결정</label>
+            <select
+              value={triggers[0]?.resolveAs ?? "innocent"}
+              onChange={(e) => setCommonResolveAs(e.target.value as "culprit" | "innocent")}
+              className="flex-1 bg-dark-800 border border-amber-700/40 rounded-lg px-2 py-1 text-amber-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 transition"
+            >
+              <option value="innocent">무고로 결정</option>
+              <option value="culprit">범인으로 결정</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1.5 border-t border-dark-700/60">
+        <label className="text-[11px] text-dark-500 shrink-0">미발동 시</label>
+        <select
+          value={defaultResolveAs ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            const next = v === "culprit" || v === "innocent" ? v : undefined;
+            commit({ defaultResolveAs: next });
+          }}
+          className="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-2 py-1.5 text-dark-100 text-xs focus:outline-none focus:ring-2 focus:ring-mystery-500 transition"
+        >
+          <option value="">미결정 유지</option>
+          <option value="innocent">무고로 결정</option>
+          <option value="culprit">범인으로 결정</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// 범인 지정 박스(`CulpritSelectorBox`)는 `./CulpritSelectorBox.tsx`로 분리됨.
+// Step 5(VoteEndingEditor) 상단에서 사용된다.

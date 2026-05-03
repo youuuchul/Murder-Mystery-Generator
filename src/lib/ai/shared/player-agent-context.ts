@@ -1,3 +1,4 @@
+import { getDisplayedVictoryRole } from "@/lib/culprit";
 import { buildGameForPlayer } from "@/lib/game-sanitizer";
 import { buildPlayerSharedBoardContent, type PlayerSharedBoardContent } from "@/lib/player-shared-board";
 import type { GamePackage, Player } from "@/types/game";
@@ -104,7 +105,12 @@ export function buildPlayerAgentVisibleContext(input: {
       background: me.background,
       story: me.story,
       secret: me.secret,
-      victoryCondition: me.victoryCondition,
+      // 미확신 캐릭터의 런타임 결정이 박혀 있으면 그 결과로 변환된 라벨을 AI에 전달.
+      victoryCondition: getDisplayedVictoryRole(
+        me,
+        input.game.story,
+        input.session.sharedState.uncertainResolutions,
+      ),
       personalGoal: me.personalGoal,
       relationships: (me.relationships ?? []).map((rel) => {
         const allPlayers = input.game.players;

@@ -71,6 +71,23 @@ export interface GameRules {
   };
   cluesPerRound: number;         // 라운드당 최대 획득 단서 수 (0 = 무제한)
   allowLocationRevisit: boolean; // 같은 라운드에 같은 장소 재방문 허용
+  /**
+   * 게임 단위 점수 시스템 사용 여부 (default true).
+   * false면 메이커 [승점] 탭이 비활성, 결과 화면 점수 표시 X, 점수 평가 자체 skip.
+   * 승점 없이 승리조건(범인/무고 라벨)만 있는 게임을 표현.
+   */
+  scoringEnabled?: boolean;
+  /**
+   * 라운드별 이벤트(나레이션·이미지·BGM·영상) 사용 여부 (default false).
+   * false면 미디어/이벤트 탭에서 라운드 카드 그룹이 접혀 있고, 라이브에서도 게임 단위 기본 지도/BGM만 사용.
+   * true면 라운드 카드별 enabled 토글로 라운드별 입력 펼침/접힘 제어.
+   */
+  useRoundEvents?: boolean;
+  /**
+   * 대기실 안내(나레이션·BGM) 사용 여부 (default false).
+   * true면 미디어/이벤트 탭에서 대기실 입력 펼침. game.scripts.lobby에 저장.
+   */
+  useLobbyScript?: boolean;
 }
 
 // ─── 스토리 & 타임라인 ───────────────────────────────────────
@@ -117,6 +134,8 @@ export interface Story {
   location?: string;
   gmOverview?: string; // GM 메인 화면 공통 메모
   mapImageUrl?: string; // GM 메인 화면 공통 지도/이미지
+  /** 게임 단위 기본 BGM URL — 라운드별 BGM이 없거나 라운드 이벤트가 off일 때 사용. */
+  defaultBackgroundMusic?: string;
   timeline: StoryTimeline;
   /**
    * GM only — 진짜 범인의 식별자.
@@ -155,23 +174,34 @@ export const VICTORY_CONDITION_LABELS: Record<VictoryCondition, string> = {
 
 /** 승점 조건 자동 판정 타입 */
 export type ScoreConditionType =
-  | "manual"            // 수동 판정 (기본, 설명만 표시)
-  | "culprit-outcome"   // 범인 검거 결과 (arrested/escaped)
-  | "clue-ownership"    // 특정 단서 보유 여부 (has/not-has)
-  | "vote-answer";      // 추가 투표 답변 일치 여부
+  | "manual"                       // 수동 판정 (설명만 표시)
+  | "culprit-outcome"              // 범인 검거 결과 (arrested/escaped) — auto 모드 캐릭터의 기본 점수
+  | "vote-answer"                  // 추가 투표 답변 일치 여부
+  | "target-player-not-arrested"   // 개인 목표 — 특정 플레이어가 검거되지 않으면 (케이스 A)
+  | "target-player-arrested"       // 개인 목표 — 특정 플레이어가 검거되면 (범인 유무 무관, 케이스 C)
+  | "clue-collection";             // 개인 목표 — 특정 단서 수집 (케이스 D, all / at-least-n / per-clue 모드)
 
 /** 자동 판정 조건의 세부 설정 */
 export interface ScoreConditionConfig {
   /** culprit-outcome: "arrested"=범인이 검거됨, "escaped"=범인이 도주함 */
   expectedOutcome?: "arrested" | "escaped";
-  /** clue-ownership: 대상 단서 ID */
-  clueId?: string;
-  /** clue-ownership: "has"=보유해야 달성, "not-has"=미보유해야 달성 */
-  expectedOwnership?: "has" | "not-has";
   /** vote-answer: 대상 투표 질문 ID (purpose="personal" 질문) */
   questionId?: string;
   /** vote-answer: 기대 답변 ID (선택지 ID 또는 플레이어 ID) */
   expectedAnswerId?: string;
+  /** target-player-not-arrested / target-player-arrested: 대상 플레이어 ID */
+  targetPlayerId?: string;
+  /** clue-collection: 대상 단서 ID 목록 */
+  clueIds?: string[];
+  /**
+   * clue-collection 매칭 모드:
+   * - "all" — 선택한 단서 모두 보유 시 points (1회)
+   * - "at-least-n" — N개 이상 보유 시 points (1회). N은 clueCountThreshold.
+   * - "per-clue" — 보유한 단서 1개당 points (누적). 1순위 points × ownedCount.
+   */
+  clueCountMode?: "all" | "at-least-n" | "per-clue";
+  /** clue-collection: at-least-n 모드일 때 최소 개수 N */
+  clueCountThreshold?: number;
 }
 
 /** 승점 조건 1개 */
@@ -181,6 +211,36 @@ export interface ScoreCondition {
   /** 자동 판정 타입. 없거나 "manual"이면 수동 판정(달성 여부 표시 안 함) */
   type?: ScoreConditionType;
   config?: ScoreConditionConfig;
+  /**
+   * 승리 조건 자동 연동 항목 마커. 메이커가 승리 조건 라디오를 선택하면 자동 생성/유지된다.
+   * 메이커 [승점] 탭에서는 표시·편집 안 됨(자동 관리). 승리 조건 영역에서 점수 액수만 편집 가능.
+   * 한 캐릭터당 1개만 존재.
+   */
+  autoFromVictory?: boolean;
+}
+
+/** 미확신(uncertain) 캐릭터의 게임 도중 입장 결정 트리거. */
+export type UncertainResolutionTrigger =
+  | { kind: "round-reached"; round: number; resolveAs: "culprit" | "innocent"; message?: string }
+  | { kind: "clue-seen"; clueId: string; resolveAs: "culprit" | "innocent"; message?: string };
+
+/**
+ * 미확신 캐릭터의 트리거 정의.
+ *
+ * `triggers` array — 발동 조건 묶음. 발동 시 `SharedState.uncertainResolutions[playerId]`에 결정 박힘.
+ * `triggerMatch`로 매칭 모드 결정:
+ * - `"any"` (기본): 어느 한 트리거라도 만족하면 발동. 첫 만족 트리거의 `resolveAs` 채택.
+ * - `"all"`: 모든 트리거 동시 만족 시 발동. 마지막 만족 트리거 시점에 첫 트리거의 `resolveAs` 채택.
+ *
+ * `defaultResolveAs`가 있으면 어떤 트리거도 발동 안 했을 때 게임 종료 시 default 적용. 없으면 "uncertain" 라벨 유지.
+ * `triggers` 빈 array = "라벨만 유지, 자동 결정 안 함".
+ *
+ * 트리거 발동 시 본인 카드 toast: 메이커가 `message` 입력했으면 그것, 없으면 시스템 기본 ("당신이 범인이었습니다." / "당신은 무고합니다.").
+ */
+export interface UncertainResolution {
+  triggers: UncertainResolutionTrigger[];
+  triggerMatch?: "any" | "all";
+  defaultResolveAs?: "culprit" | "innocent";
 }
 
 /** 연관 단서 정보 — 플레이어 카드에 표기. 자기 관련 단서가 어떤 것인지 알려줌 */
@@ -214,8 +274,13 @@ export interface Player {
   id: string;
   name: string; // 캐릭터 이름
   victoryCondition: VictoryCondition;
-  personalGoal?: string; // victoryCondition === "personal-goal"일 때 목표 설명
-  scoreConditions: ScoreCondition[]; // 승점 조건 목록
+  /**
+   * [deprecated] victoryCondition === "personal-goal"일 때 목표 설명.
+   * 신규 시스템에서는 `scoreConditions`에 개인 목표 4 케이스(target-player-not-arrested 등)로 자동 판정.
+   * 기존 데이터 호환용으로 유지. 마이그레이션 시 `scoreConditions[manual]`로 이전.
+   */
+  personalGoal?: string;
+  scoreConditions: ScoreCondition[]; // 승점 조건 목록 (기본 + 추가 통합)
   background: string; // 캐릭터 배경 (전원 공개)
   story: string; // 캐릭터 상세 스토리
   secret: string; // 비밀 정보
@@ -225,6 +290,11 @@ export interface Player {
   relatedClues: RelatedClueRef[]; // 연관 단서 카드 + 설명
   relationships: Relationship[];
   cardImage?: string;
+  /**
+   * 미확신(victoryCondition === "uncertain") 캐릭터의 게임 도중 입장 결정 트리거.
+   * 비어있으면 "라벨만 유지, 자동 결정 안 함" 모드. 메이커 시나리오 안내 텍스트 노출만.
+   */
+  uncertainResolution?: UncertainResolution;
 }
 
 // ─── 단서/장소 획득 조건 ──────────────────────────────────────
@@ -251,7 +321,6 @@ export interface Location {
   id: string;
   name: string;
   description: string;
-  imageUrl?: string;            // 장소 대표 이미지
   unlocksAtRound: number | null;
   clueIds: string[];
   ownerPlayerId?: string;         // 이 장소 소유자 — 해당 플레이어는 접근 불가
@@ -325,6 +394,11 @@ export interface RoundScript {
   imageUrl?: string;
   videoUrl?: string;
   backgroundMusic?: string;
+  /**
+   * 라운드 이벤트 사용 여부. false/undefined면 게임의 기본 대표 지도/BGM을 사용한다.
+   * 메이커가 [미디어/이벤트] 탭에서 라운드 카드의 on/off 토글로 제어한다.
+   */
+  enabled?: boolean;
 }
 
 export interface Scripts {

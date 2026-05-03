@@ -20,6 +20,7 @@ import {
   getNextRoundSubPhase,
   getRoundSubPhaseLabel,
   markPhaseStarted,
+  applyUncertainResolutionUpdate,
 } from "@/lib/session-phase";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import {
@@ -424,6 +425,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           }
 
           clearPhaseAdvanceRequests(sharedState);
+          // GM 직접 phase advance 시에도 미확신 트리거 평가 — round-reached 발동 가능.
+          if (game) applyUncertainResolutionUpdate(latestSession, game);
         } else if (body.action === "set_subphase") {
           const sub = normalizeSubPhase(body.subPhase);
           const enabledSubPhases = getEnabledRoundSubPhases(game?.rules);

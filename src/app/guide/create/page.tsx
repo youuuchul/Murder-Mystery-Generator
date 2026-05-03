@@ -38,7 +38,7 @@ export default function CreateGuidePage() {
           <h3 className="mt-3 text-xl font-semibold text-dark-50">기본 제작 흐름</h3>
           <ol className="mt-4 space-y-3 text-sm leading-relaxed text-dark-300">
             <li>1. `내 게임 관리`에서 `+ 새 게임 만들기`를 눌러 기본 정보를 만듭니다.</li>
-            <li>2. 편집 화면에서 Step 1~6을 순서대로 채워 시나리오를 완성합니다.</li>
+            <li>2. 편집 화면에서 Step 1~5를 순서대로 채워 시나리오를 완성합니다.</li>
             <li>3. 각 단계에서 저장 상태를 확인하며 필요한 부분을 다시 다듬습니다.</li>
             <li>4. 완성 전에는 비공개로 점검하고, 준비가 되면 공개로 전환합니다.</li>
           </ol>

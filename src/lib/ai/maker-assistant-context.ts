@@ -6,11 +6,10 @@ import type { MakerAssistantTask } from "@/types/assistant";
 
 const STEP_LABELS: Record<number, string> = {
   1: "기본 설정",
-  2: "사건 개요 / 오프닝",
+  2: "사건 개요 / 안내·미디어",
   3: "플레이어",
   4: "장소/단서",
-  5: "스크립트",
-  6: "엔딩",
+  5: "투표 / 엔딩",
 };
 
 export interface MakerAssistantContext {

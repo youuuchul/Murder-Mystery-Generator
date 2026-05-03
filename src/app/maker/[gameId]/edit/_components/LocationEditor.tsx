@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import ImageAssetField from "./ImageAssetField";
+import { useScrollAnchor } from "./useScrollAnchor";
 import type { Location, Clue, GameRules, Player, ClueCondition, ClueConditionType } from "@/types/game";
 
 interface LocationEditorProps {
@@ -46,7 +47,6 @@ function createLocation(): Location {
     id: crypto.randomUUID(),
     name: "",
     description: "",
-    imageUrl: undefined,
     unlocksAtRound: null,
     clueIds: [],
   };
@@ -271,7 +271,8 @@ function LocationBlock({
   onDeleteClue: (clueId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(!location.name && clues.length === 0);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // 장소·단서 추가/삭제 시 panel 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
   const ownerName = allCharacters.find((c) => c.id === location.ownerPlayerId)?.name ?? "지정 캐릭터";
   const visibleSummaryBadges = [
     `${clues.length}개 단서`,
@@ -279,7 +280,6 @@ function LocationBlock({
     location.ownerPlayerId
       ? `${ownerName} 제한`
       : null,
-    location.imageUrl ? "이미지 연결" : null,
     location.accessCondition ? "입장 조건" : null,
     location.previewCluesEnabled ? "단서 미리보기" : null,
   ].filter(Boolean) as string[];
@@ -287,36 +287,6 @@ function LocationBlock({
 
   function update<K extends keyof Location>(key: K, value: Location[K]) {
     onChangeLocation({ ...location, [key]: value });
-  }
-
-  /**
-   * 장소 대표 이미지를 업로드하고, 응답으로 받은 내부 자산 URL을 장소 데이터에 연결한다.
-   * 실제 저장 위치는 provider 설정에 따라 local 또는 Supabase Storage로 갈린다.
-   */
-  async function handleLocationImageUpload(file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    setUploadingImage(true);
-    try {
-      const res = await fetch(`/api/games/${gameId}/assets`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error ?? "이미지 업로드 실패");
-        return;
-      }
-
-      update("imageUrl", data.url);
-    } catch (error) {
-      console.error("장소 이미지 업로드 실패:", error);
-      alert("이미지 업로드 중 오류가 발생했습니다.");
-    } finally {
-      setUploadingImage(false);
-    }
   }
 
   return (
@@ -351,7 +321,7 @@ function LocationBlock({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDeleteLocation(); }}
+              onClick={(e) => { e.stopPropagation(); captureScrollAnchor(e); onDeleteLocation(); }}
               className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-500 transition-colors hover:border-red-900/50 hover:text-red-400"
             >
               삭제
@@ -450,21 +420,6 @@ function LocationBlock({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
-            <ImageAssetField
-              title="장소 대표 이미지"
-              description="장소 카드 이미지"
-              value={location.imageUrl}
-              alt={location.name || "장소 이미지 미리보기"}
-              profile="location"
-              onChange={(nextValue) => update("imageUrl", nextValue)}
-              onUpload={handleLocationImageUpload}
-              uploading={uploadingImage}
-              uploadLabel="이미지 업로드"
-              emptyStateLabel="아직 연결된 장소 이미지가 없습니다."
-            />
-          </section>
-
           {/* 획득 전 단서 미리보기 */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/45 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -510,7 +465,7 @@ function LocationBlock({
               </div>
               <button
                 type="button"
-                onClick={onAddClue}
+                onClick={(e) => { captureScrollAnchor(e); onAddClue(); }}
                 className="rounded-lg border border-mystery-900/60 bg-mystery-950/25 px-3 py-2 text-xs text-mystery-300 transition-colors hover:border-mystery-700 hover:bg-mystery-950/40"
               >
                 + 단서 추가
@@ -539,7 +494,7 @@ function LocationBlock({
                 {/* 연속 추가 시 위로 스크롤할 필요가 없도록 목록 하단에도 추가 버튼 노출 */}
                 <button
                   type="button"
-                  onClick={onAddClue}
+                  onClick={(e) => { captureScrollAnchor(e); onAddClue(); }}
                   className="w-full rounded-xl border border-dashed border-mystery-900/50 bg-mystery-950/15 py-2 text-xs text-mystery-300/80 transition-colors hover:border-mystery-700 hover:bg-mystery-950/30 hover:text-mystery-200"
                 >
                   + 단서 추가
@@ -577,6 +532,8 @@ function ClueForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const typeInfo = CLUE_TYPES.find((t) => t.value === clue.type);
   const isSharedClue = clue.type === "shared";
+  // 단서 삭제 시 panel 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
 
   function update<K extends keyof Clue>(key: K, value: Clue[K]) {
     onChange({ ...clue, [key]: value });
@@ -652,7 +609,7 @@ function ClueForm({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onClick={(e) => { e.stopPropagation(); captureScrollAnchor(e); onDelete(); }}
               className="rounded-lg border border-dark-700 px-2.5 py-1.5 text-xs text-dark-500 transition-colors hover:border-red-900/50 hover:text-red-400"
             >
               삭제
@@ -788,6 +745,9 @@ export default function LocationEditor({
   onChangeClues,
   onChangeRules,
 }: LocationEditorProps) {
+  // 장소·단서 추가/삭제로 panel(장소·단서 1개 이상 / 이름·설명 비어있음) 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
+
   function addLocation() {
     onChangeLocations([...locations, createLocation()]);
   }
@@ -836,9 +796,13 @@ export default function LocationEditor({
   }
 
   const totalClues = clues.length;
-  const locationsWithImages = locations.filter((location) => Boolean(location.imageUrl)).length;
   const lockedLocations = locations.filter((location) => location.unlocksAtRound !== null).length;
-  const conditionalClues = clues.filter((clue) => Boolean(clue.condition)).length;
+  const restrictedLocations = locations.filter(
+    (location) => location.unlocksAtRound === null && (location.ownerPlayerId || location.accessCondition),
+  ).length;
+  const publicLocations = locations.length - lockedLocations - restrictedLocations;
+  const ownedClues = clues.filter((clue) => clue.type !== "shared").length;
+  const sharedClues = clues.filter((clue) => clue.type === "shared").length;
   const cardTradingEnabled = rules.cardTrading?.enabled ?? true;
 
   return (
@@ -850,7 +814,7 @@ export default function LocationEditor({
             {locations.length}개 장소 · {totalClues}개 단서 — 단서는 장소에 배치되고, 플레이어가 방문해 획득합니다.
           </p>
         </div>
-        <Button size="sm" onClick={addLocation}>+ 장소 추가</Button>
+        <Button size="sm" onClick={(e) => { captureScrollAnchor(e); addLocation(); }}>+ 장소 추가</Button>
       </div>
 
       {/* 획득/방문 규칙 설정 */}
@@ -942,18 +906,21 @@ export default function LocationEditor({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "장소", value: `${locations.length}개` },
-          { label: "단서", value: `${totalClues}개` },
-          { label: "이미지", value: `${locationsWithImages}개` },
-          { label: "잠금/조건", value: `${lockedLocations + conditionalClues}개` },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-dark-800 bg-dark-900/45 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-dark-600">{item.label}</p>
-            <p className="mt-2 text-lg font-semibold text-dark-100">{item.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-dark-800 bg-dark-900/45 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-dark-600">장소</p>
+          <p className="mt-2 text-lg font-semibold text-dark-100">{locations.length}개</p>
+          <p className="mt-1 text-[11px] text-dark-500">
+            공개 {publicLocations} · 잠금 {lockedLocations} · 특정인 제한 {restrictedLocations}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-dark-800 bg-dark-900/45 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-dark-600">단서</p>
+          <p className="mt-2 text-lg font-semibold text-dark-100">{totalClues}개</p>
+          <p className="mt-1 text-[11px] text-dark-500">
+            획득 {ownedClues} · 공개 {sharedClues}
+          </p>
+        </div>
       </div>
 
       {locations.length === 0 ? (
@@ -965,7 +932,7 @@ export default function LocationEditor({
           </p>
           <button
             type="button"
-            onClick={addLocation}
+            onClick={(e) => { captureScrollAnchor(e); addLocation(); }}
             className="mt-3 text-sm text-mystery-400 hover:text-mystery-300 transition-colors"
           >
             + 첫 번째 장소 추가

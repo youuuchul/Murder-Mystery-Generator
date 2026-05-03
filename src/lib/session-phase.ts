@@ -1,5 +1,6 @@
 import type { GamePackage, GameRules } from "@/types/game";
 import type { GameSession, SharedState } from "@/types/session";
+import { resolveUncertainTriggers } from "@/lib/uncertain-resolver";
 
 export type SessionAdvanceConfirmKind = "opening" | "vote";
 export type SessionAdvanceRequestAction = "request" | "withdraw";
@@ -108,10 +109,54 @@ export function markPhaseStarted(sharedState: SharedState, now: string): void {
 }
 
 /**
+ * 미확신(uncertain) 캐릭터의 트리거 평가 결과를 SharedState에 적용한다.
+ *
+ * 호출 시점:
+ * - phase / currentRound 변경 후 (`round-reached` 트리거 평가)
+ * - 단서 acquire / shared 단서 reveal 후 (`clue-seen` 트리거 평가)
+ *
+ * 한 번 결정된 캐릭터는 다시 평가하지 않으므로 매 호출 비용 작음.
+ * 새로 결정된 항목은 eventLog에 기록 — 본인 카드 toast는 P5에서 별도 처리 (스포일러 방지를 위해
+ * 캐릭터 식별 정보는 eventLog에 노출하지 않음).
+ */
+export function applyUncertainResolutionUpdate(session: GameSession, game: GamePackage): void {
+  const result = resolveUncertainTriggers({
+    game,
+    sharedState: session.sharedState,
+    playerStates: session.playerStates,
+  });
+  if (!result.changed) return;
+  session.sharedState.uncertainResolutions = result.resolutions;
+
+  // 본인 카드 toast 메시지 — 메이커 입력값이 있으면 그것, 없으면 시스템 기본 문구.
+  const messages = session.sharedState.uncertainResolutionMessages ?? {};
+  for (const item of result.newlyResolved) {
+    const fallback = item.resolveAs === "culprit" ? "당신이 범인이었습니다." : "당신은 무고합니다.";
+    messages[item.playerId] = item.message?.trim() ? item.message : fallback;
+  }
+  session.sharedState.uncertainResolutionMessages = messages;
+
+  // eventLog는 모든 플레이어가 보므로 캐릭터/결과를 그대로 노출하지 않는다.
+  // 본인 카드 toast는 sharedState.uncertainResolutions / uncertainResolutionMessages를 클라이언트에서 비교해 표시.
+  session.sharedState.eventLog.push({
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    message: `미확신 캐릭터 ${result.newlyResolved.length}명의 입장이 결정됐습니다.`,
+    type: "phase_changed",
+  });
+}
+
+/**
  * 현재 세션을 다음 진행 단계로 한 칸 이동시킨다.
  * 플레이어 합의 진행과 GM 수동 진행이 같은 규칙을 쓰도록 공용 로직으로 둔다.
  */
 export function applySessionAdvanceStep(session: GameSession, game: GamePackage): void {
+  applySessionAdvanceStepInternal(session, game);
+  // phase/currentRound 변경 후 미확신 트리거 재평가 (round-reached 트리거 발동 가능).
+  applyUncertainResolutionUpdate(session, game);
+}
+
+function applySessionAdvanceStepInternal(session: GameSession, game: GamePackage): void {
   const { sharedState } = session;
   const maxRound = game.rules?.roundCount ?? 4;
   const now = new Date().toISOString();

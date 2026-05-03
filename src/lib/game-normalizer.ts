@@ -286,42 +286,59 @@ function normalizeAuthorNote(note: AuthorNote | undefined): AuthorNote {
  * 기존 `alibi` 중심 데이터와 신규 `story/timeline` 구조를 함께 받아
  * 현재 플레이어 편집기/플레이 화면에서 바로 쓸 수 있는 형태로 정규화한다.
  */
-function normalizePlayer(player: Player | undefined, timelineSlots: TimelineSlot[]): Player {
+function normalizePlayer(
+  player: Player | undefined,
+  timelineSlots: TimelineSlot[],
+  scoringEnabled: boolean = true,
+): Player {
   const legacyAlibi = asOptionalString(player?.alibi);
+  const victoryCondition = normalizeVictoryCondition(player?.victoryCondition);
+  const scoreConditions = Array.isArray(player?.scoreConditions)
+    ? player.scoreConditions.map(normalizeScoreCondition)
+    : [];
+
+  // 호환 마이그레이션: autoFromVictory 마커가 없는 기존 데이터에 모드별 자동 점수 항목을 보장.
+  // - 매칭 항목(culprit-outcome | manual)이 있으면 첫 항목에 마커만 박음 (idempotent).
+  // - 매칭 항목이 없으면 모드에 맞는 새 항목을 생성. scoringEnabled === false면 생성 skip.
+  if (!scoreConditions.some((sc) => sc.autoFromVictory === true)) {
+    const inputMode: "auto" | "personal-goal" | "uncertain" =
+      victoryCondition === "personal-goal" ? "personal-goal"
+      : victoryCondition === "uncertain" ? "uncertain"
+      : "auto";
+    if (inputMode === "auto" || inputMode === "uncertain") {
+      const idx = scoreConditions.findIndex((sc) => (sc.type ?? "manual") === "culprit-outcome");
+      if (idx >= 0) {
+        scoreConditions[idx] = { ...scoreConditions[idx], autoFromVictory: true };
+      } else if (scoringEnabled) {
+        scoreConditions.unshift({
+          description: "승리 조건 달성",
+          points: 5,
+          type: "culprit-outcome",
+          autoFromVictory: true,
+        });
+      }
+    } else {
+      const idx = scoreConditions.findIndex((sc) => (sc.type ?? "manual") === "manual");
+      if (idx >= 0) {
+        scoreConditions[idx] = { ...scoreConditions[idx], autoFromVictory: true };
+      } else if (scoringEnabled) {
+        const goalText = asTrimmedString(player?.personalGoal);
+        scoreConditions.unshift({
+          description: goalText || "개인 목표 달성",
+          points: 5,
+          type: "manual",
+          autoFromVictory: true,
+        });
+      }
+    }
+  }
 
   return {
     id: asTrimmedString(player?.id) || crypto.randomUUID(),
     name: asTrimmedString(player?.name),
-    victoryCondition: normalizeVictoryCondition(player?.victoryCondition),
+    victoryCondition,
     personalGoal: asOptionalString(player?.personalGoal),
-    scoreConditions: Array.isArray(player?.scoreConditions)
-      ? player.scoreConditions.map((condition) => {
-          const rawType = condition?.type;
-          const type: "manual" | "culprit-outcome" | "clue-ownership" | "vote-answer" =
-            rawType === "culprit-outcome" || rawType === "clue-ownership" || rawType === "vote-answer"
-              ? rawType
-              : "manual";
-          const config = condition?.config && typeof condition.config === "object"
-            ? {
-                expectedOutcome: condition.config.expectedOutcome === "arrested" || condition.config.expectedOutcome === "escaped"
-                  ? condition.config.expectedOutcome
-                  : undefined,
-                clueId: asOptionalString(condition.config.clueId),
-                expectedOwnership: condition.config.expectedOwnership === "has" || condition.config.expectedOwnership === "not-has"
-                  ? condition.config.expectedOwnership
-                  : undefined,
-                questionId: asOptionalString(condition.config.questionId),
-                expectedAnswerId: asOptionalString(condition.config.expectedAnswerId),
-              }
-            : undefined;
-          return {
-            description: asTrimmedString(condition?.description),
-            points: Number.isFinite(condition?.points) ? Number(condition.points) : 0,
-            type,
-            config,
-          };
-        })
-      : [],
+    scoreConditions,
     background: asTrimmedString(player?.background),
     story: asTrimmedString(player?.story) || legacyAlibi || "",
     secret: asTrimmedString(player?.secret),
@@ -337,7 +354,100 @@ function normalizePlayer(player: Player | undefined, timelineSlots: TimelineSlot
       ? player.relationships.map(normalizeRelationship)
       : [],
     cardImage: asOptionalString(player?.cardImage),
+    uncertainResolution: normalizeUncertainResolution(player?.uncertainResolution),
   };
+}
+
+/**
+ * 6 ScoreConditionType 정규화.
+ *
+ * 옛 `clue-ownership` 데이터 자동 마이그레이션:
+ * - `clue-ownership + config.clueId + expectedOwnership="has"` → `clue-collection + clueIds=[clueId] + clueCountMode="all"`
+ * - `expectedOwnership="not-has"` 케이스는 신규 시스템에 직접 대응 X — has로 변환(메이커가 보고 정정 권장).
+ */
+function normalizeScoreCondition(condition: unknown): import("@/types/game").ScoreCondition {
+  const c = (condition ?? {}) as Record<string, unknown>;
+
+  // legacy: clue-ownership → clue-collection 자동 변환
+  if (c.type === "clue-ownership") {
+    const legacyConfig = (c.config && typeof c.config === "object" ? c.config : {}) as Record<string, unknown>;
+    const legacyClueId = asOptionalString(legacyConfig.clueId);
+    return {
+      description: asTrimmedString(c.description),
+      points: Number.isFinite(c.points) ? Number(c.points) : 0,
+      type: "clue-collection",
+      config: {
+        clueIds: legacyClueId ? [legacyClueId] : [],
+        clueCountMode: "all",
+      },
+    };
+  }
+
+  return {
+    description: asTrimmedString(c.description),
+    points: Number.isFinite(c.points) ? Number(c.points) : 0,
+    type: normalizeScoreConditionType(c.type),
+    config: normalizeScoreConditionConfig(c.config),
+    autoFromVictory: c.autoFromVictory === true ? true : undefined,
+  };
+}
+
+function normalizeScoreConditionType(value: unknown): import("@/types/game").ScoreConditionType {
+  const allowed: import("@/types/game").ScoreConditionType[] = [
+    "manual",
+    "culprit-outcome",
+    "vote-answer",
+    "target-player-not-arrested",
+    "target-player-arrested",
+    "clue-collection",
+  ];
+  return allowed.includes(value as import("@/types/game").ScoreConditionType)
+    ? (value as import("@/types/game").ScoreConditionType)
+    : "manual";
+}
+
+function normalizeScoreConditionConfig(value: unknown): import("@/types/game").ScoreConditionConfig | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const c = value as Record<string, unknown>;
+  return {
+    expectedOutcome: c.expectedOutcome === "arrested" || c.expectedOutcome === "escaped" ? c.expectedOutcome : undefined,
+    questionId: asOptionalString(c.questionId),
+    expectedAnswerId: asOptionalString(c.expectedAnswerId),
+    targetPlayerId: asOptionalString(c.targetPlayerId),
+    clueIds: Array.isArray(c.clueIds) ? c.clueIds.map((id) => asTrimmedString(id)).filter(Boolean) : undefined,
+    clueCountMode:
+      c.clueCountMode === "all" || c.clueCountMode === "at-least-n" || c.clueCountMode === "per-clue"
+        ? c.clueCountMode
+        : undefined,
+    clueCountThreshold: Number.isFinite(c.clueCountThreshold) ? Number(c.clueCountThreshold) : undefined,
+  };
+}
+
+/** 미확신 트리거 정규화. triggers 빈 array면 트리거 미정 모드. */
+function normalizeUncertainResolution(value: unknown): import("@/types/game").UncertainResolution | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const triggers: import("@/types/game").UncertainResolutionTrigger[] = Array.isArray(v.triggers)
+    ? (v.triggers as unknown[]).map(normalizeUncertainTrigger).filter((t): t is import("@/types/game").UncertainResolutionTrigger => t !== null)
+    : [];
+  const defaultResolveAs = v.defaultResolveAs === "culprit" || v.defaultResolveAs === "innocent" ? v.defaultResolveAs : undefined;
+  const triggerMatch = v.triggerMatch === "all" ? "all" : "any";
+  return { triggers, triggerMatch, defaultResolveAs };
+}
+
+function normalizeUncertainTrigger(raw: unknown): import("@/types/game").UncertainResolutionTrigger | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+  const resolveAs = t.resolveAs === "culprit" || t.resolveAs === "innocent" ? t.resolveAs : null;
+  if (!resolveAs) return null;
+  const message = asOptionalString(t.message);
+  if (t.kind === "round-reached" && Number.isFinite(t.round)) {
+    return { kind: "round-reached", round: Number(t.round), resolveAs, message };
+  }
+  if (t.kind === "clue-seen" && asTrimmedString(t.clueId)) {
+    return { kind: "clue-seen", clueId: asTrimmedString(t.clueId), resolveAs, message };
+  }
+  return null;
 }
 
 /**
@@ -349,7 +459,6 @@ function normalizeLocation(location: Location | undefined): Location {
     id: asTrimmedString(location?.id) || crypto.randomUUID(),
     name: asTrimmedString(location?.name),
     description: asTrimmedString(location?.description),
-    imageUrl: asOptionalString(location?.imageUrl),
     unlocksAtRound: Number.isInteger(location?.unlocksAtRound) ? Number(location?.unlocksAtRound) : null,
     clueIds: Array.isArray(location?.clueIds)
       ? location.clueIds.map((id) => asTrimmedString(id)).filter(Boolean)
@@ -557,6 +666,9 @@ export function normalizeGame(game: GamePackage): GamePackage {
     },
     cluesPerRound: game.rules?.cluesPerRound ?? 2,
     allowLocationRevisit: game.rules?.allowLocationRevisit ?? false,
+    scoringEnabled: typeof game.rules?.scoringEnabled === "boolean" ? game.rules.scoringEnabled : true,
+    useRoundEvents: game.rules?.useRoundEvents === true ? true : false,
+    useLobbyScript: game.rules?.useLobbyScript === true ? true : false,
   };
 
   function normalizeSegment(segment: ScriptSegment | undefined): ScriptSegment {
@@ -575,6 +687,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
       imageUrl: asOptionalString(round.imageUrl),
       videoUrl: asOptionalString(round.videoUrl),
       backgroundMusic: asOptionalString(round.backgroundMusic),
+      enabled: round.enabled === true ? true : false,
     };
   }
 
@@ -611,6 +724,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     location: asOptionalString(game.story?.location),
     gmOverview: asOptionalString(game.story?.gmOverview) ?? asOptionalString(game.story?.synopsis),
     mapImageUrl: asOptionalString(game.story?.mapImageUrl),
+    defaultBackgroundMusic: asOptionalString(game.story?.defaultBackgroundMusic),
     timeline,
     culpritPlayerId: asTrimmedString(game.story?.culpritPlayerId),
     motive: asTrimmedString(game.story?.motive),
@@ -624,7 +738,7 @@ export function normalizeGame(game: GamePackage): GamePackage {
     rules,
     story,
     players: Array.isArray(game.players)
-      ? game.players.map((player) => normalizePlayer(player, story.timeline.slots))
+      ? game.players.map((player) => normalizePlayer(player, story.timeline.slots, rules.scoringEnabled !== false))
       : [],
     locations: Array.isArray(game.locations) ? game.locations.map(normalizeLocation) : [],
     clues: Array.isArray(game.clues) ? game.clues.map(normalizeClue) : [],

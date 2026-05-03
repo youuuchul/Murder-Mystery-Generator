@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useScrollAnchor } from "./useScrollAnchor";
 import { buildPlayersNpcsVictimTargets } from "@/lib/culprit";
 import type {
   AuthorNote,
@@ -90,6 +91,8 @@ function BranchStoryForm({
 }) {
   const [showMedia, setShowMedia] = useState(Boolean(branch.videoUrl || branch.backgroundMusic));
   const [expanded, setExpanded] = useState(true);
+  // 분기 삭제 시 panel(분기 1개 이상 / 검거 / 미검거) 변동 보존.
+  const captureScrollAnchor = useScrollAnchor();
 
   return (
     <div className="rounded-xl border border-dark-700/70 bg-dark-900/40 overflow-hidden">
@@ -114,7 +117,7 @@ function BranchStoryForm({
             {onDelete && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onClick={(e) => { e.stopPropagation(); captureScrollAnchor(e); onDelete(); }}
                 className="rounded-lg border border-dark-700 px-2.5 py-1.5 text-xs text-dark-500 hover:border-red-900/50 hover:text-red-400 transition-colors"
               >
                 삭제
@@ -266,6 +269,8 @@ export default function EndingEditor({
   const showBranches = !section || section === "branches";
   const showPersonal = section === "personal";
   const showAuthor = !section || section === "author";
+  // 작가 후기 토글 / 분기 추가/삭제로 panel 변동 시 viewport 보존.
+  const captureScrollAnchor = useScrollAnchor();
 
   // ── 분기 업데이트 헬퍼 ──
 
@@ -453,7 +458,7 @@ export default function EndingEditor({
                     </p>
                     <button
                       type="button"
-                      onClick={() => addBranch("custom-choice-matched", endingQuestion1.id)}
+                      onClick={(e) => { captureScrollAnchor(e); addBranch("custom-choice-matched", endingQuestion1.id); }}
                       className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
                     >
                       + 엔딩 분기 추가
@@ -569,7 +574,7 @@ export default function EndingEditor({
                           <p className="text-xs text-dark-400 font-medium">{q2.label || "2차 투표 질문"}</p>
                           <button
                             type="button"
-                            onClick={() => addBranch("vote-round-2-matched", q2.id)}
+                            onClick={(e) => { captureScrollAnchor(e); addBranch("vote-round-2-matched", q2.id); }}
                             className="text-xs text-mystery-400 hover:text-mystery-300 transition-colors"
                           >
                             + 엔딩 분기 추가
@@ -720,7 +725,10 @@ export default function EndingEditor({
             </div>
             <button
               type="button"
-              onClick={() => onChange({ ...ending, authorNotesEnabled: !ending.authorNotesEnabled })}
+              onClick={(e) => {
+                captureScrollAnchor(e);
+                onChange({ ...ending, authorNotesEnabled: !ending.authorNotesEnabled });
+              }}
               className={[
                 "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                 ending.authorNotesEnabled

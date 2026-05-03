@@ -10,12 +10,11 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: 1, label: "기본 설정", description: "태그·인원·난이도·시간" },
-  { id: 2, label: "오프닝 / 배경 설정", description: "오프닝·대표지도·피해자·NPC" },
-  { id: 3, label: "플레이어", description: "범인·배경·상세 스토리·비밀" },
-  { id: 4, label: "단서 카드", description: "물적 증거·증언·현장 단서" },
-  { id: 5, label: "스크립트", description: "대기실·라운드 가이드·미디어" },
-  { id: 6, label: "투표 & 엔딩", description: "투표·분기 엔딩·개인 엔딩·작가 후기" },
+  { id: 1, label: "기본 설정", description: "표지·기본 규칙·시간" },
+  { id: 2, label: "사건 개요", description: "오프닝·NPC·미디어" },
+  { id: 3, label: "플레이어", description: "캐릭터 정보·타임라인·AI 페르소나" },
+  { id: 4, label: "단서 카드", description: "장소 설정·단서 배치" },
+  { id: 5, label: "투표 & 엔딩", description: "범인·분기·작가 후기" },
 ];
 
 interface StepWizardProps {
@@ -160,37 +159,8 @@ export default function StepWizard({
         </div>
       </div>
 
-      {currentStepIssues.length > 0 && (
-        <div
-          className={`mt-4 rounded-xl border px-4 py-3 ${
-            getHighestValidationLevel(currentStepIssues) === "error"
-              ? "border-red-900 bg-red-950/20"
-              : "border-yellow-900 bg-yellow-950/20"
-          }`}
-        >
-          <p
-            className={`text-xs font-medium ${
-              getHighestValidationLevel(currentStepIssues) === "error"
-                ? "text-red-300"
-                : "text-yellow-300"
-            }`}
-          >
-            현재 단계에서 확인할 항목 {currentStepIssues.length}개
-          </p>
-          <ul className="mt-2 space-y-1">
-            {currentStepIssues.slice(0, 3).map((issue) => (
-              <li key={issue.id} className="text-xs text-dark-300">
-                {issue.level === "error" ? "• 필수" : "• 권장"}: {issue.message}
-              </li>
-            ))}
-          </ul>
-          {currentStepIssues.length > 3 && (
-            <p className="mt-2 text-[11px] text-dark-500">
-              나머지 항목은 단계 배지에 마우스를 올려 확인할 수 있습니다.
-            </p>
-          )}
-        </div>
-      )}
+      {/* 현재 단계 issue 상세는 MakerEditor 안의 "Step N 확인 항목" 카드(위치 보기 버튼 포함)가 단일 진실로 처리.
+          여기 중복 panel은 폐기(2026-05-03). step 배지 라벨 ("주의 N" / "확인 N")로 1차 알림만 유지. */}
     </div>
   );
 }

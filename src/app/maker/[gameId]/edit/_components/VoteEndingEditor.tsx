@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import CulpritSelectorBox from "./CulpritSelectorBox";
 import EndingEditor from "./EndingEditor";
-import { buildPlayersNpcsVictimTargets } from "@/lib/culprit";
+import { useScrollAnchor } from "./useScrollAnchor";
+import { buildPlayersNpcsVictimTargets, isCulpritIdValid, getVictoryConditionInputMode } from "@/lib/culprit";
 import type {
   EndingConfig,
   GamePackage,
@@ -113,9 +115,11 @@ function VoteQuestionForm({
               <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400">
                 {TARGET_MODE_LABELS[question.targetMode]}
               </span>
-              <span className="rounded-full border border-dark-700 bg-dark-900 px-2 py-0.5 text-[11px] text-dark-400">
-                {question.purpose === "personal" ? "개인 목표" : "엔딩 결정"}
-              </span>
+              {question.purpose === "personal" && (
+                <span className="rounded-full border border-purple-800 bg-purple-950/30 px-2 py-0.5 text-[11px] text-purple-200">
+                  {players.find((p) => p.id === question.personalTargetPlayerId)?.name?.trim() || "대상 미지정"}
+                </span>
+              )}
             </div>
             <p className="mt-1.5 text-sm font-medium text-dark-100">
               {question.label || <span className="text-dark-500 italic">질문 텍스트 없음</span>}
@@ -281,7 +285,7 @@ function VoteQuestionForm({
 
 // ─── Toggle Switch ────────────────────────────────────────
 
-function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
   return (
     <button
       type="button"
@@ -302,15 +306,11 @@ function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () =>
 interface VoteEndingEditorProps {
   game: GamePackage;
   onUpdate: (partial: Partial<GamePackage>) => void;
-  focusTarget?: string | null;
-  focusToken?: number;
 }
 
 export default function VoteEndingEditor({
   game,
   onUpdate,
-  focusTarget,
-  focusToken,
 }: VoteEndingEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("vote");
   const [showPreStory, setShowPreStory] = useState(Boolean(game.scripts.vote.narration?.trim()));
@@ -320,12 +320,9 @@ export default function VoteEndingEditor({
     (game.voteQuestions ?? []).some((q) => q.purpose === "personal")
   );
 
-  useEffect(() => {
-    if (!focusTarget) return;
-    if (focusTarget === "step-6-vote") setActiveTab("vote");
-    if (focusTarget === "step-6-branches") setActiveTab("ending");
-    if (focusTarget === "step-6-author-notes") setActiveTab("author");
-  }, [focusTarget, focusToken]);
+  // 옵션 토글로 layout shift가 발생해도 클릭 element의 viewport 위치를 보존.
+  // 자세한 동작은 `./useScrollAnchor.ts` 참조.
+  const captureScrollAnchor = useScrollAnchor();
 
   const ending = game.ending;
   const players = game.players ?? [];
@@ -402,6 +399,49 @@ export default function VoteEndingEditor({
     { id: "author", label: "작가 후기" },
   ];
 
+  // 범인 지정 변경 콜백 — 투표 탭 안 CulpritSelectorBox와 공유.
+  // 자동 파생 모드("기본") player의 victoryCondition을 새 culprit에 맞춰 동기화.
+  // override 모드("personal-goal" / "uncertain") player는 손대지 않는다.
+  function handleChangeCulprit(culpritId: string) {
+    const stillValid = isCulpritIdValid(culpritId, players, game.story);
+    const nextCulpritId = stillValid ? culpritId : "";
+    const syncedPlayers: Player[] = players.map((p) => {
+      if (getVictoryConditionInputMode(p) !== "auto") return p;
+      const expected: Player["victoryCondition"] = nextCulpritId === p.id ? "avoid-arrest" : "arrest-culprit";
+      return p.victoryCondition === expected ? p : { ...p, victoryCondition: expected };
+    });
+    const playersChanged = syncedPlayers.some((p, i) => p !== players[i]);
+    onUpdate({
+      story: { ...game.story, culpritPlayerId: nextCulpritId },
+      ...(playersChanged ? { players: syncedPlayers } : {}),
+    });
+  }
+  function handleChangeCulpritScope(mode: "players-only" | "players-and-npcs") {
+    const primary = voteQuestions.find((q) => q.purpose === "ending" && q.voteRound === 1);
+    if (primary) {
+      onUpdate({
+        voteQuestions: voteQuestions.map((q) =>
+          q.id === primary.id ? { ...q, targetMode: mode, choices: [] } : q,
+        ),
+      });
+      return;
+    }
+    onUpdate({
+      voteQuestions: [
+        {
+          id: crypto.randomUUID(),
+          voteRound: 1,
+          label: "",
+          targetMode: mode,
+          purpose: "ending",
+          sortOrder: 0,
+          choices: [],
+        },
+        ...voteQuestions,
+      ],
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -429,18 +469,61 @@ export default function VoteEndingEditor({
 
       {/* ─── 투표 탭 ─── */}
       {activeTab === "vote" && (
-        <div data-maker-anchor="step-6-vote" className="space-y-6">
+        <div data-maker-anchor="step-5-vote" className="space-y-6">
 
-          {/* 기본 투표 설정 */}
+          {/* 범인 지정 — 투표 정답 결정. Story.culpritPlayerId ↔ vote 주 질문 targetMode 양방향 동기화. */}
+          <CulpritSelectorBox
+            story={game.story}
+            syncedPlayers={players}
+            voteQuestions={voteQuestions}
+            onChangeCulprit={handleChangeCulprit}
+            onChangeCulpritScope={handleChangeCulpritScope}
+          />
+
+          {/* 기본 투표 설정
+              플레이어 화면 노출 순서(PlayerView.tsx:929~966)에 맞춰
+              [투표 전 안내] → [질문 텍스트] → [투표 대상] → [커스텀 선택지] 순서로 입력. */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-dark-100">기본 투표</p>
             </div>
 
-            {/* 질문 텍스트 */}
             {currentPrimary && (
               <div className="space-y-3">
-                <div>
+                {/* 1. 투표 전 안내 — 플레이어 화면에서 가장 먼저 표시되는 영역 */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-xs text-dark-500">투표 전 안내</label>
+                    <ToggleSwitch
+                      enabled={showPreStory}
+                      onToggle={(e) => {
+                        captureScrollAnchor(e);
+                        if (showPreStory) {
+                          setNarrationCache(voteScript.narration ?? "");
+                          updateVoteScript({ ...voteScript, narration: "" });
+                        } else {
+                          updateVoteScript({ ...voteScript, narration: narrationCache });
+                        }
+                        setShowPreStory(!showPreStory);
+                      }}
+                    />
+                  </div>
+                  {showPreStory && (
+                    <textarea
+                      rows={3}
+                      value={voteScript.narration}
+                      onChange={(e) => {
+                        updateVoteScript({ ...voteScript, narration: e.target.value });
+                        setNarrationCache(e.target.value);
+                      }}
+                      placeholder="예: 모든 조사가 끝났습니다. 이제 최종 투표를 시작합니다."
+                      className={inp + " resize-none"}
+                    />
+                  )}
+                </div>
+
+                {/* 2. 질문 텍스트 */}
+                <div className="border-t border-dark-800/80 pt-3">
                   <label className="block text-xs text-dark-500 mb-1">질문 텍스트</label>
                   <input
                     type="text"
@@ -451,32 +534,60 @@ export default function VoteEndingEditor({
                   />
                 </div>
 
-                {/* 선택지 옵션 */}
+                {/* 3. 투표 대상 — [범인 지정 따름 / 커스텀 선택지] 2-옵션 토글.
+                    "범인 지정 따름"은 위 CulpritSelectorBox의 후보군 모드(players-only / players-and-npcs)를 그대로 따라간다.
+                    "커스텀 선택지"는 targetMode="custom-choices"로 전환하고 메이커가 직접 선택지를 입력한다. */}
                 <div>
                   <label className="block text-xs text-dark-500 mb-1">투표 대상</label>
-                  <select
-                    value={currentPrimary.targetMode}
-                    onChange={(e) => {
-                      const mode = e.target.value as VoteTargetMode;
-                      updatePrimaryQuestion({
-                        targetMode: mode,
-                        choices: mode === "custom-choices" ? currentPrimary.choices : [],
-                      });
-                    }}
-                    className={inp}
-                  >
-                    {(Object.keys(TARGET_MODE_LABELS) as VoteTargetMode[]).map((m) => (
-                      <option key={m} value={m}>{TARGET_MODE_LABELS[m]}</option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        captureScrollAnchor(e);
+                        // 위 culprit 박스가 현재 어느 후보군 모드인지 보고 그 값으로 정렬.
+                        // 박스의 effectiveMode 결정 로직과 일관성을 맞춘다(NPC/피해자 범인이면 자동 확장).
+                        const culprit = game.story.culpritPlayerId;
+                        const isNonPlayerCulprit = Boolean(culprit) && !players.some((p) => p.id === culprit);
+                        const followMode: VoteTargetMode = isNonPlayerCulprit
+                          ? "players-and-npcs"
+                          : currentPrimary.targetMode === "players-and-npcs"
+                            ? "players-and-npcs"
+                            : "players-only";
+                        updatePrimaryQuestion({ targetMode: followMode, choices: [] });
+                      }}
+                      className={[
+                        "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                        currentPrimary.targetMode !== "custom-choices"
+                          ? "border-mystery-600 bg-mystery-950/40 text-mystery-200"
+                          : "border-dark-700 bg-dark-800/40 text-dark-400 hover:border-dark-500",
+                      ].join(" ")}
+                    >
+                      범인 지정 따름
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        captureScrollAnchor(e);
+                        updatePrimaryQuestion({ targetMode: "custom-choices" });
+                      }}
+                      className={[
+                        "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                        currentPrimary.targetMode === "custom-choices"
+                          ? "border-mystery-600 bg-mystery-950/40 text-mystery-200"
+                          : "border-dark-700 bg-dark-800/40 text-dark-400 hover:border-dark-500",
+                      ].join(" ")}
+                    >
+                      커스텀 선택지
+                    </button>
+                  </div>
                   {currentPrimary.targetMode !== "custom-choices" && (
                     <p className="text-xs text-dark-600 mt-1">
-                      자동 선택지 {buildAutoTargets(currentPrimary.targetMode, players, npcs, victim).length}개
+                      위 범인 지정의 후보군({TARGET_MODE_LABELS[currentPrimary.targetMode]})을 따라갑니다 · 자동 선택지 {buildAutoTargets(currentPrimary.targetMode, players, npcs, victim).length}개
                     </p>
                   )}
                 </div>
 
-                {/* 커스텀 선택지 */}
+                {/* 4. 커스텀 선택지 — targetMode === "custom-choices"일 때만 노출 */}
                 {currentPrimary.targetMode === "custom-choices" && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -523,50 +634,18 @@ export default function VoteEndingEditor({
             )}
           </section>
 
-          {/* 투표 전 안내 텍스트 (on/off) */}
-          <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-dark-100">투표 전 안내</p>
-              </div>
-              <ToggleSwitch
-                enabled={showPreStory}
-                onToggle={() => {
-                  if (showPreStory) {
-                    // off: 현재 값 캐시하고 빈 값으로 저장
-                    setNarrationCache(voteScript.narration ?? "");
-                    updateVoteScript({ ...voteScript, narration: "" });
-                  } else {
-                    // on: 캐시된 값 복원
-                    updateVoteScript({ ...voteScript, narration: narrationCache });
-                  }
-                  setShowPreStory(!showPreStory);
-                }}
-              />
-            </div>
-            {showPreStory && (
-              <textarea
-                rows={3}
-                value={voteScript.narration}
-                onChange={(e) => {
-                  updateVoteScript({ ...voteScript, narration: e.target.value });
-                  setNarrationCache(e.target.value);
-                }}
-                placeholder="예: 모든 조사가 끝났습니다. 이제 최종 투표를 시작합니다."
-                className={inp + " resize-none"}
-              />
-            )}
-          </section>
-
-          {/* 추가 투표 (개인 목표 질문) */}
+          {/* 개인 질문 (캐릭터별 개인 투표) */}
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-dark-100">추가 투표 (개인 목표)</p>
+                <p className="text-sm font-semibold text-dark-100">개인 질문</p>
               </div>
               <ToggleSwitch
                 enabled={showPersonalQuestions}
-                onToggle={() => setShowPersonalQuestions(!showPersonalQuestions)}
+                onToggle={(e) => {
+                  captureScrollAnchor(e);
+                  setShowPersonalQuestions(!showPersonalQuestions);
+                }}
               />
             </div>
 
@@ -604,11 +683,14 @@ export default function VoteEndingEditor({
           <section className="rounded-2xl border border-dark-800 bg-dark-900/55 p-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-dark-100">2차 투표</p>
+                <p className="text-sm font-semibold text-dark-100">2차 투표 <span className="text-xs font-normal text-dark-500">(기본 투표 추가 분기)</span></p>
               </div>
               <ToggleSwitch
                 enabled={advancedVotingEnabled}
-                onToggle={() => setAdvancedVoting(!advancedVotingEnabled)}
+                onToggle={(e) => {
+                  captureScrollAnchor(e);
+                  setAdvancedVoting(!advancedVotingEnabled);
+                }}
               />
             </div>
 
@@ -649,7 +731,7 @@ export default function VoteEndingEditor({
 
       {/* ─── 엔딩 탭 ─── */}
       {activeTab === "ending" && (
-        <div data-maker-anchor="step-6-branches">
+        <div data-maker-anchor="step-5-branches">
           <EndingEditor
             ending={ending}
             players={players}
@@ -679,7 +761,7 @@ export default function VoteEndingEditor({
 
       {/* ─── 작가 후기 탭 ─── */}
       {activeTab === "author" && (
-        <div data-maker-anchor="step-6-author-notes">
+        <div data-maker-anchor="step-5-author-notes">
           <EndingEditor
             ending={ending}
             players={players}

@@ -154,6 +154,19 @@ export interface SharedState {
   revoteCandidateIds?: string[];
   /** 동점 재투표 횟수. 0=최초 투표, 1=1차 재투표. 2차 재투표도 동점이면 랜덤 확정. */
   revoteCount?: number;
+  /**
+   * 미확신(uncertain) 캐릭터의 런타임 입장 결정.
+   * `Player.uncertainResolution.triggers`가 발동하면 그 결과("culprit" | "innocent")를 박는다.
+   * 본인 카드 라벨, AI 페르소나 컨텍스트, 점수 평가 모두 이 값을 우선시한다.
+   * key = playerId.
+   */
+  uncertainResolutions?: Record<string, "culprit" | "innocent">;
+  /**
+   * 미확신 트리거 발동 시 본인 카드에 띄울 메시지.
+   * 메이커가 트리거에 message를 입력했으면 그 값, 비워두면 시스템 기본 문구가 박힌다.
+   * key = playerId. uncertainResolutions가 박힐 때 동시에 기록된다.
+   */
+  uncertainResolutionMessages?: Record<string, string>;
 }
 
 /** 인벤토리에 보유한 단서 카드 1장 */
@@ -183,6 +196,12 @@ export interface PlayerState {
   roundAcquired: Record<string, number>;
   /** 라운드 → 해당 라운드에 방문한 locationId 목록 */
   roundVisitedLocations: Record<string, string[]>;
+  /**
+   * 본인이 모달로 직접 열람한 공용 단서 ID 목록.
+   * 인벤토리 보유와 별개 — 인벤토리에 안 들어간 공용 단서를 본인이 열람한 시점을 기록한다.
+   * 미확신(uncertain) 캐릭터의 `clue-seen` 트리거 평가에 인벤토리와 함께 사용.
+   */
+  viewedSharedClueIds?: string[];
 }
 
 export interface GameSession {

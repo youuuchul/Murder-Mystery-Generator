@@ -10,6 +10,7 @@ import { isMakerAdmin } from "@/lib/maker-role";
 import { getRequestMakerUser } from "@/lib/maker-user.server";
 import { mutateSessionWithRetry } from "@/lib/session-mutation";
 import { getSession, isSessionConflictError } from "@/lib/session-repository";
+import { applyUncertainResolutionUpdate } from "@/lib/session-phase";
 import { broadcast } from "@/lib/sse/broadcaster";
 import { publishSessionRealtime } from "@/lib/sse/realtime-publisher";
 import type { InventoryCard, PlayerState } from "@/types/session";
@@ -159,22 +160,55 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // 공용 단서(shared) 분기: 첫 발견자만 비용을 내고 이후엔 무료 열람.
     // 인벤토리에 넣지 않고 sharedState.acquiredClueIds에만 등록한다.
+    // 본인이 이 카드 모달을 연 시점은 PlayerState.viewedSharedClueIds로 별도 추적 — 미확신 clue-seen 트리거 평가에 사용.
     if (clue.type === "shared") {
       session.sharedState.acquiredClueIds = session.sharedState.acquiredClueIds ?? [];
       const alreadyDiscovered = session.sharedState.acquiredClueIds.includes(clueId);
 
       if (alreadyDiscovered) {
-        // 이미 발견된 shared — 비용/조건 체크 없이 내용만 반환.
-        return NextResponse.json({
-          action: "shared_view",
-          clue: {
-            id: clue.id,
-            title: clue.title,
-            description: clue.description,
-            imageUrl: clue.imageUrl,
-          },
-          sharedState: session.sharedState,
-        });
+        // 이미 발견된 shared — 본인 열람 기록만 push하고 미확신 트리거 재평가.
+        const alreadyViewed = (pState.viewedSharedClueIds ?? []).includes(clueId);
+        try {
+          const { session: persistedSession } = await mutateSessionWithRetry(
+            sessionId,
+            (latestSession) => {
+              const latestPS = latestSession.playerStates.find((p) => p.token === token);
+              if (!latestPS) return { skipped: true as const };
+              latestPS.viewedSharedClueIds = latestPS.viewedSharedClueIds ?? [];
+              if (!latestPS.viewedSharedClueIds.includes(clueId)) {
+                latestPS.viewedSharedClueIds.push(clueId);
+                applyUncertainResolutionUpdate(latestSession, game);
+              }
+              return { skipped: false as const };
+            },
+          );
+          if (!alreadyViewed) {
+            broadcast(sessionId, "session_update", { sharedState: persistedSession.sharedState });
+          }
+          return NextResponse.json({
+            action: "shared_view",
+            clue: {
+              id: clue.id,
+              title: clue.title,
+              description: clue.description,
+              imageUrl: clue.imageUrl,
+            },
+            sharedState: persistedSession.sharedState,
+          });
+        } catch (error) {
+          console.error("공용 단서 열람 기록 실패:", error);
+          // 기록 실패는 viewer 차단 사유 아님 — 기존 sharedState로 컨텐츠만 반환.
+          return NextResponse.json({
+            action: "shared_view",
+            clue: {
+              id: clue.id,
+              title: clue.title,
+              description: clue.description,
+              imageUrl: clue.imageUrl,
+            },
+            sharedState: session.sharedState,
+          });
+        }
       }
 
       // 첫 발견 — owned와 동일한 게이트를 거치되 인벤토리에는 넣지 않는다.
@@ -247,6 +281,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
             // 발견 처리: acquiredClueIds에 추가, 인벤토리에는 넣지 않음.
             latestSession.sharedState.acquiredClueIds.push(clueId);
+            // 발견자 본인은 카드 내용을 즉시 본 것으로 간주 — viewedSharedClueIds에도 등록.
+            latestPlayerState.viewedSharedClueIds = latestPlayerState.viewedSharedClueIds ?? [];
+            if (!latestPlayerState.viewedSharedClueIds.includes(clueId)) {
+              latestPlayerState.viewedSharedClueIds.push(clueId);
+            }
             latestPlayerState.roundAcquired = latestPlayerState.roundAcquired ?? {};
             latestPlayerState.roundAcquired[latestRoundKey] = (latestPlayerState.roundAcquired[latestRoundKey] ?? 0) + 1;
 
@@ -264,6 +303,9 @@ export async function POST(req: NextRequest, { params }: Params) {
               message: `${latestPlayerState.playerName}님이 공용 단서 "${clue.title}"을(를) 발견했습니다.`,
               type: "system",
             });
+
+            // 단서 노출 후 미확신 트리거 평가 — clue-seen 발동 가능.
+            applyUncertainResolutionUpdate(latestSession, game);
 
             return { raced: false as const };
           }
@@ -451,6 +493,9 @@ export async function POST(req: NextRequest, { params }: Params) {
             message: `${latestPlayerState.playerName}님이 단서를 획득했습니다.`,
             type: "card_received",
           });
+
+          // 단서 노출(owned 획득 또는 shared 공개) 후 미확신 트리거 평가 — clue-seen 발동 가능.
+          applyUncertainResolutionUpdate(latestSession, game);
 
           // 모든 AI 플레이어가 각각 1개씩 단서를 획득하도록 반복 호출
           const autoAcquireOutcomes: PlayerAgentAutoAcquireOutcome[] = [];

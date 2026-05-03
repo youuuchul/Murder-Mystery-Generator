@@ -2,7 +2,7 @@
 
 > **AI 에이전트(Claude, Codex 등)가 세션 시작 시 가장 먼저 읽어야 할 파일.**
 > 완료/진행중/미착수 상태는 이 파일이 기준이다.
-> 마지막 업데이트: 2026-04-30 (기본설정 시간/인원 입력 컨트롤 통합)
+> 마지막 업데이트: 2026-05-04 (승리조건/승점 자동 연동, Step 2 sub-tab, 미확신 트리거)
 
 ---
 
@@ -16,6 +16,21 @@
 ---
 
 ## 완료된 주요 기능
+
+### 메이커 — 승리조건 ↔ 승점 자동 연동 (2026-05-04)
+- [x] **미확신(uncertain) 트리거 시스템** — `Player.uncertainResolution` (라운드 진입/단서 확인 트리거 + AND/OR 매칭 + 결과). `SharedState.uncertainResolutions/Messages`로 런타임 결정 박힘. PlayerState 단위 평가 (`uncertain-resolver.ts`). 트리거 발동 시 본인 카드 toast (메이커 메시지 또는 시스템 기본). 캐릭터 정보 라벨 + AI 페르소나 컨텍스트 자동 변환. 마이그레이션 `20260503_000001_uncertain_resolution.sql`.
+- [x] **공용 단서 본인 열람 추적** — `PlayerState.viewedSharedClueIds`. 본인이 공용 단서 카드를 클릭 (`acquire`) 한 시점에만 `clue-seen` 트리거 발동. 다른 사람이 발견·공개해도 본인이 안 봤으면 미발동.
+- [x] **승점 자동 연동** (`ScoreCondition.autoFromVictory` 마커) — 승리조건 라디오(기본/개인 목표/미확신) 선택 시 자동 점수 항목 1개 자동 유지. `culprit-outcome`은 `displayedRole` 기반 자동 파생 (`score-evaluator.ts` deriveExpectedFromRole). 메이커 [승점] 탭에서는 read-only row + 다른 추가 점수와 동일 폼. 마이그레이션 `20260503_000002_scoring_enabled.sql`.
+- [x] **개인 목표 ↔ 승점 type 자동 연동** — 자유 텍스트 + 자동 평가 type 선택 (`수동 판정` / `target-player-not-arrested` / `target-player-arrested` / `clue-collection`) + type별 config 입력. score-evaluator가 type대로 자동 판정. per-clue 모드에서 `points × selected.length` 동적 계산 표시 (메이커는 최대 점수, 유저는 "1개당 N점"만 — 스포일러 안전).
+- [x] **단서 선택 UI 장소 그룹핑** — `groupCluesByLocation` 헬퍼. 셀렉트는 `<optgroup>`, 체크박스 그리드는 장소별 섹션 분리. ClueCollectionInput / UncertainResolutionEditor 둘 다 적용.
+
+### 메이커 — Step 1~5 구조 정리 (2026-05-04)
+- [x] **Step 2 sub-tab 분할** — `Step2Editor` 신설 (오프닝 / 피해자·NPC / 미디어·이벤트). 기존 `StoryEditor.tsx` 폐기. ScriptEditor 503→160줄 단순화 (대기실 탭/스크립트 헤더 제거, "이 라운드에서 열리는 장소"·"GM 보드 안내" 잔류 텍스트 제거). 라운드 카드 enabled 토글 + 게임 단위 `useRoundEvents`/`useLobbyScript` 토글 + `Story.defaultBackgroundMusic`(라운드 off 시 fallback). 마이그레이션 `20260503_000003_step2_round_lobby_toggles.sql`.
+- [x] **Step 1 라벨**: 표지·기본 규칙·시간
+- [x] **Step 2 라벨**: 사건 개요 (오프닝·NPC·미디어)
+- [x] **Step 3 캐릭터 카드 레이아웃** — 좌측 200px 이미지 사각형(클릭 시 모달, 바깥 클릭 닫힘) / 우측 이름·배경. "기본 정보" 탭 → "개인 정보". "중앙 타임라인" → "타임라인". 승리조건 영역 별도 섹션(모드별 컬러 톤) + 동적 서브 박스. 라디오 라벨 단축: 기본 / 개인 목표 / 미확신.
+- [x] **Step 4 정리** — `Location.imageUrl` 제거 (메이커/라이브 둘 다). stats 카드 4개 → 2개 (장소: 공개/잠금/특정인 제한 / 단서: 획득/공개).
+- [x] **Step 5 워딩**: "추가 투표 (개인 목표)" → "개인 질문". "2차 투표" → "2차 투표 (기본 투표 추가 분기)". 질문 카드 배지에 personalTargetPlayerId 캐릭터 이름 표시.
 
 ### 배포/인프라
 - [x] Vercel 배포 + 도메인 (murdermysterygenerator.shop) + SSL

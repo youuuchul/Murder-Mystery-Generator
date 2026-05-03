@@ -555,7 +555,13 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-dark-100">기본 룰</h3>
+          <p className="mt-0.5 text-xs text-dark-500">게임 진행에 영향을 주는 기본 설정입니다.</p>
+        </div>
+
+        <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <div
           data-maker-anchor="step-1-player-count"
           className="flex flex-col gap-3 rounded-xl border border-dark-800 bg-dark-900/45 p-4"
@@ -645,6 +651,38 @@ export default function SettingsEditor({ game, onChange }: SettingsEditorProps) 
               </button>
             ))}
           </div>
+        </div>
+        </div>
+
+        {/* 게임 단위 승점 시스템 toggle (사용자 결정 2026-05-03 — 승점 없이 승리조건만 있는 게임 표현). */}
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dark-800 bg-dark-900/45 p-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-dark-200">승점 시스템 사용</p>
+            <p className="mt-0.5 text-xs text-dark-500">
+              끄면 점수 숨김 — 승리 조건 라벨만 사용
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateRules({ scoringEnabled: !(rules.scoringEnabled ?? true) })}
+            aria-pressed={rules.scoringEnabled ?? true}
+            aria-label="승점 시스템 사용 여부"
+            className="shrink-0"
+          >
+            <span
+              className={[
+                "relative block h-6 w-11 rounded-full transition-colors",
+                (rules.scoringEnabled ?? true) ? "bg-mystery-600" : "bg-dark-600",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                  (rules.scoringEnabled ?? true) ? "translate-x-6" : "translate-x-1",
+                ].join(" ")}
+              />
+            </span>
+          </button>
         </div>
       </div>
 
